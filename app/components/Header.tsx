@@ -45,55 +45,6 @@ export default function Header() {
               <textPath href="#hArc">AFRICA ♥ HEART</textPath>
             </text>
 
-            {/* ── Elephant ── */}
-            <ellipse cx="76"  cy="87"  rx="10" ry="12" fill="#E8861A" stroke="#2a2a2a" strokeWidth="2" />
-            <ellipse cx="88"  cy="110" rx="21" ry="17" fill="#F5A623" stroke="#2a2a2a" strokeWidth="2" />
-            <circle  cx="88"  cy="90"  r="14"          fill="#F5A623" stroke="#2a2a2a" strokeWidth="2" />
-            <path d="M94,98 Q109,105 106,117 Q104,123 99,120" fill="none" stroke="#2a2a2a" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="92"   cy="87"   r="2.5" fill="#2a2a2a" />
-            <circle cx="92.8" cy="86.2" r="0.8" fill="white" />
-            <circle cx="86"   cy="94"   r="4"   fill="#FF9999" opacity="0.4" />
-
-            {/* ── Giraffe ── */}
-            <rect x="114" y="71" width="13" height="46" rx="5" fill="#F5A623" stroke="#2a2a2a" strokeWidth="2" />
-            <ellipse cx="117" cy="80" rx="3"   ry="2.2" fill="#C4680A" opacity="0.75" />
-            <ellipse cx="123" cy="91" rx="2.5" ry="2"   fill="#C4680A" opacity="0.75" />
-            <ellipse cx="116" cy="102" rx="2.2" ry="1.8" fill="#C4680A" opacity="0.75" />
-            <ellipse cx="120" cy="126" rx="14" ry="10"  fill="#F5A623" stroke="#2a2a2a" strokeWidth="2" />
-            <ellipse cx="120" cy="62"  rx="10" ry="8"   fill="#F5A623" stroke="#2a2a2a" strokeWidth="2" />
-            <line x1="115" y1="55" x2="112" y2="47" stroke="#2a2a2a" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="111" cy="46" r="2.2" fill="#E8861A" stroke="#2a2a2a" strokeWidth="1" />
-            <line x1="124" y1="55" x2="127" y2="47" stroke="#2a2a2a" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="128" cy="46" r="2.2" fill="#E8861A" stroke="#2a2a2a" strokeWidth="1" />
-            <circle cx="123"   cy="62"   r="2.5" fill="#2a2a2a" />
-            <circle cx="123.8" cy="61.2" r="0.8" fill="white" />
-            <path d="M117,68 Q120,71 123,68" fill="none" stroke="#2a2a2a" strokeWidth="1.5" strokeLinecap="round" />
-            <circle cx="115" cy="66" r="3.5" fill="#FF9999" opacity="0.4" />
-
-            {/* ── Lion ── */}
-            <line x1="162" y1="73" x2="162" y2="64" stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="175" y1="77" x2="181" y2="70" stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="183" y1="90" x2="192" y2="87" stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="183" y1="103" x2="192" y2="108" stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="175" y1="115" x2="180" y2="123" stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="149" y1="115" x2="144" y2="123" stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="141" y1="103" x2="132" y2="108" stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="141" y1="90"  x2="132" y2="87"  stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <line x1="149" y1="77"  x2="143" y2="70"  stroke="#FF8C00" strokeWidth="6" strokeLinecap="round" />
-            <circle cx="162" cy="97" r="22" fill="#FFA500" stroke="#2a2a2a" strokeWidth="2.5" />
-            <circle cx="162" cy="97" r="16" fill="#F5C842" stroke="#2a2a2a" strokeWidth="2" />
-            <circle cx="157" cy="94" r="2.5" fill="#2a2a2a" />
-            <circle cx="157.8" cy="93.2" r="0.8" fill="white" />
-            <circle cx="167" cy="94" r="2.5" fill="#2a2a2a" />
-            <circle cx="167.8" cy="93.2" r="0.8" fill="white" />
-            <ellipse cx="162" cy="100" rx="3.5" ry="2.5" fill="#CC3333" stroke="#2a2a2a" strokeWidth="1" />
-            <path d="M157,104 Q162,109 167,104" fill="none" stroke="#2a2a2a" strokeWidth="1.8" strokeLinecap="round" />
-            <circle cx="153" cy="100" r="1" fill="#2a2a2a" />
-            <circle cx="151" cy="102.5" r="1" fill="#2a2a2a" />
-            <circle cx="171" cy="100" r="1" fill="#2a2a2a" />
-            <circle cx="173" cy="102.5" r="1" fill="#2a2a2a" />
-            <circle cx="153" cy="103" r="4" fill="#FF9999" opacity="0.4" />
-            <circle cx="171" cy="103" r="4" fill="#FF9999" opacity="0.4" />
           </svg>
         </div>
 
