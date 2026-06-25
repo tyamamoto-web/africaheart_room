@@ -30,7 +30,7 @@ export const eventInfo = {
 export const defaultMembers: Member[] = [
   { id: "1", nickname: "よし",       role: "leader" },
   { id: "2", nickname: "くる",       role: "subleader" },
-  { id: "3", nickname: "しゃちょー", role: "subleader" },
+  { id: "3", nickname: "しゃちょー", role: "regular" },
   { id: "4", nickname: "たけ",       role: "regular" },
   { id: "5", nickname: "シュウ",     role: "regular" },
   { id: "6", nickname: "ハッシー",   role: "regular" },
