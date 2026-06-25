@@ -101,7 +101,8 @@ export default function RotationTable() {
             if (room === "A" || room === "B" || room === "C") groups[room].push(m);
             else groups.unassigned.push(m);
           }
-          const hasAny = groups.A.length + groups.B.length + groups.C.length > 0;
+          const usedRooms = (["A", "B", "C"] as const).filter((r) => groups[r].length > 0);
+          const hasAny = usedRooms.length > 0;
 
           return (
             <div key={slot.id} className="card overflow-hidden animate-fade-up">
@@ -123,8 +124,11 @@ export default function RotationTable() {
                   <p className="text-sm mt-1" style={{ color: "#ddd" }}>しばらくお待ちください</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 divide-x divide-gray-100">
-                  {(["A", "B", "C"] as const).map((room) => {
+                <div
+                  className="grid divide-x divide-gray-100"
+                  style={{ gridTemplateColumns: `repeat(${usedRooms.length}, minmax(0, 1fr))` }}
+                >
+                  {usedRooms.map((room) => {
                     const cfg = roomCfg[room];
                     const names = groups[room];
                     return (
@@ -134,15 +138,11 @@ export default function RotationTable() {
                           <span className="text-xs font-bold text-white/80">ルーム</span>
                         </div>
                         <div className="px-2 py-3 flex flex-col gap-2 min-h-[52px]">
-                          {names.length === 0 ? (
-                            <p className="text-sm text-center" style={{ color: "#ccc" }}>—</p>
-                          ) : (
-                            names.map((m) => (
-                              <p key={m.id} className="text-sm font-semibold text-center leading-snug" style={{ color: "#2c2c2c" }}>
-                                {m.nickname}
-                              </p>
-                            ))
-                          )}
+                          {names.map((m) => (
+                            <p key={m.id} className="text-base font-semibold text-center leading-snug" style={{ color: "#2c2c2c" }}>
+                              {m.nickname}
+                            </p>
+                          ))}
                         </div>
                       </div>
                     );

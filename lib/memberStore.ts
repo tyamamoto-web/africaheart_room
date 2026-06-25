@@ -2,7 +2,7 @@
 
 import { Member, defaultMembers } from "./data";
 
-const STORAGE_KEY = "africaheart_members_v2";
+const STORAGE_KEY = "africaheart_members_v3";
 
 export function getMembers(): Member[] {
   if (typeof window === "undefined") return defaultMembers;

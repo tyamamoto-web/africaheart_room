@@ -9,12 +9,12 @@ export type EventSetup = {
   rotations: Record<string, Record<string, RoomKey>>;
 };
 
-const STORAGE_KEY = "africaheart_event_v2";
+const STORAGE_KEY = "africaheart_event_v3";
 
 function defaultSetup(): EventSetup {
   return {
     attendanceIds: defaultMembers.map((m) => m.id),
-    rotations: {},
+    rotations: defaultRotations,
   };
 }
 
