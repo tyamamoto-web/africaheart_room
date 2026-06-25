@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { timeSlots, defaultMembers, defaultRotations } from "@/lib/data";
 import { getMembers } from "@/lib/memberStore";
-import { getEventSetup, getRotationGroups } from "@/lib/eventStore";
+import { getEventSetup } from "@/lib/eventStore";
 import type { Member } from "@/lib/data";
 import type { EventSetup } from "@/lib/eventStore";
 
@@ -47,7 +47,15 @@ export default function Schedule() {
         {timeSlots.map((slot) => {
           /* ── Rotation ── */
           if (slot.type === "rotation") {
-            const groups = getRotationGroups(slot.id, members);
+            const assignments = setup.rotations[slot.id] ?? {};
+            const attending = new Set(setup.attendanceIds);
+            const groups: Record<"A" | "B" | "C", Member[]> = { A: [], B: [], C: [] };
+            for (const m of members) {
+              if (!attending.has(m.id)) continue;
+              const room = assignments[m.id];
+              if (room === "A" || room === "B" || room === "C") groups[room].push(m);
+            }
+            const usedRooms = (["A", "B", "C"] as const).filter((r) => groups[r].length > 0);
             return (
               <div key={slot.id} className="card px-4 py-3.5 animate-fade-up">
                 <div className="flex items-center gap-3 mb-3">
@@ -59,27 +67,27 @@ export default function Schedule() {
                   </div>
                   <p className="text-sm font-bold" style={{ color: "#2c2c2c" }}>{slot.label}</p>
                 </div>
-                <div className="flex gap-2">
-                  {(["A","B","C"] as const).map((room) => (
-                    <div key={room} className="flex-1 rounded-xl px-2 py-2" style={{ background: "#f4f0ea" }}>
-                      <div
-                        className="text-center text-xs font-black mb-1.5 rounded-lg py-0.5 text-white"
-                        style={{ background: roomAccent[room] }}
-                      >
-                        {room}
-                      </div>
-                      {groups[room].length === 0 ? (
-                        <p className="text-[10px] text-center" style={{ color: "#ccc" }}>—</p>
-                      ) : (
-                        groups[room].map((m) => (
-                          <p key={m.id} className="text-[10px] text-center leading-relaxed" style={{ color: "#555" }}>
+                {usedRooms.length === 0 ? (
+                  <p className="text-xs text-center py-2" style={{ color: "#ccc" }}>部屋割りは設定中です</p>
+                ) : (
+                  <div className="flex gap-2">
+                    {usedRooms.map((room) => (
+                      <div key={room} className="flex-1 rounded-xl px-2 py-2" style={{ background: "#f4f0ea" }}>
+                        <div
+                          className="text-center text-xs font-black mb-1.5 rounded-lg py-0.5 text-white"
+                          style={{ background: roomAccent[room] }}
+                        >
+                          {room}
+                        </div>
+                        {groups[room].map((m) => (
+                          <p key={m.id} className="text-xs text-center leading-relaxed" style={{ color: "#444" }}>
                             {m.nickname}
                           </p>
-                        ))
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           }
