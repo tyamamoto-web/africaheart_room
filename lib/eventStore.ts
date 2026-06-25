@@ -9,7 +9,7 @@ export type EventSetup = {
   rotations: Record<string, Record<string, RoomKey>>;
 };
 
-const STORAGE_KEY = "africaheart_event_v3";
+const STORAGE_KEY = "africaheart_event_v4";
 
 function defaultSetup(): EventSetup {
   return {
