@@ -44,7 +44,7 @@ export default function RotationTable() {
     <section className="px-4 pb-4">
       <div className="flex items-center gap-3 mb-4 max-w-lg mx-auto">
         <div className="h-px flex-1" style={{ background: "#d8d0c8" }} />
-        <p className="text-xs font-bold tracking-widest uppercase" style={{ color: "#aaa" }}>部屋割り一覧</p>
+        <p className="text-xs font-bold tracking-widest uppercase" style={{ color: "#aaa" }}>本日のタイムテーブル</p>
         <div className="h-px flex-1" style={{ background: "#d8d0c8" }} />
       </div>
 
