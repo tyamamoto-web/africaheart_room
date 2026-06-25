@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { timeSlots, defaultMembers } from "@/lib/data";
 import { getMembers } from "@/lib/memberStore";
 import { getEventSetup } from "@/lib/eventStore";
+import DownloadTableButton from "./DownloadTableButton";
 import type { Member } from "@/lib/data";
 import type { EventSetup, RoomKey } from "@/lib/eventStore";
 
@@ -48,6 +49,8 @@ export default function RotationTable() {
         <p className="text-xs font-bold tracking-widest uppercase" style={{ color: "#aaa" }}>本日のタイムテーブル</p>
         <div className="h-px flex-1" style={{ background: "#d8d0c8" }} />
       </div>
+
+      <DownloadTableButton />
 
       <div className="max-w-lg mx-auto flex flex-col gap-4">
         {timeSlots.map((slot) => {
