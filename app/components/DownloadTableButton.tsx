@@ -117,8 +117,12 @@ function buildAndDownload() {
   const tableH = headH + rowHeights.reduce((a, b) => a + b, 0);
   const H = titleH + tableH + padX;
 
-  // ── 高解像度キャンバス ──
-  const scale = Math.min(4, Math.max(3, Math.ceil((window.devicePixelRatio || 1) * 1.5)));
+  const isIOS =
+    /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  // ── 高解像度キャンバス（iOSは描画上限対策で3倍に抑制）──
+  const scale = isIOS ? 3 : Math.min(4, Math.max(3, Math.ceil((window.devicePixelRatio || 1) * 1.5)));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(W * scale);
   canvas.height = Math.round(H * scale);
@@ -266,28 +270,83 @@ function buildAndDownload() {
   ctx.stroke();
   ctx.restore();
 
-  // ── PNG 出力 & ダウンロード ──
+  // ── PNG 出力 & 保存 ──
+  // toBlob は非同期でタップ操作の文脈が切れ iOS で共有/保存がブロックされるため、
+  // 同期的な toDataURL を使ってユーザー操作の流れの中で保存処理を行う。
   const fileName = "africaheart_部屋割り表.png";
-  const isIOS =
-    /iP(hone|ad|od)/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const dataUrl = canvas.toDataURL("image/png");
+  const blob = dataUrlToBlob(dataUrl);
 
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    if (isIOS) {
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } else {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-  }, "image/png");
+  const nav = navigator as Navigator & {
+    canShare?: (d: { files: File[] }) => boolean;
+    share?: (d: { files: File[]; title?: string }) => Promise<void>;
+  };
+
+  let file: File | null = null;
+  try {
+    file = new File([blob], fileName, { type: "image/png" });
+  } catch {
+    file = null;
+  }
+
+  // iOS（モバイル）: 共有シート経由で「画像を保存」
+  if (isIOS && file && nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+    nav.share({ files: [file], title: "部屋割り表" }).catch(() => {
+      showImageOverlay(dataUrl); // キャンセル以外の失敗時は長押し保存にフォールバック
+    });
+    return;
+  }
+
+  // iOS で共有が使えない場合: 画像を全画面表示し長押しで保存
+  if (isIOS) {
+    showImageOverlay(dataUrl);
+    return;
+  }
+
+  // PC・Android: 通常ダウンロード
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+// dataURL → Blob（同期）
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [head, b64] = dataUrl.split(",");
+  const mime = (head.match(/:(.*?);/) || [])[1] || "image/png";
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+// iOS フォールバック: 画像を全画面表示（長押しで「写真に追加」）
+function showImageOverlay(dataUrl: string): void {
+  const ov = document.createElement("div");
+  ov.style.cssText =
+    "position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;overflow:auto;";
+  const tip = document.createElement("p");
+  tip.textContent = "画像を長押しして「写真に追加」で保存できます";
+  tip.style.cssText = "color:#fff;font-size:14px;font-weight:700;text-align:center;margin:0;";
+  const img = document.createElement("img");
+  img.src = dataUrl;
+  img.style.cssText = "max-width:100%;height:auto;border-radius:8px;background:#fff;";
+  const close = document.createElement("button");
+  close.textContent = "閉じる";
+  close.style.cssText =
+    "margin-top:6px;padding:10px 28px;border:none;border-radius:9999px;background:#fff;color:#222;font-size:14px;font-weight:700;";
+  close.onclick = () => ov.remove();
+  ov.appendChild(tip);
+  ov.appendChild(img);
+  ov.appendChild(close);
+  ov.addEventListener("click", (e) => {
+    if (e.target === ov) ov.remove();
+  });
+  document.body.appendChild(ov);
 }
 
 export default function DownloadTableButton() {
