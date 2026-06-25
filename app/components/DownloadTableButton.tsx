@@ -19,46 +19,101 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-/** 部屋割り表（4コマ）を高解像度・透明背景のPNGとして描画してダウンロード */
+// 絵文字・記号を除去（モノトーン維持のため）。uフラグを使わずサロゲートペアで対応
+function stripEmoji(s: string): string {
+  return s
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "") // 補助面の絵文字
+    .replace(/[☀-➿←-⇿⬀-⯿︀-️‍™ℹ]/g, "") // BMPの記号
+    .trim();
+}
+
+// 日本語向け：幅に合わせて文字単位で折り返し
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let cur = "";
+  for (const ch of text) {
+    const test = cur + ch;
+    if (ctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur);
+      cur = ch;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [""];
+}
+
+type Row =
+  | { kind: "rotation"; start: string; end: string; rooms: Record<RoomKey, Member[]> }
+  | { kind: "event"; start: string; end: string; label: string; detail: string };
+
+/** 全タイムテーブル（コマ＋イベント）を高解像度・透明背景のPNGとして描画してダウンロード */
 function buildAndDownload() {
   const members = getMembers();
   const setup = getEventSetup();
   const attending = new Set(setup.attendanceIds);
 
-  const rotationSlots = timeSlots.filter((s) => s.type === "rotation");
-
-  // 各コマの A/B/C グループを算出
-  type SlotData = { start: string; end: string; rooms: Record<RoomKey, Member[]> };
-  const data: SlotData[] = rotationSlots.map((slot) => {
-    const assign = setup.rotations[slot.id] ?? {};
-    const rooms: Record<RoomKey, Member[]> = { A: [], B: [], C: [] };
-    for (const m of members) {
-      if (!attending.has(m.id)) continue;
-      const r = assign[m.id];
-      if (r === "A" || r === "B" || r === "C") rooms[r].push(m);
+  // 全スロットを行データへ変換
+  const rows: Row[] = timeSlots.map((slot) => {
+    if (slot.type === "rotation") {
+      const assign = setup.rotations[slot.id] ?? {};
+      const r: Record<RoomKey, Member[]> = { A: [], B: [], C: [] };
+      for (const m of members) {
+        if (!attending.has(m.id)) continue;
+        const k = assign[m.id];
+        if (k === "A" || k === "B" || k === "C") r[k].push(m);
+      }
+      return { kind: "rotation", start: slot.startTime, end: slot.endTime, rooms: r };
     }
-    return { start: slot.startTime, end: slot.endTime, rooms };
+    return {
+      kind: "event",
+      start: slot.startTime,
+      end: slot.endTime,
+      label: stripEmoji(slot.label),
+      detail: slot.detail ? stripEmoji(slot.detail) : "",
+    };
   });
 
-  // 使用されている部屋（列）を決定
   const usedRooms = (["A", "B", "C"] as const).filter((r) =>
-    data.some((d) => d.rooms[r].length > 0)
+    rows.some((row) => row.kind === "rotation" && row.rooms[r].length > 0)
   );
 
   // ── レイアウト寸法（論理px）──
-  const W = 820;
+  const W = 860;
   const padX = 28;
   const titleH = 88;
   const headH = 56;
   const lineH = 40;
   const cellPadV = 20;
-  const timeW = 188;
-  const roomW = (W - padX * 2 - timeW) / usedRooms.length;
+  const timeW = 178;
+  const contentW = W - padX * 2 - timeW; // 右側（部屋 or イベント）全体幅
+  const roomW = contentW / usedRooms.length;
+  const x0 = padX;
+  const x1 = x0 + timeW;
+  const tableTop = titleH;
+  const tableW = W - padX * 2;
 
-  const rowHeights = data.map((d) => {
-    const maxN = Math.max(1, ...usedRooms.map((r) => d.rooms[r].length));
-    return maxN * lineH + cellPadV * 2;
+  // 高さ計測用の一時コンテキスト
+  const meas = document.createElement("canvas").getContext("2d")!;
+  const eventDetailFont = `500 16px ${FONT}`;
+
+  // 各行の高さを算出
+  const rowHeights = rows.map((row) => {
+    if (row.kind === "rotation") {
+      const maxN = Math.max(1, ...usedRooms.map((r) => row.rooms[r].length));
+      return maxN * lineH + cellPadV * 2;
+    }
+    // event
+    let h = cellPadV * 2 + 28; // ラベル
+    if (row.detail) {
+      meas.font = eventDetailFont;
+      const lines = wrapText(meas, row.detail, contentW - 36);
+      h += 6 + lines.length * 22;
+    }
+    return Math.max(72, h);
   });
+
   const tableH = headH + rowHeights.reduce((a, b) => a + b, 0);
   const H = titleH + tableH + padX;
 
@@ -71,29 +126,40 @@ function buildAndDownload() {
   ctx.scale(scale, scale);
   ctx.textBaseline = "middle";
 
-  const x0 = padX;
-  const x1 = x0 + timeW;
-  const tableTop = titleH;
-  const tableW = W - padX * 2;
-
   // モノトーン配色
   const INK = "#222222";
   const SUB = "#7a7a7a";
   const LINE = "#c9c7c2";
   const LINE_STRONG = "#5e5c58";
+  const HALO = "rgba(255,255,255,0.95)";
+
+  const haloText = (
+    text: string,
+    x: number,
+    y: number,
+    font: string,
+    color: string,
+    align: CanvasTextAlign = "center"
+  ) => {
+    ctx.save();
+    ctx.shadowColor = HALO;
+    ctx.shadowBlur = 5;
+    ctx.textAlign = align;
+    ctx.fillStyle = color;
+    ctx.font = font;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  };
+
+  // 時間（2行：start / 〜end）を縦中央に描画
+  const drawTime = (cx: number, mid: number, start: string, end: string) => {
+    haloText(start, cx, mid - 11, `800 20px ${FONT}`, INK);
+    haloText("〜" + end, cx, mid + 12, `600 15px ${FONT}`, SUB);
+  };
 
   // ── タイトル ──
-  ctx.save();
-  ctx.shadowColor = "rgba(255,255,255,0.95)";
-  ctx.shadowBlur = 5;
-  ctx.textAlign = "center";
-  ctx.fillStyle = INK;
-  ctx.font = `800 30px ${FONT}`;
-  ctx.fillText("部屋割り表", W / 2, 34);
-  ctx.fillStyle = SUB;
-  ctx.font = `600 17px ${FONT}`;
-  ctx.fillText(`${eventInfo.title}　${eventInfo.date}`, W / 2, 64);
-  ctx.restore();
+  haloText("部屋割り表", W / 2, 34, `800 30px ${FONT}`, INK);
+  haloText(`${eventInfo.title}　${eventInfo.date}`, W / 2, 64, `600 17px ${FONT}`, SUB);
 
   // ── 外枠 ──
   ctx.save();
@@ -104,20 +170,11 @@ function buildAndDownload() {
   ctx.restore();
 
   // ── ヘッダー行 ──
-  ctx.save();
-  ctx.shadowColor = "rgba(255,255,255,0.9)";
-  ctx.shadowBlur = 4;
-  ctx.fillStyle = INK;
-  ctx.textAlign = "center";
-  ctx.font = `800 19px ${FONT}`;
-  ctx.fillText("時間", x0 + timeW / 2, tableTop + headH / 2);
+  haloText("時間", x0 + timeW / 2, tableTop + headH / 2, `800 19px ${FONT}`, INK);
   usedRooms.forEach((r, i) => {
     const cx = x1 + roomW * i + roomW / 2;
-    ctx.font = `800 19px ${FONT}`;
-    ctx.fillStyle = INK;
-    ctx.fillText(`${r}ルーム`, cx, tableTop + headH / 2);
+    haloText(`${r}ルーム`, cx, tableTop + headH / 2, `800 19px ${FONT}`, INK);
   });
-  ctx.restore();
 
   // ヘッダー下の区切り線
   ctx.save();
@@ -129,14 +186,14 @@ function buildAndDownload() {
   ctx.stroke();
   ctx.restore();
 
-  // ── 各コマ行 ──
+  // ── 各行 ──
   let y = tableTop + headH;
-  data.forEach((d, idx) => {
+  rows.forEach((row, idx) => {
     const rh = rowHeights[idx];
-    const rowMid = y + rh / 2;
+    const mid = y + rh / 2;
 
-    // 行区切り線（最後の行以外）
-    if (idx < data.length - 1) {
+    // 行下の区切り線（最終行以外）
+    if (idx < rows.length - 1) {
       ctx.save();
       ctx.strokeStyle = LINE;
       ctx.lineWidth = 1;
@@ -147,59 +204,66 @@ function buildAndDownload() {
       ctx.restore();
     }
 
-    // 時間（縦中央）
-    ctx.save();
-    ctx.shadowColor = "rgba(255,255,255,0.95)";
-    ctx.shadowBlur = 4;
-    ctx.textAlign = "center";
-    ctx.fillStyle = INK;
-    ctx.font = `800 20px ${FONT}`;
-    ctx.fillText(d.start, x0 + timeW / 2, rowMid - 13);
-    ctx.fillStyle = SUB;
-    ctx.font = `600 16px ${FONT}`;
-    ctx.fillText("〜", x0 + timeW / 2, rowMid + 6);
-    ctx.fillStyle = INK;
-    ctx.font = `800 20px ${FONT}`;
-    ctx.fillText(d.end, x0 + timeW / 2, rowMid + 25);
-    ctx.restore();
+    // 時間
+    drawTime(x0 + timeW / 2, mid, row.start, row.end);
 
-    // 各部屋のメンバー名（縦並び・中央寄せ）
-    usedRooms.forEach((r, i) => {
-      const cx = x1 + roomW * i + roomW / 2;
-      const names = d.rooms[r];
-      const blockH = names.length * lineH;
-      let ny = rowMid - blockH / 2 + lineH / 2;
+    if (row.kind === "rotation") {
+      // 部屋ごとのメンバー名
+      usedRooms.forEach((r, i) => {
+        const cx = x1 + roomW * i + roomW / 2;
+        const names = row.rooms[r];
+        const blockH = names.length * lineH;
+        let ny = mid - blockH / 2 + lineH / 2;
+        if (names.length === 0) {
+          haloText("—", cx, mid, `600 21px ${FONT}`, "#bdbbb6");
+        }
+        for (const m of names) {
+          haloText(m.nickname, cx, ny, `600 21px ${FONT}`, INK);
+          ny += lineH;
+        }
+      });
+
+      // 部屋間の縦区切り線（この行のみ）
       ctx.save();
-      ctx.shadowColor = "rgba(255,255,255,0.95)";
-      ctx.shadowBlur = 5;
-      ctx.textAlign = "center";
-      ctx.fillStyle = INK;
-      ctx.font = `600 21px ${FONT}`;
-      for (const m of names) {
-        ctx.fillText(m.nickname, cx, ny);
-        ny += lineH;
-      }
-      if (names.length === 0) {
-        ctx.fillStyle = "#bdbbb6";
-        ctx.fillText("—", cx, rowMid);
+      ctx.strokeStyle = LINE;
+      ctx.lineWidth = 1;
+      for (let i = 1; i < usedRooms.length; i++) {
+        const cx = x1 + roomW * i;
+        ctx.beginPath();
+        ctx.moveTo(cx, y + 8);
+        ctx.lineTo(cx, y + rh - 8);
+        ctx.stroke();
       }
       ctx.restore();
-    });
+    } else {
+      // イベント：内容を横いっぱいに表示
+      const ccx = x1 + contentW / 2;
+      if (row.detail) {
+        meas.font = eventDetailFont;
+        const lines = wrapText(meas, row.detail, contentW - 36);
+        const labelY = mid - (6 + lines.length * 22) / 2;
+        haloText(row.label, ccx, labelY, `800 21px ${FONT}`, INK);
+        let dy = labelY + 18 + 11;
+        for (const ln of lines) {
+          haloText(ln, ccx, dy, eventDetailFont, SUB);
+          dy += 22;
+        }
+      } else {
+        haloText(row.label, ccx, mid, `800 21px ${FONT}`, INK);
+      }
+    }
 
     y += rh;
   });
 
-  // 縦の列区切り線
+  // 時間列の縦区切り線（全高）
   ctx.save();
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 1;
-  const colXs = [x1, ...usedRooms.slice(0, -1).map((_, i) => x1 + roomW * (i + 1))];
-  for (const cx of colXs) {
-    ctx.beginPath();
-    ctx.moveTo(cx, tableTop + 12);
-    ctx.lineTo(cx, tableTop + tableH - 12);
-    ctx.stroke();
-  }
+  ctx.strokeStyle = LINE_STRONG;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(x1, tableTop + 10);
+  ctx.lineTo(x1, tableTop + tableH - 10);
+  ctx.stroke();
   ctx.restore();
 
   // ── PNG 出力 & ダウンロード ──
@@ -212,7 +276,6 @@ function buildAndDownload() {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     if (isIOS) {
-      // iOS: 新規タブで開き、長押しで写真に保存
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } else {
