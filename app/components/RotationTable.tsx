@@ -7,10 +7,11 @@ import { getEventSetup } from "@/lib/eventStore";
 import type { Member } from "@/lib/data";
 import type { EventSetup, RoomKey } from "@/lib/eventStore";
 
+// コマ表はモノトーン（イベントカードのカラーを引き立てるため）
 const roomCfg = {
-  A: { gradient: "linear-gradient(135deg,#ff6b6b,#ff9a5c)", bg: "#fff4f4", color: "#ff6b6b" },
-  B: { gradient: "linear-gradient(135deg,#845ef7,#cc5de8)", bg: "#f7f3ff", color: "#845ef7" },
-  C: { gradient: "linear-gradient(135deg,#339af0,#22d3ee)", bg: "#f0f8ff", color: "#339af0" },
+  A: { gradient: "linear-gradient(135deg,#6b6b6b,#8a8a8a)", bg: "#f6f5f3", color: "#555" },
+  B: { gradient: "linear-gradient(135deg,#7e7e7e,#9e9e9e)", bg: "#f3f2f0", color: "#555" },
+  C: { gradient: "linear-gradient(135deg,#909090,#b0b0b0)", bg: "#f1f0ee", color: "#555" },
 } as const;
 
 const eventGrad: Record<string, string> = {
@@ -106,15 +107,11 @@ export default function RotationTable() {
 
           return (
             <div key={slot.id} className="card overflow-hidden animate-fade-up">
-              {/* Header */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: "#f0ece5" }}>
-                <div
-                  className="px-3 py-1.5 rounded-xl text-sm font-black text-white flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg,#555,#777)" }}
-                >
-                  {slot.startTime}〜{slot.endTime}
-                </div>
-                <p className="text-base font-bold flex-1" style={{ color: "#2c2c2c" }}>{slot.label}</p>
+              {/* Header（時間帯のみ） */}
+              <div className="px-4 py-3 border-b" style={{ borderColor: "#f0ece5" }}>
+                <p className="text-lg font-black" style={{ color: "#2c2c2c" }}>
+                  {slot.startTime}<span className="mx-1 font-bold" style={{ color: "#bbb" }}>〜</span>{slot.endTime}
+                </p>
               </div>
 
               {/* Room groups */}
