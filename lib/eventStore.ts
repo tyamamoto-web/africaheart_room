@@ -9,11 +9,17 @@ export type EventSetup = {
   rotations: Record<string, Record<string, RoomKey>>;
 };
 
-const STORAGE_KEY = "africaheart_event_v4";
+const STORAGE_KEY = "africaheart_event_v5";
 
 function defaultSetup(): EventSetup {
+  // 出席者 = いずれかのコマで部屋に割り当てられているメンバー
+  // （欠席者は部屋割りに含まれないため自動的に不参加になる）
+  const assigned = new Set<string>();
+  for (const koma of Object.values(defaultRotations)) {
+    for (const id of Object.keys(koma)) assigned.add(id);
+  }
   return {
-    attendanceIds: defaultMembers.map((m) => m.id),
+    attendanceIds: defaultMembers.map((m) => m.id).filter((id) => assigned.has(id)),
     rotations: defaultRotations,
   };
 }
