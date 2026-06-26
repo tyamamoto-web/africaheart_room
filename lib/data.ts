@@ -58,7 +58,8 @@ export const timeSlots: TimeSlot[] = [
     endTime: "16:10",
     type: "all",
     label: "宿題タイム 📝",
-    detail: "Aルームに全員集合 ／ じゅり 入場（16時〜）",
+    detail:
+      "お題：①梅雨・雨の日に聞きたい/歌いたい曲 ②しっとりした曲 ③初夏のドライブで聞きたい曲 ④気分が晴れる最強ソング ─ いずれかから1曲\nAルームに全員集合 ／ じゅり 入場（16時〜）",
     color: "green",
   },
   {

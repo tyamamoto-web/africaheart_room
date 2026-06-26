@@ -27,20 +27,22 @@ function stripEmoji(s: string): string {
     .trim();
 }
 
-// 日本語向け：幅に合わせて文字単位で折り返し
+// 日本語向け：改行(\n)を尊重しつつ幅に合わせて文字単位で折り返し
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = [];
-  let cur = "";
-  for (const ch of text) {
-    const test = cur + ch;
-    if (ctx.measureText(test).width > maxWidth && cur) {
-      lines.push(cur);
-      cur = ch;
-    } else {
-      cur = test;
+  for (const segment of text.split("\n")) {
+    let cur = "";
+    for (const ch of segment) {
+      const test = cur + ch;
+      if (ctx.measureText(test).width > maxWidth && cur) {
+        lines.push(cur);
+        cur = ch;
+      } else {
+        cur = test;
+      }
     }
+    lines.push(cur);
   }
-  if (cur) lines.push(cur);
   return lines.length ? lines : [""];
 }
 

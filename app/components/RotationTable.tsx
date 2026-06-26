@@ -88,7 +88,11 @@ export default function RotationTable() {
                   </div>
                   <div className="flex-1 pt-0.5">
                     <p className="font-black text-lg leading-tight">{slot.label}</p>
-                    {slot.detail && <p className="text-sm opacity-80 mt-1 leading-relaxed">{slot.detail}</p>}
+                    {slot.detail && (
+                      <p className="text-sm opacity-80 mt-1 leading-relaxed" style={{ whiteSpace: "pre-line" }}>
+                        {slot.detail}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
