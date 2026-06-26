@@ -28,24 +28,16 @@ export default function Header() {
       <span className="absolute bottom-14 right-10 text-xl opacity-25 select-none pointer-events-none">🎉</span>
 
       <div className="px-4 pt-10 pb-6 text-center">
-        {/* Africa Heart illustration */}
+        {/* Africa Heart ロゴ */}
         <div className="flex justify-center mb-3">
-          <svg viewBox="0 0 240 178" width="190" height="141" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <path id="hArc" d="M62,138 Q120,168 178,138" />
-            </defs>
-
-            {/* Heart */}
-            <path
-              d="M120 58 C120 44 107 31 90 31 C66 31 52 51 52 73 C52 106 120 152 120 152 C120 152 188 106 188 73 C188 51 174 31 150 31 C133 31 120 44 120 58Z"
-              fill="#FFB7C5" stroke="#2a2a2a" strokeWidth="3" strokeLinejoin="round"
-            />
-            {/* AFRICA ♥ HEART arc text */}
-            <text fontSize="7.5" fontWeight="bold" fill="#CC1155" letterSpacing="2">
-              <textPath href="#hArc">AFRICA ♥ HEART</textPath>
-            </text>
-
-          </svg>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/africaheart-logo.png"
+            alt="アフリカハート ロゴ"
+            width={224}
+            className="h-auto select-none pointer-events-none"
+            style={{ filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.18))" }}
+          />
         </div>
 
         <h1 className="text-3xl font-black tracking-tight mb-1 text-white" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.15)" }}>
