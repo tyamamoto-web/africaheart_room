@@ -21,7 +21,7 @@ export type TimeSlot = {
 
 export const eventInfo = {
   title: "アフリカハート",
-  subtitle: "社会人カラオケオフ会",
+  subtitle: "カラオケオフ会",
   date: "2026年6月27日（土）",
   startTime: "12:50",
   venue: "ジャパレン松本店",
