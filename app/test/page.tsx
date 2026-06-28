@@ -67,6 +67,13 @@ function SampleClock() {
   );
 }
 
+/* ── デュエット（準備中・空白）─────────────────────── */
+function DuetFeature() {
+  return (
+    <p className="text-sm" style={{ color: "#bbb" }}>（準備中）</p>
+  );
+}
+
 /* ── 機能一覧（ここに追加していく）──────────────────── */
 const features: Feature[] = [
   {
@@ -82,6 +89,13 @@ const features: Feature[] = [
     title: "サンプル：現在時刻",
     description: "1秒ごとに現在時刻を更新して表示します。",
     render: () => <SampleClock />,
+  },
+  {
+    id: "duet",
+    tab: "デュエット",
+    title: "デュエット",
+    description: "",
+    render: () => <DuetFeature />,
   },
 ];
 
