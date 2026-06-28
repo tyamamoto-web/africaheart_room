@@ -278,6 +278,15 @@ export default function AdminPage() {
           )}
         </div>
 
+        {/* 動作確認ページへ */}
+        <Link
+          href="/test"
+          className="w-full py-3.5 rounded-xl text-sm font-semibold text-center"
+          style={{ background: "#f4f0ea", color: "#888" }}
+        >
+          🧪 動作確認ページ
+        </Link>
+
         {/* Reset */}
         {!confirmReset ? (
           <button onClick={() => setConfirmReset(true)} className="w-full py-3.5 rounded-xl text-sm font-semibold" style={{ background: "#f4f0ea", color: "#aaa" }}>
