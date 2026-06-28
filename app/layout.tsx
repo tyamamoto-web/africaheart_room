@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: "アフリカハート | 部屋割り確認",
   description: "社会人カラオケオフ会「アフリカハート」の部屋割り確認アプリ",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎤</text></svg>",
+    icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><path d=%22M50 84 C16 60 8 40 22 28 C32 19 46 22 50 34 C54 22 68 19 78 28 C92 40 84 60 50 84 Z%22 fill=%22%23FF4FA3%22/></svg>",
   },
 };
 

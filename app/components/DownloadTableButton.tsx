@@ -373,7 +373,6 @@ export default function DownloadTableButton() {
           opacity: busy ? 0.6 : 1,
         }}
       >
-        <span className="text-base">📥</span>
         {busy ? "作成中…" : "部屋割り表をダウンロード（透明PNG）"}
       </button>
       <p className="text-[11px] text-center mt-1.5" style={{ color: "#aaa" }}>

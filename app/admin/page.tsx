@@ -146,7 +146,15 @@ export default function AdminPage() {
                     border: `2px solid ${isAtt ? "#10b981" : "transparent"}`,
                   }}
                 >
-                  <span className="text-xl flex-shrink-0">{isAtt ? "✅" : "⬜"}</span>
+                  <span
+                    className="flex-shrink-0 inline-block rounded-md"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      background: isAtt ? "#10b981" : "transparent",
+                      border: `2px solid ${isAtt ? "#10b981" : "#cfcfcf"}`,
+                    }}
+                  />
                   <span className="text-sm font-semibold truncate" style={{ color: isAtt ? "#065f46" : "#888" }}>
                     {m.nickname}
                   </span>
@@ -251,7 +259,6 @@ export default function AdminPage() {
           </div>
           {sorted.length === 0 ? (
             <div className="py-12 text-center" style={{ color: "#bbb" }}>
-              <p className="text-3xl mb-2">👤</p>
               <p className="text-base">メンバーがいません</p>
             </div>
           ) : (
@@ -269,8 +276,8 @@ export default function AdminPage() {
                         {cfg.label}
                       </span>
                     </div>
-                    <button onClick={() => openEdit(m)} className="p-2.5 rounded-xl" style={{ background: "#f4f0ea", color: "#888" }}>✏️</button>
-                    <button onClick={() => handleDelete(m.id)} className="p-2.5 rounded-xl" style={{ background: "#fff0f0", color: "#ff6b6b" }}>🗑️</button>
+                    <button onClick={() => openEdit(m)} className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
+                    <button onClick={() => handleDelete(m.id)} className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>削除</button>
                   </div>
                 );
               })}
@@ -285,14 +292,14 @@ export default function AdminPage() {
             className="flex-1 py-3.5 rounded-xl text-sm font-semibold text-center"
             style={{ background: "#f4f0ea", color: "#888" }}
           >
-            🗂️ 部屋割りアーカイブ
+            部屋割りアーカイブ
           </Link>
           <Link
             href="/test"
             className="flex-1 py-3.5 rounded-xl text-sm font-semibold text-center"
             style={{ background: "#f4f0ea", color: "#888" }}
           >
-            🧪 動作確認ページ
+            動作確認ページ
           </Link>
         </div>
 

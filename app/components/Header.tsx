@@ -19,14 +19,6 @@ export default function Header() {
         </Link>
       </div>
 
-      {/* Decorative floating notes */}
-      <span className="absolute top-4 left-5 text-2xl opacity-40 -rotate-12 select-none pointer-events-none">🎵</span>
-      <span className="absolute top-8 left-16 text-lg opacity-30 rotate-6 select-none pointer-events-none">⭐</span>
-      <span className="absolute top-5 right-8 text-2xl opacity-40 rotate-12 select-none pointer-events-none">🎶</span>
-      <span className="absolute top-10 right-20 text-lg opacity-30 -rotate-6 select-none pointer-events-none">✨</span>
-      <span className="absolute bottom-16 left-8 text-xl opacity-25 select-none pointer-events-none">🎸</span>
-      <span className="absolute bottom-14 right-10 text-xl opacity-25 select-none pointer-events-none">🎉</span>
-
       <div className="px-4 pt-10 pb-6 text-center">
         {/* Africa Heart ロゴ */}
         <div className="flex justify-center mb-3">
@@ -47,17 +39,13 @@ export default function Header() {
           {eventInfo.subtitle}
         </p>
         <div className="flex flex-wrap justify-center gap-2">
-          {[
-            { icon: "📅", text: eventInfo.date },
-            { icon: "⏰", text: `${eventInfo.startTime}〜` },
-            { icon: "📍", text: eventInfo.venue },
-          ].map(({ icon, text }) => (
+          {[eventInfo.date, `${eventInfo.startTime}〜`, eventInfo.venue].map((text) => (
             <span
               key={text}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
               style={{ background: "rgba(255,255,255,0.25)", color: "#fff" }}
             >
-              {icon} {text}
+              {text}
             </span>
           ))}
         </div>

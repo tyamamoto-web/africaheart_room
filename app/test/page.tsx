@@ -38,51 +38,6 @@ type Feature = {
   render: () => ReactNode;
 };
 
-/* ── サンプル機能①：カウンター ───────────────────────── */
-function SampleCounter() {
-  const [n, setN] = useState(0);
-  return (
-    <div className="flex items-center gap-3">
-      <button
-        onClick={() => setN((v) => v - 1)}
-        className="w-11 h-11 rounded-xl text-xl font-black"
-        style={{ background: "#f0ece5", color: "#555" }}
-      >
-        −
-      </button>
-      <span className="text-2xl font-black w-16 text-center" style={{ color: "#2c2c2c" }}>
-        {n}
-      </span>
-      <button
-        onClick={() => setN((v) => v + 1)}
-        className="w-11 h-11 rounded-xl text-xl font-black text-white"
-        style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }}
-      >
-        ＋
-      </button>
-    </div>
-  );
-}
-
-/* ── サンプル機能②：現在時刻 ─────────────────────────── */
-function SampleClock() {
-  const [now, setNow] = useState<string>("—");
-  useEffect(() => {
-    const tick = () =>
-      setNow(
-        new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-      );
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <p className="text-3xl font-black tabular-nums" style={{ color: "#2c2c2c" }}>
-      {now}
-    </p>
-  );
-}
-
 /* ── デュエット：歌いたいデュエット曲を登録・いいね ──── */
 const KEY_OPTS = [3, 2, 1, 0, -1, -2, -3];
 const MAX_ROWS = 5;
@@ -376,29 +331,29 @@ function DuetFeature() {
                           <p className="text-xs truncate" style={{ color: "#999" }}>{s.artist || "—"}</p>
                           {s.part && s.part.trim() && (
                             <p className="text-[11px] font-semibold truncate mt-0.5" style={{ color: "#845ef7" }}>
-                              🎶 {s.part.trim()} を歌ってほしい
+                              {s.part.trim()} を歌ってほしい
                             </p>
                           )}
                         </div>
                         <button
                           onClick={() => toggleLike(s)}
-                          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-2 rounded-xl transition-all"
+                          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
                           style={{ background: liked ? "#ffe8f1" : "#f4f0ea", border: `1.5px solid ${liked ? "#FF6B9D" : "transparent"}` }}
-                          title="歌える！（いいね）"
+                          title="「歌える！」を表明"
                         >
-                          <span className="text-sm">{liked ? "🎤" : "🎙️"}</span>
-                          <span className="text-xs font-black" style={{ color: liked ? "#FF4FA3" : "#aaa" }}>{s.likes.length}</span>
+                          <span className="text-xs font-black" style={{ color: liked ? "#FF4FA3" : "#888" }}>歌える</span>
+                          <span className="text-xs font-black" style={{ color: liked ? "#FF4FA3" : "#bbb" }}>{s.likes.length}</span>
                         </button>
                         {mine && (
                           <div className="flex-shrink-0 flex gap-1">
-                            <button onClick={() => startEdit(s)} className="p-2 rounded-lg" style={{ background: "#f4f0ea", color: "#888" }}>✏️</button>
-                            <button onClick={() => handleDelete(s.id)} className="p-2 rounded-lg" style={{ background: "#fff0f0", color: "#ff6b6b" }}>🗑️</button>
+                            <button onClick={() => startEdit(s)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
+                            <button onClick={() => handleDelete(s.id)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>削除</button>
                           </div>
                         )}
                       </div>
                       {names.length > 0 && (
                         <p className="text-[11px] mt-2 pl-1 leading-relaxed" style={{ color: "#FF4FA3" }}>
-                          🎤 歌える：{names.join("・")}
+                          歌える：{names.join("・")}
                         </p>
                       )}
                     </div>
@@ -410,7 +365,7 @@ function DuetFeature() {
         </div>
       )}
       <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-        🎙️を押して名前を入れると「歌える！」を表明できます。自分が登録した曲は ✏️編集・🗑️削除できます。内容は全員に共有され、約4秒ごとに自動更新されます。
+        「歌える」を押して名前を入れると意思表示できます。自分が登録した曲は編集・削除できます。内容は全員に共有され、約4秒ごとに自動更新されます。
       </p>
     </div>
   );
@@ -419,24 +374,10 @@ function DuetFeature() {
 /* ── 機能一覧（ここに追加していく）──────────────────── */
 const features: Feature[] = [
   {
-    id: "sample-counter",
-    tab: "カウンター",
-    title: "サンプル：カウンター",
-    description: "動作確認用のサンプルです。ボタンで数字が増減します。",
-    render: () => <SampleCounter />,
-  },
-  {
-    id: "sample-clock",
-    tab: "現在時刻",
-    title: "サンプル：現在時刻",
-    description: "1秒ごとに現在時刻を更新して表示します。",
-    render: () => <SampleClock />,
-  },
-  {
     id: "duet",
     tab: "デュエット",
     title: "デュエット曲リスト",
-    description: "歌いたいデュエット曲を登録し、歌える曲に❤️。全員で共有されます。",
+    description: "歌いたいデュエット曲を登録し、歌える曲にいいね。全員で共有されます。",
     render: () => <DuetFeature />,
   },
 ];
@@ -452,7 +393,7 @@ export default function TestPage() {
         <Link href="/" className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl card" style={{ color: "#555" }}>
           ← 戻る
         </Link>
-        <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>🧪 動作確認</h1>
+        <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>動作確認</h1>
         <Link
           href="/admin"
           className="ml-auto text-sm font-semibold px-3 py-2 rounded-xl card"
@@ -466,18 +407,18 @@ export default function TestPage() {
         {/* 説明 */}
         <div className="card px-4 py-4">
           <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-            新しい機能を試すためのページです。上のタブで機能を切り替えて動作を確認できます。
+            新しい機能を試すためのページです。{features.length > 1 ? "上のタブで機能を切り替えて確認できます。" : ""}
           </p>
         </div>
 
         {features.length === 0 ? (
           <div className="card px-4 py-10 text-center">
-            <p className="text-3xl mb-2">🧩</p>
             <p className="text-sm" style={{ color: "#aaa" }}>まだ機能がありません</p>
           </div>
         ) : (
           <>
-            {/* 機能タブ */}
+            {/* 機能タブ（2つ以上のときだけ表示） */}
+            {features.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
               {features.map((f) => {
                 const sel = f.id === activeId;
@@ -497,6 +438,7 @@ export default function TestPage() {
                 );
               })}
             </div>
+            )}
 
             {/* 選択中の機能 */}
             {active && (

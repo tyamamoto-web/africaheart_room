@@ -103,7 +103,7 @@ export default function ArchivePage() {
         <Link href="/admin" className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl card" style={{ color: "#555" }}>
           ← 管理画面
         </Link>
-        <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>🗂️ 部屋割りアーカイブ</h1>
+        <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>部屋割りアーカイブ</h1>
       </div>
 
       <div className="px-4 pt-3 max-w-lg mx-auto flex flex-col gap-3">
@@ -115,7 +115,6 @@ export default function ArchivePage() {
 
         {archivedEvents.length === 0 ? (
           <div className="card px-4 py-10 text-center">
-            <p className="text-3xl mb-2">🗂️</p>
             <p className="text-sm" style={{ color: "#aaa" }}>まだアーカイブがありません</p>
           </div>
         ) : (
@@ -127,7 +126,7 @@ export default function ArchivePage() {
                   onClick={() => setOpenId(open ? null : ev.id)}
                   className="card px-4 py-3.5 text-left flex items-center gap-3"
                 >
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: "#fff0f5" }}>🎤</div>
+                  <div className="flex-shrink-0 w-1.5 h-10 rounded-full" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-black" style={{ color: "#2c2c2c" }}>{ev.date}</p>
                     <p className="text-xs truncate" style={{ color: "#999" }}>{ev.venue}{ev.note ? `　/　${ev.note}` : ""}</p>
