@@ -4,19 +4,21 @@ import Link from "next/link";
 import { useState, useEffect, type ReactNode } from "react";
 
 /* ============================================================
-   動作確認ページ
+   動作確認ページ（タブ切り替え式）
    ------------------------------------------------------------
    新しい機能を試すためのページです。
    機能を追加するには：
      1) 下に機能用のコンポーネントを作る
-     2) 末尾の features 配列に { id, title, description, render } を追加する
-   これだけでカードとして自動的に一覧に並びます。
+     2) 末尾の features 配列に
+        { id, tab, title, description, render } を追加する
+   これだけでタブが1つ増え、切り替えて表示できます。
    ============================================================ */
 
 type Feature = {
   id: string;
-  title: string;
-  description: string;
+  tab: string;          // タブに表示する短い名前
+  title: string;        // 機能の正式名称
+  description: string;  // 機能の説明
   render: () => ReactNode;
 };
 
@@ -69,12 +71,14 @@ function SampleClock() {
 const features: Feature[] = [
   {
     id: "sample-counter",
+    tab: "カウンター",
     title: "サンプル：カウンター",
     description: "動作確認用のサンプルです。ボタンで数字が増減します。",
     render: () => <SampleCounter />,
   },
   {
     id: "sample-clock",
+    tab: "現在時刻",
     title: "サンプル：現在時刻",
     description: "1秒ごとに現在時刻を更新して表示します。",
     render: () => <SampleClock />,
@@ -82,6 +86,9 @@ const features: Feature[] = [
 ];
 
 export default function TestPage() {
+  const [activeId, setActiveId] = useState<string>(features[0]?.id ?? "");
+  const active = features.find((f) => f.id === activeId);
+
   return (
     <main className="min-h-screen fun-bg pb-16">
       {/* Top bar */}
@@ -103,35 +110,49 @@ export default function TestPage() {
         {/* 説明 */}
         <div className="card px-4 py-4">
           <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-            新しい機能を試すためのページです。下のカードに機能が追加されます。
-            気になる機能があればここで動作を確認してから本番に組み込みます。
+            新しい機能を試すためのページです。上のタブで機能を切り替えて動作を確認できます。
           </p>
         </div>
 
-        {/* 機能カード一覧 */}
-        {features.map((f, i) => (
-          <div key={f.id} className="card overflow-hidden">
-            <div className="px-4 py-3 border-b" style={{ borderColor: "#f4f0ea" }}>
-              <div className="flex items-center gap-2">
-                <span
-                  className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black text-white"
-                  style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }}
-                >
-                  {i + 1}
-                </span>
-                <p className="text-sm font-black" style={{ color: "#2c2c2c" }}>{f.title}</p>
-              </div>
-              <p className="text-xs mt-1" style={{ color: "#aaa" }}>{f.description}</p>
-            </div>
-            <div className="px-4 py-5 flex justify-center">{f.render()}</div>
-          </div>
-        ))}
-
-        {features.length === 0 && (
+        {features.length === 0 ? (
           <div className="card px-4 py-10 text-center">
             <p className="text-3xl mb-2">🧩</p>
             <p className="text-sm" style={{ color: "#aaa" }}>まだ機能がありません</p>
           </div>
+        ) : (
+          <>
+            {/* 機能タブ */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {features.map((f) => {
+                const sel = f.id === activeId;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setActiveId(f.id)}
+                    className="flex-shrink-0 px-4 py-2.5 rounded-2xl text-sm font-black transition-all"
+                    style={{
+                      background: sel ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+                      color: sel ? "#fff" : "#aaa",
+                      boxShadow: sel ? "0 3px 10px rgba(255,107,157,0.3)" : "none",
+                    }}
+                  >
+                    {f.tab}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 選択中の機能 */}
+            {active && (
+              <div className="card overflow-hidden animate-fade-up">
+                <div className="px-4 py-3 border-b" style={{ borderColor: "#f4f0ea" }}>
+                  <p className="text-sm font-black" style={{ color: "#2c2c2c" }}>{active.title}</p>
+                  <p className="text-xs mt-1" style={{ color: "#aaa" }}>{active.description}</p>
+                </div>
+                <div className="px-4 py-6 flex justify-center">{active.render()}</div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
