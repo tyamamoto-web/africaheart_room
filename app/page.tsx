@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Header from "./components/Header";
-import RotationTable from "./components/RotationTable";
 
 export default function Home() {
   return (
@@ -25,10 +24,18 @@ export default function Home() {
         </Link>
       </div>
 
-      <div className="pt-4">
-        <RotationTable />
+      {/* 次回案内（6/27の部屋割りはアーカイブへ移動済み） */}
+      <div className="px-4 pt-4 max-w-lg mx-auto">
+        <div className="card px-5 py-9 text-center">
+          <p className="text-3xl mb-2">🎤</p>
+          <p className="text-base font-black" style={{ color: "#2c2c2c" }}>次回のオフ会をお楽しみに！</p>
+          <p className="text-sm mt-1.5 leading-relaxed" style={{ color: "#999" }}>
+            部屋割りは決まり次第、こちらに表示されます。
+          </p>
+        </div>
       </div>
-      <footer className="text-center pb-10 pt-4 px-4">
+
+      <footer className="text-center pb-10 pt-6 px-4">
         <p className="text-xs" style={{ color: "#bbb" }}>
           アフリカハート 運営スタッフ一同 🎤
         </p>
