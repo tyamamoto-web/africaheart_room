@@ -86,8 +86,8 @@ function SampleClock() {
 /* ── デュエット：歌いたいデュエット曲を登録・いいね ──── */
 const KEY_OPTS = [3, 2, 1, 0, -1, -2, -3];
 const MAX_ROWS = 5;
-type Row = { title: string; artist: string; key: number };
-const emptyRow = (): Row => ({ title: "", artist: "", key: 0 });
+type Row = { title: string; artist: string; key: number; part: string };
+const emptyRow = (): Row => ({ title: "", artist: "", key: 0, part: "" });
 
 function DuetFeature() {
   const [me, setMe] = useState("");
@@ -105,6 +105,7 @@ function DuetFeature() {
   const [eTitle, setETitle] = useState("");
   const [eArtist, setEArtist] = useState("");
   const [eKey, setEKey] = useState(0);
+  const [ePart, setEPart] = useState("");
 
   const refresh = useCallback(async () => {
     try {
@@ -179,6 +180,7 @@ function DuetFeature() {
           title: r.title.trim(),
           artist: r.artist.trim(),
           key_offset: r.key,
+          part: r.part.trim(),
           owner_id: me,
           owner_name: who,
         });
@@ -220,12 +222,13 @@ function DuetFeature() {
     setETitle(s.title);
     setEArtist(s.artist);
     setEKey(s.key_offset);
+    setEPart(s.part ?? "");
   }
   async function saveEdit(id: string) {
     const t = eTitle.trim();
     if (!t) return;
     try {
-      await updateSong(id, { title: t, artist: eArtist.trim(), key_offset: eKey });
+      await updateSong(id, { title: t, artist: eArtist.trim(), key_offset: eKey, part: ePart.trim() });
       setEditId(null);
       await refresh();
     } catch (e) {
@@ -274,7 +277,7 @@ function DuetFeature() {
                   <button onClick={() => removeRow(i)} className="flex-shrink-0 w-7 h-7 rounded-lg text-sm" style={{ background: "#fff0f0", color: "#ff6b6b" }}>×</button>
                 )}
               </div>
-              <div className="flex gap-1.5 pl-6">
+              <div className="flex gap-1.5 pl-6 mb-1.5">
                 <input
                   value={r.artist} onChange={(e) => setRow(i, { artist: e.target.value })} placeholder="アーティスト名"
                   className="flex-1 min-w-0 rounded-lg px-2.5 py-2 text-sm focus:outline-none" style={inputStyle}
@@ -285,6 +288,12 @@ function DuetFeature() {
                     {KEY_OPTS.map((k) => <option key={k} value={k}>{keyLabel(k)}</option>)}
                   </select>
                 </div>
+              </div>
+              <div className="pl-6">
+                <input
+                  value={r.part} onChange={(e) => setRow(i, { part: e.target.value })} placeholder="歌ってほしいパート（任意）例：高音/男性パート"
+                  className="w-full rounded-lg px-2.5 py-2 text-sm focus:outline-none" style={inputStyle}
+                />
               </div>
             </div>
           ))}
@@ -341,6 +350,7 @@ function DuetFeature() {
                       <div key={s.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #FF6B9D55" }}>
                         <input value={eTitle} onChange={(e) => setETitle(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="曲名" />
                         <input value={eArtist} onChange={(e) => setEArtist(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="アーティスト名" />
+                        <input value={ePart} onChange={(e) => setEPart(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="歌ってほしいパート（任意）" />
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1.5 rounded-lg px-3" style={{ background: "#f4f0ea" }}>
                             <span className="text-xs font-bold" style={{ color: "#888" }}>キー</span>
@@ -364,6 +374,11 @@ function DuetFeature() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold truncate" style={{ color: "#2c2c2c" }}>{s.title}</p>
                           <p className="text-xs truncate" style={{ color: "#999" }}>{s.artist || "—"}</p>
+                          {s.part && s.part.trim() && (
+                            <p className="text-[11px] font-semibold truncate mt-0.5" style={{ color: "#845ef7" }}>
+                              🎶 {s.part.trim()} を歌ってほしい
+                            </p>
+                          )}
                         </div>
                         <button
                           onClick={() => toggleLike(s)}

@@ -13,6 +13,7 @@ export type DuetSong = {
   title: string;
   artist: string;
   key_offset: number; // -3 〜 +3
+  part?: string; // 歌ってほしいパート（任意）。DB列 part が必要
   owner_id: string;
   owner_name: string;
   likes: string[]; // "端末ID<US>名前" 形式の配列
@@ -50,31 +51,45 @@ export async function listSongs(): Promise<DuetSong[]> {
   return res.json();
 }
 
+// part列が未作成でも壊れないよう、エラー時はpartを外して再送する
+async function sendWithPartFallback(
+  method: "POST" | "PATCH",
+  url: string,
+  body: Record<string, unknown>
+): Promise<void> {
+  const send = (b: Record<string, unknown>) =>
+    fetch(url, { method, headers: headers({ Prefer: "return=minimal" }), body: JSON.stringify(b) });
+  let res = await send(body);
+  if (!res.ok && "part" in body) {
+    let txt = "";
+    try {
+      txt = await res.text();
+    } catch {}
+    if (/part/i.test(txt)) {
+      const { part: _omit, ...rest } = body;
+      void _omit;
+      res = await send(rest);
+    }
+  }
+  if (!res.ok) throw new Error(`保存に失敗しました (${res.status})`);
+}
+
 export async function addSong(input: {
   title: string;
   artist: string;
   key_offset: number;
   owner_id: string;
   owner_name: string;
+  part?: string;
 }): Promise<void> {
-  const res = await fetch(endpoint(), {
-    method: "POST",
-    headers: headers({ Prefer: "return=minimal" }),
-    body: JSON.stringify({ ...input, likes: [] }),
-  });
-  if (!res.ok) throw new Error(`追加に失敗しました (${res.status})`);
+  await sendWithPartFallback("POST", endpoint(), { ...input, part: input.part ?? "", likes: [] });
 }
 
 export async function updateSong(
   id: string,
-  patch: Partial<Pick<DuetSong, "title" | "artist" | "key_offset" | "likes">>
+  patch: Partial<Pick<DuetSong, "title" | "artist" | "key_offset" | "likes" | "part">>
 ): Promise<void> {
-  const res = await fetch(`${endpoint()}?id=eq.${id}`, {
-    method: "PATCH",
-    headers: headers({ Prefer: "return=minimal" }),
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) throw new Error(`更新に失敗しました (${res.status})`);
+  await sendWithPartFallback("PATCH", `${endpoint()}?id=eq.${id}`, patch);
 }
 
 export async function deleteSong(id: string): Promise<void> {

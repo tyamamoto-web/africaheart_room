@@ -8,11 +8,15 @@ create table if not exists public.duet_songs (
   title text not null,
   artist text not null default '',
   key_offset int not null default 0,   -- -3 〜 +3
+  part text not null default '',       -- 歌ってほしいパート（任意）
   owner_id text not null,              -- 登録した端末ID
   owner_name text not null default '', -- 登録者名
   likes text[] not null default '{}',  -- いいねした端末IDの配列
   created_at timestamptz not null default now()
 );
+
+-- 既にテーブルがある場合に part 列を追加（後から追加した場合用）
+alter table public.duet_songs add column if not exists part text not null default '';
 
 -- 行レベルセキュリティ（小規模グループ向けに匿名アクセスを許可）
 alter table public.duet_songs enable row level security;
