@@ -278,14 +278,23 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* 動作確認ページへ */}
-        <Link
-          href="/test"
-          className="w-full py-3.5 rounded-xl text-sm font-semibold text-center"
-          style={{ background: "#f4f0ea", color: "#888" }}
-        >
-          🧪 動作確認ページ
-        </Link>
+        {/* アーカイブ・動作確認ページへ */}
+        <div className="flex gap-2">
+          <Link
+            href="/archive"
+            className="flex-1 py-3.5 rounded-xl text-sm font-semibold text-center"
+            style={{ background: "#f4f0ea", color: "#888" }}
+          >
+            🗂️ 部屋割りアーカイブ
+          </Link>
+          <Link
+            href="/test"
+            className="flex-1 py-3.5 rounded-xl text-sm font-semibold text-center"
+            style={{ background: "#f4f0ea", color: "#888" }}
+          >
+            🧪 動作確認ページ
+          </Link>
+        </div>
 
         {/* Reset */}
         {!confirmReset ? (
