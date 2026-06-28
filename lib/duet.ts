@@ -15,7 +15,7 @@ export type DuetSong = {
   key_offset: number; // -3 〜 +3
   owner_id: string;
   owner_name: string;
-  likes: string[]; // いいねした端末IDの配列
+  likes: string[]; // "端末ID<US>名前" 形式の配列
   created_at: string;
 };
 
@@ -110,4 +110,25 @@ export function setNickname(name: string): void {
 export function keyLabel(n: number): string {
   if (n === 0) return "±0";
   return n > 0 ? `+${n}` : `${n}`;
+}
+
+/* ── いいね（端末ID＋名前を1要素にエンコードして text[] に保存）──
+   1要素 = "端末ID<US>名前"。スキーマ変更不要で「誰がいいねしたか」を保持。 */
+const LIKE_SEP = String.fromCharCode(31); // Unit Separator（名前に出現しない区切り）
+
+export function makeLike(id: string, name: string): string {
+  const clean = (name || "").split(LIKE_SEP).join("").trim();
+  return `${id}${LIKE_SEP}${clean}`;
+}
+export function likeId(entry: string): string {
+  return entry.split(LIKE_SEP)[0];
+}
+export function likeName(entry: string): string {
+  return entry.split(LIKE_SEP).slice(1).join(LIKE_SEP);
+}
+export function hasLiked(likes: string[], id: string): boolean {
+  return likes.some((e) => likeId(e) === id);
+}
+export function likerNames(likes: string[]): string[] {
+  return likes.map(likeName).map((n) => n.trim()).filter(Boolean);
 }
