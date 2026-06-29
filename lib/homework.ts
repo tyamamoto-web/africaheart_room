@@ -121,9 +121,11 @@ export async function listThemes(): Promise<ThemeRow[]> {
 }
 
 export async function addTheme(month: number, text: string): Promise<void> {
+  // 衝突時は何もしない（ignore-duplicates）。merge=UPDATE は homework_themes に
+  // UPDATE ポリシーが無く RLS で弾かれるため使わない（テーマは挿入/削除のみ）。
   const res = await fetch(`${THEMES_ENDPOINT}?on_conflict=month,text`, {
     method: "POST",
-    headers: headers({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+    headers: headers({ Prefer: "resolution=ignore-duplicates,return=minimal" }),
     body: JSON.stringify({ month, text }),
   });
   if (!res.ok) {

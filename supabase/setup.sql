@@ -78,3 +78,11 @@ drop policy if exists "ht anon delete" on public.homework_themes;
 create policy "ht anon read"   on public.homework_themes for select using (true);
 create policy "ht anon insert" on public.homework_themes for insert with check (true);
 create policy "ht anon delete" on public.homework_themes for delete using (true);
+
+-- 旧「月なし版」homework_themes が既にある場合の移行（データは保持。fresh環境では実質no-op）
+alter table public.homework_themes
+  add column if not exists month smallint not null default 6 check (month between 1 and 12);
+alter table public.homework_themes alter column month drop default;
+alter table public.homework_themes drop constraint if exists homework_themes_text_key;
+alter table public.homework_themes drop constraint if exists homework_themes_month_text_key;
+alter table public.homework_themes add constraint homework_themes_month_text_key unique (month, text);
