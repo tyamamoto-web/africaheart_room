@@ -35,20 +35,9 @@ export default function Header() {
         <h1 className="text-3xl font-black tracking-tight mb-1 text-white" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.15)" }}>
           {eventInfo.title}
         </h1>
-        <p className="text-xs font-semibold tracking-widest mb-4" style={{ color: "rgba(255,255,255,0.8)" }}>
+        <p className="text-xs font-semibold tracking-widest" style={{ color: "rgba(255,255,255,0.8)" }}>
           {eventInfo.subtitle}
         </p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {[`${eventInfo.startTime}〜`, eventInfo.venue].map((text) => (
-            <span
-              key={text}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{ background: "rgba(255,255,255,0.25)", color: "#fff" }}
-            >
-              {text}
-            </span>
-          ))}
-        </div>
       </div>
 
       {/* Wave divider */}
