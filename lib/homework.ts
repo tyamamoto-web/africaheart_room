@@ -94,3 +94,53 @@ export async function saveHomework(themes: string[], by: string): Promise<void> 
     throw new Error(`宿題結果の保存に失敗しました (${res.status})`);
   }
 }
+
+/* ── 宿題リスト（候補テーマ）：全員で共有・追加する行ごとのテーブル ──
+   テーブル: homework_themes（id uuid, month smallint 1-12, text text, created_at）。
+   (month, text) に unique を付け、同じ月の同じテーマは重複しない（月が違えば同名OK）。 */
+const THEMES_ENDPOINT = `${SUPA_URL}/rest/v1/homework_themes`;
+
+export type ThemeRow = { month: number; text: string };
+
+export async function listThemes(): Promise<ThemeRow[]> {
+  const res = await fetch(`${THEMES_ENDPOINT}?select=month,text&order=month.asc,created_at.asc`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const txt = await readText(res);
+    if (looksMissingTable(res.status, txt)) throw new HomeworkSetupError();
+    throw new Error(`宿題リストの取得に失敗しました (${res.status})`);
+  }
+  const rows = (await res.json()) as Array<{ month?: number; text?: string }>;
+  return Array.isArray(rows)
+    ? rows
+        .filter((r) => typeof r.month === "number" && !!r.text)
+        .map((r) => ({ month: r.month as number, text: r.text as string }))
+    : [];
+}
+
+export async function addTheme(month: number, text: string): Promise<void> {
+  const res = await fetch(`${THEMES_ENDPOINT}?on_conflict=month,text`, {
+    method: "POST",
+    headers: headers({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify({ month, text }),
+  });
+  if (!res.ok) {
+    const t = await readText(res);
+    if (looksMissingTable(res.status, t)) throw new HomeworkSetupError();
+    throw new Error(`テーマの追加に失敗しました (${res.status})`);
+  }
+}
+
+export async function deleteTheme(month: number, text: string): Promise<void> {
+  const res = await fetch(`${THEMES_ENDPOINT}?month=eq.${month}&text=eq.${encodeURIComponent(text)}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const t = await readText(res);
+    if (looksMissingTable(res.status, t)) throw new HomeworkSetupError();
+    throw new Error(`テーマの削除に失敗しました (${res.status})`);
+  }
+}

@@ -22,6 +22,10 @@ import {
   getHomework,
   saveHomework,
   HomeworkSetupError,
+  listThemes,
+  addTheme as apiAddTheme,
+  deleteTheme as apiDeleteTheme,
+  type ThemeRow,
 } from "@/lib/homework";
 
 /* ============================================================
@@ -377,9 +381,15 @@ function DuetFeature() {
 }
 
 /* ── 宿題ルーレット：宿題リストからテーマを3つ抽選 ──── */
-const HW_KEY = "africaheart_homework_themes_v1"; // 候補テーマ（この端末のみ）
+// 候補テーマは Supabase(homework_themes) で全員共有。月ごとに区分け（1〜12月）、各月 MAX_PER_MONTH 件まで。
+// DEFAULT_THEMES は未設定時のフォールバック表示用（テーブルが無いときだけ現在の月に出す）。
 const HW_RESULT_KEY = "africaheart_homework_result_v1"; // 抽選結果（DB未設定時のローカル控え）
 const PICK_COUNT = 3;
+const MAX_PER_MONTH = 20; // 1ヶ月あたりの登録上限
+const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1); // 1〜12月
+function currentMonth(): number {
+  return new Date().getMonth() + 1;
+}
 const DEFAULT_THEMES = [
   "アニメソング",
   "90年代の名曲",
@@ -449,7 +459,8 @@ function Confetti({ burst }: { burst: number }) {
 }
 
 function HomeworkRoulette() {
-  const [themes, setThemes] = useState<string[]>(DEFAULT_THEMES);
+  const [allThemes, setAllThemes] = useState<ThemeRow[]>([]);
+  const [selMonth, setSelMonth] = useState<number>(1); // マウント後に現在の月へ
   const [decided, setDecided] = useState<string[]>([]);
   const [display, setDisplay] = useState<string>("");
   const [spinning, setSpinning] = useState(false);
@@ -469,6 +480,11 @@ function HomeworkRoulette() {
   const landRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const busyRef = useRef(false); // スピン中・保存中はポーリングで上書きしない
   const migratedRef = useRef(false); // 端末の結果をDBへ一度だけ引き継ぐ
+
+  // 現在の月を初期選択（ハイドレーション差異を避けるためマウント後に設定）
+  useEffect(() => {
+    setSelMonth(currentMonth());
+  }, []);
 
   // 抽選結果をローカル＋（可能なら）DBへ保存
   const saveResult = useCallback(async (next: string[]) => {
@@ -490,54 +506,64 @@ function HomeworkRoulette() {
     }
   }, []);
 
-  // 共有中の抽選結果を取得（ポーリングで他端末の更新も反映）
+  // 候補テーマと抽選結果を共有DBから取得（ポーリングで他端末の追加も反映）
   const refresh = useCallback(async () => {
+    let setupMissing = false;
+    let errMsg: string | null = null;
+
+    // 候補テーマ（全員で共有・追加・月別）
     try {
-      const hw = await getHomework();
-      setNeedsSetup(false);
-      setSyncErr(null);
-      setLastBy(hw.updatedBy);
-      if (busyRef.current) return; // スピン/保存中は触らない
-      // DBが空でも端末に結果が残っていれば、一度だけDBへ引き継ぐ
-      if (hw.themes.length === 0 && !migratedRef.current) {
-        const local = loadLocalResult();
-        if (local.length > 0) {
-          migratedRef.current = true;
-          setDecided(local);
-          void saveResult(local);
-          return;
-        }
-      }
-      migratedRef.current = true;
-      setDecided(hw.themes);
-      saveLocalResult(hw.themes);
+      const rows = await listThemes();
+      if (!busyRef.current) setAllThemes(rows);
     } catch (e) {
       if (e instanceof HomeworkSetupError) {
-        setNeedsSetup(true); // DB未設定：この端末のローカルのみで動作
+        setupMissing = true;
+        // 未設定時は現在の月にだけ初期リストを出して抽選だけは可能に（追加/削除は無効）
+        setAllThemes(DEFAULT_THEMES.map((text) => ({ month: currentMonth(), text })));
       } else {
-        setSyncErr(e instanceof Error ? e.message : "同期に失敗しました");
+        errMsg = e instanceof Error ? e.message : "宿題リストの同期に失敗しました";
       }
-    } finally {
-      setLoading(false);
     }
+
+    // 抽選結果（全員で共有）
+    try {
+      const hw = await getHomework();
+      setLastBy(hw.updatedBy);
+      if (!busyRef.current) {
+        // DBが空でも端末に結果が残っていれば、一度だけDBへ引き継ぐ
+        if (hw.themes.length === 0 && !migratedRef.current) {
+          const local = loadLocalResult();
+          if (local.length > 0) {
+            migratedRef.current = true;
+            setDecided(local);
+            void saveResult(local);
+          } else {
+            migratedRef.current = true;
+            setDecided(hw.themes);
+            saveLocalResult(hw.themes);
+          }
+        } else {
+          migratedRef.current = true;
+          setDecided(hw.themes);
+          saveLocalResult(hw.themes);
+        }
+      }
+    } catch (e) {
+      if (e instanceof HomeworkSetupError) setupMissing = true;
+      else errMsg = e instanceof Error ? e.message : "同期に失敗しました";
+    }
+
+    setNeedsSetup(setupMissing);
+    setSyncErr(errMsg);
+    setLoading(false);
   }, [saveResult]);
 
   useEffect(() => {
-    // 宿題リスト（候補）はこの端末に保存
-    try {
-      const raw = localStorage.getItem(HW_KEY);
-      if (raw) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr) && arr.every((x) => typeof x === "string")) setThemes(arr);
-      }
-    } catch {
-      /* localStorage 未対応でもデフォルトで動く */
-    }
     // 端末に残る前回結果を即時表示（DB取得前でも表示が崩れない）
     const local = loadLocalResult();
     if (local.length > 0) setDecided(local);
     refresh();
-    const poll = setInterval(refresh, 5000);
+    const poll = setInterval(refresh, 5000); // 候補テーマ・結果を最新へ
     return () => {
       clearInterval(poll);
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -545,16 +571,13 @@ function HomeworkRoulette() {
     };
   }, [refresh]);
 
-  function persistThemes(next: string[]) {
-    setThemes(next);
-    try {
-      localStorage.setItem(HW_KEY, JSON.stringify(next));
-    } catch {
-      /* 保存できなくても続行 */
-    }
-  }
-
-  const pool = themes.filter((t) => !decided.includes(t));
+  // 選択中の月の候補曲
+  const monthThemes = useMemo(
+    () => allThemes.filter((t) => t.month === selMonth).map((t) => t.text),
+    [allThemes, selMonth]
+  );
+  const monthFull = monthThemes.length >= MAX_PER_MONTH;
+  const pool = monthThemes.filter((t) => !decided.includes(t));
   const done = decided.length >= PICK_COUNT;
   const canSpin = !spinning && !done && pool.length > 0 && !loading && !saving;
 
@@ -601,17 +624,33 @@ function HomeworkRoulette() {
     await saveResult([]);
   }
 
-  function addTheme() {
+  // 選択中の月へ追加（全員に共有）。楽観更新してからDBへ保存。
+  async function addTheme() {
     const t = newTheme.trim();
-    if (!t || themes.includes(t)) {
-      setNewTheme("");
+    setNewTheme("");
+    if (!t || monthThemes.includes(t)) return;
+    if (monthThemes.length >= MAX_PER_MONTH) {
+      setSyncErr(`${selMonth}月は${MAX_PER_MONTH}件まで登録できます`);
       return;
     }
-    persistThemes([...themes, t]);
-    setNewTheme("");
+    setAllThemes((prev) => [...prev, { month: selMonth, text: t }]);
+    try {
+      await apiAddTheme(selMonth, t);
+    } catch (e) {
+      if (e instanceof HomeworkSetupError) setNeedsSetup(true);
+      else setSyncErr(e instanceof Error ? e.message : "テーマの追加に失敗しました");
+    }
+    refresh();
   }
-  function removeTheme(t: string) {
-    persistThemes(themes.filter((x) => x !== t));
+  async function removeTheme(t: string) {
+    setAllThemes((prev) => prev.filter((x) => !(x.month === selMonth && x.text === t)));
+    try {
+      await apiDeleteTheme(selMonth, t);
+    } catch (e) {
+      if (e instanceof HomeworkSetupError) setNeedsSetup(true);
+      else setSyncErr(e instanceof Error ? e.message : "テーマの削除に失敗しました");
+    }
+    refresh();
   }
 
   const spinLabel = spinning
@@ -631,6 +670,33 @@ function HomeworkRoulette() {
           {syncErr}
         </p>
       )}
+
+      {/* 対象の月を選択（1〜12月） */}
+      <div>
+        <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#bbb" }}>
+          対象の月（{selMonth}月・{monthThemes.length}/{MAX_PER_MONTH}曲）
+        </p>
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+          {MONTHS.map((m) => {
+            const sel = m === selMonth;
+            const count = allThemes.filter((t) => t.month === m).length;
+            return (
+              <button
+                key={m}
+                onClick={() => setSelMonth(m)}
+                className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-black transition-all"
+                style={{
+                  background: sel ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+                  color: sel ? "#fff" : "#aaa",
+                  boxShadow: sel ? "0 3px 10px rgba(255,107,157,0.3)" : "none",
+                }}
+              >
+                {m}月{count > 0 ? `・${count}` : ""}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* 決定枠（3つ） */}
       <div className="grid grid-cols-3 gap-2">
@@ -757,20 +823,18 @@ function HomeworkRoulette() {
 
       {pool.length === 0 && !done && (
         <p className="text-xs text-center" style={{ color: "#c0392b" }}>
-          抽選できるテーマが足りません。下のリストにテーマを追加してください。
+          {selMonth}月の候補曲がありません。下のリストに追加してください。
         </p>
       )}
 
       {needsSetup ? (
         <p className="text-[11px] text-center leading-relaxed" style={{ color: "#bbb" }}>
-          現在この結果はこの端末に保存されています（全員で共有するには共有設定が必要です）
+          共有設定が未完了のため、初期リストを表示中です（宿題リストと結果を全員で共有するには設定が必要です）
         </p>
       ) : (
-        decided.length > 0 && (
-          <p className="text-[11px] text-center" style={{ color: "#bbb" }}>
-            {lastBy ? `最終更新: ${lastBy}・` : ""}この結果はみんなで共有・保存されます
-          </p>
-        )
+        <p className="text-[11px] text-center" style={{ color: "#bbb" }}>
+          {lastBy ? `最終更新: ${lastBy}・` : ""}宿題リストも結果も全員で共有・保存されます
+        </p>
       )}
 
       {/* 宿題リストの編集 */}
@@ -781,7 +845,7 @@ function HomeworkRoulette() {
           style={{ background: "#faf8f5" }}
         >
           <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
-            宿題リストを編集（{themes.length}件）
+            {selMonth}月の宿題リスト（{monthThemes.length}/{MAX_PER_MONTH}）
           </span>
           <span className="text-xs font-black" style={{ color: "#FF4FA3" }}>
             {showEdit ? "閉じる" : "開く"}
@@ -790,7 +854,7 @@ function HomeworkRoulette() {
         {showEdit && (
           <div className="px-4 py-3 flex flex-col gap-3" style={{ background: "#fff" }}>
             <div className="flex flex-wrap gap-2">
-              {themes.map((t) => (
+              {monthThemes.map((t) => (
                 <span
                   key={t}
                   className="inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-bold"
@@ -799,16 +863,17 @@ function HomeworkRoulette() {
                   {t}
                   <button
                     onClick={() => removeTheme(t)}
+                    disabled={needsSetup}
                     className="w-5 h-5 rounded-full flex items-center justify-center text-sm"
-                    style={{ background: "#fff0f0", color: "#ff6b6b" }}
+                    style={{ background: "#fff0f0", color: "#ff6b6b", opacity: needsSetup ? 0.4 : 1 }}
                     aria-label={`${t}を削除`}
                   >
                     ×
                   </button>
                 </span>
               ))}
-              {themes.length === 0 && (
-                <span className="text-xs" style={{ color: "#bbb" }}>テーマがありません。下から追加してください。</span>
+              {monthThemes.length === 0 && (
+                <span className="text-xs" style={{ color: "#bbb" }}>{selMonth}月はまだ登録がありません。下から追加してください。</span>
               )}
             </div>
             <div className="flex gap-2">
@@ -818,21 +883,22 @@ function HomeworkRoulette() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") addTheme();
                 }}
-                placeholder="新しいテーマを追加"
+                disabled={needsSetup || monthFull}
+                placeholder={needsSetup ? "共有設定が必要です" : monthFull ? `${selMonth}月は登録上限（${MAX_PER_MONTH}件）です` : `${selMonth}月に曲を追加`}
                 className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm focus:outline-none"
-                style={{ background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent" }}
+                style={{ background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent", opacity: needsSetup || monthFull ? 0.6 : 1 }}
               />
               <button
                 onClick={addTheme}
-                disabled={!newTheme.trim()}
+                disabled={!newTheme.trim() || needsSetup || monthFull}
                 className="px-4 rounded-xl text-sm font-bold text-white transition-opacity"
-                style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: newTheme.trim() ? 1 : 0.4 }}
+                style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: newTheme.trim() && !needsSetup && !monthFull ? 1 : 0.4 }}
               >
                 追加
               </button>
             </div>
-            <p className="text-[11px]" style={{ color: "#bbb" }}>
-              このリストはこの端末（ブラウザ）に保存されます。抽選では決定済みのテーマは除外され、重複しません。
+            <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
+              宿題リストは12ヶ月分、各月{MAX_PER_MONTH}曲まで登録できます。全員で共有され、約5秒ごとに最新へ更新（同じ月の重複は防止）。抽選は選択中の月の曲から行われ、決定済みは除外されます。
             </p>
           </div>
         )}

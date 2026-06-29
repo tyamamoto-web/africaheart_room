@@ -39,7 +39,7 @@ export default function Header() {
           {eventInfo.subtitle}
         </p>
         <div className="flex flex-wrap justify-center gap-2">
-          {[eventInfo.date, `${eventInfo.startTime}〜`, eventInfo.venue].map((text) => (
+          {[`${eventInfo.startTime}〜`, eventInfo.venue].map((text) => (
             <span
               key={text}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"

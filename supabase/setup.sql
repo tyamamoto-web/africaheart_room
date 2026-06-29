@@ -55,3 +55,26 @@ drop policy if exists "hw anon update" on public.homework_result;
 create policy "hw anon read"   on public.homework_result for select using (true);
 create policy "hw anon insert" on public.homework_result for insert with check (true);
 create policy "hw anon update" on public.homework_result for update using (true) with check (true);
+
+
+-- ============================================================
+-- 宿題リスト（候補曲）：全員で追加・共有。月ごとに区分け（1〜12月）、各月20件まで。
+-- 行ごとに保存し、(month, text) を一意にして同月内の重複登録を防ぐ。
+-- ============================================================
+create table if not exists public.homework_themes (
+  id uuid primary key default gen_random_uuid(),
+  month smallint not null check (month between 1 and 12),
+  text text not null,
+  created_at timestamptz not null default now(),
+  unique (month, text)
+);
+
+alter table public.homework_themes enable row level security;
+
+drop policy if exists "ht anon read"   on public.homework_themes;
+drop policy if exists "ht anon insert" on public.homework_themes;
+drop policy if exists "ht anon delete" on public.homework_themes;
+
+create policy "ht anon read"   on public.homework_themes for select using (true);
+create policy "ht anon insert" on public.homework_themes for insert with check (true);
+create policy "ht anon delete" on public.homework_themes for delete using (true);
