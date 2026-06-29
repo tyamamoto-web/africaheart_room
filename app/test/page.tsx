@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import {
   isDuetConfigured,
   listSongs,
@@ -18,6 +18,11 @@ import {
   likerNames,
   type DuetSong,
 } from "@/lib/duet";
+import {
+  getHomework,
+  saveHomework,
+  HomeworkSetupError,
+} from "@/lib/homework";
 
 /* ============================================================
    動作確認ページ（タブ切り替え式）
@@ -371,6 +376,471 @@ function DuetFeature() {
   );
 }
 
+/* ── 宿題ルーレット：宿題リストからテーマを3つ抽選 ──── */
+const HW_KEY = "africaheart_homework_themes_v1"; // 候補テーマ（この端末のみ）
+const HW_RESULT_KEY = "africaheart_homework_result_v1"; // 抽選結果（DB未設定時のローカル控え）
+const PICK_COUNT = 3;
+const DEFAULT_THEMES = [
+  "アニメソング",
+  "90年代の名曲",
+  "心に響くバラード",
+  "ボカロ曲",
+  "洋楽",
+  "アイドルソング",
+  "高音チャレンジ",
+  "盛り上がる曲",
+  "泣ける曲",
+  "最近ハマっている曲",
+  "ドラマ・映画の主題歌",
+  "自分の十八番",
+  "懐かしのJ-POP",
+  "デュエット曲",
+];
+const CONFETTI_COLORS = ["#FF6B9D", "#845ef7", "#339af0", "#f59e0b", "#10b981", "#FF4FA3"];
+
+// 抽選結果のローカル控え（DB未設定でも端末内で結果を保持・表示できる）
+function loadLocalResult(): string[] {
+  try {
+    const raw = localStorage.getItem(HW_RESULT_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.every((x) => typeof x === "string")) return arr;
+    }
+  } catch {
+    /* 読めなくても空で続行 */
+  }
+  return [];
+}
+function saveLocalResult(themes: string[]) {
+  try {
+    localStorage.setItem(HW_RESULT_KEY, JSON.stringify(themes));
+  } catch {
+    /* 保存できなくても続行 */
+  }
+}
+
+function Confetti({ burst }: { burst: number }) {
+  return (
+    <div key={burst} className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
+      {Array.from({ length: 18 }).map((_, i) => {
+        const left = 5 + (i / 18) * 90;
+        const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+        const delay = (i % 6) * 45;
+        const dur = 750 + (i % 4) * 180;
+        const w = i % 3 === 0 ? 6 : 8;
+        return (
+          <span
+            key={i}
+            style={{
+              position: "absolute",
+              left: `${left}%`,
+              top: 0,
+              width: w,
+              height: w + 4,
+              background: color,
+              borderRadius: 2,
+              animation: `confetti-fall ${dur}ms ease-in ${delay}ms forwards`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function HomeworkRoulette() {
+  const [themes, setThemes] = useState<string[]>(DEFAULT_THEMES);
+  const [decided, setDecided] = useState<string[]>([]);
+  const [display, setDisplay] = useState<string>("");
+  const [spinning, setSpinning] = useState(false);
+  const [landed, setLanded] = useState(false);
+  const [burst, setBurst] = useState(0);
+  const [showEdit, setShowEdit] = useState(false);
+  const [newTheme, setNewTheme] = useState("");
+
+  // 抽選結果のDB同期
+  const [loading, setLoading] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [syncErr, setSyncErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [lastBy, setLastBy] = useState("");
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const landRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const busyRef = useRef(false); // スピン中・保存中はポーリングで上書きしない
+  const migratedRef = useRef(false); // 端末の結果をDBへ一度だけ引き継ぐ
+
+  // 抽選結果をローカル＋（可能なら）DBへ保存
+  const saveResult = useCallback(async (next: string[]) => {
+    saveLocalResult(next); // まず端末に控える（DBが無くても結果は残る）
+    busyRef.current = true;
+    setSaving(true);
+    try {
+      const by = getNickname() || "";
+      await saveHomework(next, by);
+      setLastBy(by);
+      setNeedsSetup(false);
+      setSyncErr(null);
+    } catch (e) {
+      if (e instanceof HomeworkSetupError) setNeedsSetup(true);
+      else setSyncErr(e instanceof Error ? e.message : "結果の保存に失敗しました");
+    } finally {
+      setSaving(false);
+      busyRef.current = false;
+    }
+  }, []);
+
+  // 共有中の抽選結果を取得（ポーリングで他端末の更新も反映）
+  const refresh = useCallback(async () => {
+    try {
+      const hw = await getHomework();
+      setNeedsSetup(false);
+      setSyncErr(null);
+      setLastBy(hw.updatedBy);
+      if (busyRef.current) return; // スピン/保存中は触らない
+      // DBが空でも端末に結果が残っていれば、一度だけDBへ引き継ぐ
+      if (hw.themes.length === 0 && !migratedRef.current) {
+        const local = loadLocalResult();
+        if (local.length > 0) {
+          migratedRef.current = true;
+          setDecided(local);
+          void saveResult(local);
+          return;
+        }
+      }
+      migratedRef.current = true;
+      setDecided(hw.themes);
+      saveLocalResult(hw.themes);
+    } catch (e) {
+      if (e instanceof HomeworkSetupError) {
+        setNeedsSetup(true); // DB未設定：この端末のローカルのみで動作
+      } else {
+        setSyncErr(e instanceof Error ? e.message : "同期に失敗しました");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [saveResult]);
+
+  useEffect(() => {
+    // 宿題リスト（候補）はこの端末に保存
+    try {
+      const raw = localStorage.getItem(HW_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.every((x) => typeof x === "string")) setThemes(arr);
+      }
+    } catch {
+      /* localStorage 未対応でもデフォルトで動く */
+    }
+    // 端末に残る前回結果を即時表示（DB取得前でも表示が崩れない）
+    const local = loadLocalResult();
+    if (local.length > 0) setDecided(local);
+    refresh();
+    const poll = setInterval(refresh, 5000);
+    return () => {
+      clearInterval(poll);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (landRef.current) clearTimeout(landRef.current);
+    };
+  }, [refresh]);
+
+  function persistThemes(next: string[]) {
+    setThemes(next);
+    try {
+      localStorage.setItem(HW_KEY, JSON.stringify(next));
+    } catch {
+      /* 保存できなくても続行 */
+    }
+  }
+
+  const pool = themes.filter((t) => !decided.includes(t));
+  const done = decided.length >= PICK_COUNT;
+  const canSpin = !spinning && !done && pool.length > 0 && !loading && !saving;
+
+  function spin() {
+    if (!canSpin) return;
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+    const base = decided; // 抽選開始時点の確定リスト
+    busyRef.current = true; // スピン中はポーリングで上書きしない
+    setSpinning(true);
+    setLanded(false);
+    let i = Math.floor(Math.random() * pool.length);
+    let ticks = 0;
+    const total = 26 + Math.floor(Math.random() * 10); // スピン量をランダム化
+    const step = () => {
+      ticks++;
+      if (ticks >= total) {
+        const next = [...base, winner];
+        setDisplay(winner);
+        setSpinning(false);
+        setLanded(true);
+        setBurst((b) => b + 1);
+        setDecided(next);
+        landRef.current = setTimeout(() => setLanded(false), 1100);
+        saveResult(next); // DBへ保存（busyRef は saveResult 内で解除）
+        return;
+      }
+      i = (i + 1) % pool.length;
+      setDisplay(pool[i]);
+      const p = ticks / total;
+      const delay = 45 + Math.pow(p, 2.4) * 280; // 45ms→約325msへ減速（ease-out）
+      timerRef.current = setTimeout(step, delay);
+    };
+    step();
+  }
+
+  async function reset() {
+    if (decided.length > 0 && !confirm("みんなで共有している宿題結果をリセットします。よろしいですか？")) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (landRef.current) clearTimeout(landRef.current);
+    setDecided([]);
+    setDisplay("");
+    setSpinning(false);
+    setLanded(false);
+    await saveResult([]);
+  }
+
+  function addTheme() {
+    const t = newTheme.trim();
+    if (!t || themes.includes(t)) {
+      setNewTheme("");
+      return;
+    }
+    persistThemes([...themes, t]);
+    setNewTheme("");
+  }
+  function removeTheme(t: string) {
+    persistThemes(themes.filter((x) => x !== t));
+  }
+
+  const spinLabel = spinning
+    ? "抽選中…"
+    : saving
+    ? "保存中…"
+    : loading
+    ? "読み込み中…"
+    : decided.length === 0
+    ? "ルーレット開始"
+    : `ルーレット開始（${decided.length + 1}つ目）`;
+
+  return (
+    <div className="w-full flex flex-col gap-4">
+      {syncErr && (
+        <p className="text-xs px-3 py-2 rounded-lg" style={{ background: "#fff0f0", color: "#c0392b" }}>
+          {syncErr}
+        </p>
+      )}
+
+      {/* 決定枠（3つ） */}
+      <div className="grid grid-cols-3 gap-2">
+        {Array.from({ length: PICK_COUNT }).map((_, idx) => {
+          const t = decided[idx];
+          return (
+            <div
+              key={idx}
+              className={`rounded-2xl px-2 py-3 flex flex-col items-center justify-center text-center min-h-[78px] ${t ? "slot-pop" : ""}`}
+              style={
+                t
+                  ? { background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", boxShadow: "0 4px 12px rgba(255,107,157,0.3)" }
+                  : { background: "#faf8f5", border: "1.5px dashed #e7ddd1" }
+              }
+            >
+              <span
+                className="text-[10px] font-black mb-1"
+                style={{ color: t ? "rgba(255,255,255,0.85)" : "#cdbfae" }}
+              >
+                {idx + 1}つ目
+              </span>
+              <span
+                className="text-xs font-black leading-tight"
+                style={{ color: t ? "#fff" : "#d8ccbb" }}
+              >
+                {t ?? "？"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ルーレット表示 */}
+      <div className="relative">
+        <Confetti burst={burst} />
+        <div
+          className={`rounded-3xl px-4 flex flex-col items-center justify-center text-center min-h-[140px] ${
+            spinning ? "reel-spinning" : landed ? "reel-land" : ""
+          }`}
+          style={{
+            background: landed
+              ? "linear-gradient(135deg,#fff0f6,#ffe3ef)"
+              : "linear-gradient(135deg,#faf8f5,#f4f0ea)",
+            border: `2px solid ${landed ? "#FF6B9D" : "#efe9e1"}`,
+          }}
+        >
+          {display ? (
+            <>
+              <span
+                className="text-[11px] font-bold tracking-widest uppercase mb-1"
+                style={{ color: spinning ? "#cbb" : "#FF4FA3" }}
+              >
+                {spinning ? "抽選中" : landed ? "決定" : "前回のテーマ"}
+              </span>
+              <span
+                className="text-2xl font-black leading-tight"
+                style={{ color: "#2c2c2c" }}
+              >
+                {display}
+              </span>
+            </>
+          ) : (
+            <span className="text-sm font-bold" style={{ color: "#c2b6a6" }}>
+              ボタンを押して
+              <br />
+              次回の宿題テーマを決めよう
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 操作ボタン */}
+      {done ? (
+        <div className="flex flex-col gap-2">
+          <div
+            className="rounded-2xl px-4 py-3 text-center"
+            style={{ background: "#fff0f6", border: "1.5px solid #ffd0e4" }}
+          >
+            <p className="text-sm font-black" style={{ color: "#FF4FA3" }}>
+              次回の宿題テーマが決定しました
+            </p>
+            <p className="text-base font-black mt-1.5" style={{ color: "#2c2c2c" }}>
+              {decided.join(" / ")}
+            </p>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: "#c98aae" }}>
+              次回のオフ会までに、各テーマに合う持ち歌を1曲ずつ準備してきてください。
+            </p>
+          </div>
+          <button
+            onClick={reset}
+            disabled={saving}
+            className="w-full py-3 rounded-2xl text-sm font-black"
+            style={{ background: "#f0ece5", color: "#888", opacity: saving ? 0.4 : 1 }}
+          >
+            {saving ? "保存中…" : "もう一度引き直す"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <button
+            onClick={spin}
+            disabled={!canSpin}
+            className="flex-1 py-3.5 rounded-2xl text-sm font-black text-white transition-opacity"
+            style={{
+              background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)",
+              boxShadow: "0 4px 14px rgba(255,107,157,0.35)",
+              opacity: canSpin ? 1 : 0.4,
+            }}
+          >
+            {spinLabel}
+          </button>
+          {decided.length > 0 && (
+            <button
+              onClick={reset}
+              disabled={spinning}
+              className="px-4 py-3.5 rounded-2xl text-sm font-bold"
+              style={{ background: "#f0ece5", color: "#888", opacity: spinning ? 0.4 : 1 }}
+            >
+              やり直す
+            </button>
+          )}
+        </div>
+      )}
+
+      {pool.length === 0 && !done && (
+        <p className="text-xs text-center" style={{ color: "#c0392b" }}>
+          抽選できるテーマが足りません。下のリストにテーマを追加してください。
+        </p>
+      )}
+
+      {needsSetup ? (
+        <p className="text-[11px] text-center leading-relaxed" style={{ color: "#bbb" }}>
+          現在この結果はこの端末に保存されています（全員で共有するには共有設定が必要です）
+        </p>
+      ) : (
+        decided.length > 0 && (
+          <p className="text-[11px] text-center" style={{ color: "#bbb" }}>
+            {lastBy ? `最終更新: ${lastBy}・` : ""}この結果はみんなで共有・保存されます
+          </p>
+        )
+      )}
+
+      {/* 宿題リストの編集 */}
+      <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #efe9e1" }}>
+        <button
+          onClick={() => setShowEdit((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3"
+          style={{ background: "#faf8f5" }}
+        >
+          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
+            宿題リストを編集（{themes.length}件）
+          </span>
+          <span className="text-xs font-black" style={{ color: "#FF4FA3" }}>
+            {showEdit ? "閉じる" : "開く"}
+          </span>
+        </button>
+        {showEdit && (
+          <div className="px-4 py-3 flex flex-col gap-3" style={{ background: "#fff" }}>
+            <div className="flex flex-wrap gap-2">
+              {themes.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-bold"
+                  style={{ background: "#f4f0ea", color: "#555" }}
+                >
+                  {t}
+                  <button
+                    onClick={() => removeTheme(t)}
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-sm"
+                    style={{ background: "#fff0f0", color: "#ff6b6b" }}
+                    aria-label={`${t}を削除`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {themes.length === 0 && (
+                <span className="text-xs" style={{ color: "#bbb" }}>テーマがありません。下から追加してください。</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newTheme}
+                onChange={(e) => setNewTheme(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addTheme();
+                }}
+                placeholder="新しいテーマを追加"
+                className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+                style={{ background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent" }}
+              />
+              <button
+                onClick={addTheme}
+                disabled={!newTheme.trim()}
+                className="px-4 rounded-xl text-sm font-bold text-white transition-opacity"
+                style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: newTheme.trim() ? 1 : 0.4 }}
+              >
+                追加
+              </button>
+            </div>
+            <p className="text-[11px]" style={{ color: "#bbb" }}>
+              このリストはこの端末（ブラウザ）に保存されます。抽選では決定済みのテーマは除外され、重複しません。
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── 機能一覧（ここに追加していく）──────────────────── */
 const features: Feature[] = [
   {
@@ -379,6 +849,13 @@ const features: Feature[] = [
     title: "デュエット曲リスト",
     description: "歌いたいデュエット曲を登録し、歌える曲にいいね。全員で共有されます。",
     render: () => <DuetFeature />,
+  },
+  {
+    id: "homework",
+    tab: "宿題ルーレット",
+    title: "宿題ルーレット",
+    description: "ここで決まった3つが次回の宿題テーマです。各テーマに合う持ち歌を1曲ずつ、次回のオフ会までに準備してきてください。",
+    render: () => <HomeworkRoulette />,
   },
 ];
 

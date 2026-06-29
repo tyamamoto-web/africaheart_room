@@ -1,0 +1,96 @@
+"use client";
+
+/* ============================================================
+   宿題ルーレットの抽選結果：Supabase(REST) データ層（依存ライブラリ不要）
+   ------------------------------------------------------------
+   抽選で選ばれた3テーマを全員で共有・永続化するための単一行テーブル。
+   テーブル: homework_result（id=1 の1行だけを使う / SQLは supabase/setup.sql）
+   ※ 宿題リスト（候補）の方は各端末の localStorage に保存（共有しない）。
+   ============================================================ */
+
+const SUPA_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://klwfhpyftnirkxxcmjff.supabase.co";
+const SUPA_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  "sb_publishable_7xk88rvHPopcdMd9MyyE_A_XKvS1MIi";
+
+const ENDPOINT = `${SUPA_URL}/rest/v1/homework_result`;
+const ROW_ID = 1; // 共有する結果は常にこの1行を読み書きする
+
+function headers(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    apikey: SUPA_KEY ?? "",
+    Authorization: `Bearer ${SUPA_KEY ?? ""}`,
+    "Content-Type": "application/json",
+    ...extra,
+  };
+}
+
+export type Homework = { themes: string[]; updatedBy: string; updatedAt: string };
+
+/** テーブル未作成（セットアップ未実施）を表すエラー */
+export class HomeworkSetupError extends Error {
+  constructor(message = "homework_result テーブルが未作成です") {
+    super(message);
+    this.name = "HomeworkSetupError";
+  }
+}
+
+async function readText(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return "";
+  }
+}
+// テーブルが無いときの典型的なレスポンスを判定
+function looksMissingTable(status: number, txt: string): boolean {
+  return (
+    status === 404 ||
+    /42P01|does not exist|Could not find the table|relation .* does not exist/i.test(txt)
+  );
+}
+
+/** 共有中の抽選結果を取得（未設定時は空配列の Homework を返さず例外） */
+export async function getHomework(): Promise<Homework> {
+  const res = await fetch(`${ENDPOINT}?id=eq.${ROW_ID}&select=themes,updated_by,updated_at`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const txt = await readText(res);
+    if (looksMissingTable(res.status, txt)) throw new HomeworkSetupError();
+    throw new Error(`宿題結果の取得に失敗しました (${res.status})`);
+  }
+  const rows = (await res.json()) as Array<{
+    themes?: string[];
+    updated_by?: string;
+    updated_at?: string;
+  }>;
+  const row = Array.isArray(rows) ? rows[0] : undefined;
+  return {
+    themes: row?.themes ?? [],
+    updatedBy: row?.updated_by ?? "",
+    updatedAt: row?.updated_at ?? "",
+  };
+}
+
+/** 抽選結果を保存（id=1 を upsert。全員に共有される） */
+export async function saveHomework(themes: string[], by: string): Promise<void> {
+  const body = {
+    id: ROW_ID,
+    themes,
+    updated_by: by,
+    updated_at: new Date().toISOString(),
+  };
+  const res = await fetch(`${ENDPOINT}?on_conflict=id`, {
+    method: "POST",
+    headers: headers({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const txt = await readText(res);
+    if (looksMissingTable(res.status, txt)) throw new HomeworkSetupError();
+    throw new Error(`宿題結果の保存に失敗しました (${res.status})`);
+  }
+}

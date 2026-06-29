@@ -30,3 +30,28 @@ create policy "anon read"   on public.duet_songs for select using (true);
 create policy "anon insert" on public.duet_songs for insert with check (true);
 create policy "anon update" on public.duet_songs for update using (true) with check (true);
 create policy "anon delete" on public.duet_songs for delete using (true);
+
+
+-- ============================================================
+-- 宿題ルーレットの抽選結果（全員で共有する単一行 id=1）
+-- ============================================================
+create table if not exists public.homework_result (
+  id smallint primary key,                          -- 常に 1 を使う
+  themes text[] not null default '{}',              -- 抽選で決まったテーマ（最大3件）
+  updated_by text not null default '',              -- 最後に更新した人の名前
+  updated_at timestamptz not null default now()
+);
+
+-- 共有用の1行を用意（無ければ作成）
+insert into public.homework_result (id, themes) values (1, '{}')
+  on conflict (id) do nothing;
+
+alter table public.homework_result enable row level security;
+
+drop policy if exists "hw anon read"   on public.homework_result;
+drop policy if exists "hw anon insert" on public.homework_result;
+drop policy if exists "hw anon update" on public.homework_result;
+
+create policy "hw anon read"   on public.homework_result for select using (true);
+create policy "hw anon insert" on public.homework_result for insert with check (true);
+create policy "hw anon update" on public.homework_result for update using (true) with check (true);
