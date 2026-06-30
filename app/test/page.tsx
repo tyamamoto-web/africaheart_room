@@ -306,7 +306,6 @@ function DuetFeature() {
 
               <div className="flex flex-col gap-2">
                 {list.map((s) => {
-                  const mine = s.owner_id === me;
                   const liked = hasLiked(s.likes, me);
                   const names = likerNames(s.likes);
                   if (editId === s.id) {
@@ -353,12 +352,10 @@ function DuetFeature() {
                           <span className="text-xs font-black" style={{ color: liked ? "#FF4FA3" : "#888" }}>歌える</span>
                           <span className="text-xs font-black" style={{ color: liked ? "#FF4FA3" : "#bbb" }}>{s.likes.length}</span>
                         </button>
-                        {mine && (
-                          <div className="flex-shrink-0 flex gap-1">
-                            <button onClick={() => startEdit(s)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
-                            <button onClick={() => handleDelete(s.id)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>削除</button>
-                          </div>
-                        )}
+                        <div className="flex-shrink-0 flex gap-1">
+                          <button onClick={() => startEdit(s)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
+                          <button onClick={() => handleDelete(s.id)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>削除</button>
+                        </div>
                       </div>
                       {names.length > 0 && (
                         <p className="text-[11px] mt-2 pl-1 leading-relaxed" style={{ color: "#FF4FA3" }}>
@@ -374,7 +371,7 @@ function DuetFeature() {
         </div>
       )}
       <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-        「歌える」を押して名前を入れると意思表示できます。自分が登録した曲は編集・削除できます。内容は全員に共有され、約4秒ごとに自動更新されます。
+        「歌える」を押して名前を入れると意思表示できます。曲はどなたでも編集・削除できます（みんなで管理）。内容は全員に共有され、約4秒ごとに自動更新されます。
       </p>
     </div>
   );
