@@ -13,9 +13,8 @@ import {
   setNickname,
   keyLabel,
   makeLike,
-  hasLiked,
-  likeId,
-  likerNames,
+  likeName,
+  getLikes,
   type DuetSong,
 } from "@/lib/duet";
 import {
@@ -158,21 +157,46 @@ function DuetFeature() {
     }
   }
 
-  async function toggleLike(s: DuetSong) {
-    const liked = hasLiked(s.likes, me);
-    let next: string[];
-    if (liked) {
-      next = s.likes.filter((e) => likeId(e) !== me);
-    } else {
-      const def = getNickname() || name.trim();
-      const input = window.prompt("「歌える！」を表明します。お名前を入力してください", def);
-      if (input === null) return;
-      const who = input.trim();
-      if (!who) return;
-      setNickname(who);
-      setName(who);
-      next = [...s.likes, makeLike(me, who)];
+  // 「歌える」を1つ追加（複数メンバーが名前付きでスタンプ可能）
+  async function addLike(s: DuetSong) {
+    const def = getNickname() || name.trim();
+    const input = window.prompt("「歌える！」を表明します。お名前を入力してください", def);
+    if (input === null) return;
+    const who = input.trim();
+    if (!who) return;
+    setNickname(who);
+    setName(who);
+    const entry = makeLike(me, who); // 端末ID＋名前で一意（同名でも別端末なら別スタンプ）
+    // 同時押しでの取りこぼしを防ぐため、書き込み直前に最新のlikesを取得
+    let base = s.likes;
+    try {
+      base = await getLikes(s.id);
+    } catch {
+      /* 取得失敗時はローカルのlikesで続行 */
     }
+    if (base.includes(entry)) {
+      // 同じ端末＆同名は既にスタンプ済み。最新を反映して終了（重複させない）
+      setSongs((prev) => prev.map((x) => (x.id === s.id ? { ...x, likes: base } : x)));
+      return;
+    }
+    const next = [...base, entry];
+    setSongs((prev) => prev.map((x) => (x.id === s.id ? { ...x, likes: next } : x))); // 楽観更新
+    try {
+      await updateSong(s.id, { likes: next });
+    } catch {
+      refresh();
+    }
+  }
+
+  // 特定のスタンプ（entry）だけを取り消し（同名が別にいても巻き込まない）
+  async function removeLike(s: DuetSong, entry: string) {
+    let base = s.likes;
+    try {
+      base = await getLikes(s.id);
+    } catch {
+      /* 取得失敗時はローカルのlikesで続行 */
+    }
+    const next = base.filter((e) => e !== entry);
     setSongs((prev) => prev.map((x) => (x.id === s.id ? { ...x, likes: next } : x))); // 楽観更新
     try {
       await updateSong(s.id, { likes: next });
@@ -306,8 +330,8 @@ function DuetFeature() {
 
               <div className="flex flex-col gap-2">
                 {list.map((s) => {
-                  const liked = hasLiked(s.likes, me);
-                  const names = likerNames(s.likes);
+                  const likeEntries = s.likes.filter((e) => likeName(e).trim()); // 名前ありのスタンプ
+
                   if (editId === s.id) {
                     return (
                       <div key={s.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #FF6B9D55" }}>
@@ -338,29 +362,49 @@ function DuetFeature() {
                           <p className="text-sm font-bold truncate" style={{ color: "#2c2c2c" }}>{s.title}</p>
                           <p className="text-xs truncate" style={{ color: "#999" }}>{s.artist || "—"}</p>
                           {s.part && s.part.trim() && (
-                            <p className="text-[11px] font-semibold truncate mt-0.5" style={{ color: "#845ef7" }}>
+                            <p className="text-[11px] font-semibold mt-0.5 leading-relaxed break-words" style={{ color: "#845ef7" }}>
                               {s.part.trim()} を歌ってほしい
                             </p>
                           )}
                         </div>
                         <button
-                          onClick={() => toggleLike(s)}
+                          onClick={() => addLike(s)}
                           className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
-                          style={{ background: liked ? "#ffe8f1" : "#f4f0ea", border: `1.5px solid ${liked ? "#FF6B9D" : "transparent"}` }}
-                          title="「歌える！」を表明"
+                          style={{ background: likeEntries.length ? "#ffe8f1" : "#f4f0ea", border: `1.5px solid ${likeEntries.length ? "#FF6B9D" : "transparent"}` }}
+                          title="「歌える！」を表明（複数人OK）"
                         >
-                          <span className="text-xs font-black" style={{ color: liked ? "#FF4FA3" : "#888" }}>歌える</span>
-                          <span className="text-xs font-black" style={{ color: liked ? "#FF4FA3" : "#bbb" }}>{s.likes.length}</span>
+                          <span className="text-xs font-black" style={{ color: likeEntries.length ? "#FF4FA3" : "#888" }}>歌える</span>
+                          <span className="text-xs font-black" style={{ color: likeEntries.length ? "#FF4FA3" : "#bbb" }}>{likeEntries.length}</span>
                         </button>
                         <div className="flex-shrink-0 flex gap-1">
                           <button onClick={() => startEdit(s)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
                           <button onClick={() => handleDelete(s.id)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>削除</button>
                         </div>
                       </div>
-                      {names.length > 0 && (
-                        <p className="text-[11px] mt-2 pl-1 leading-relaxed" style={{ color: "#FF4FA3" }}>
-                          歌える：{names.join("・")}
-                        </p>
+                      {likeEntries.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-1">
+                          <span className="text-[11px] font-bold" style={{ color: "#bbb" }}>歌える</span>
+                          {likeEntries.map((e) => {
+                            const n = likeName(e).trim();
+                            return (
+                              <span
+                                key={e}
+                                className="inline-flex items-center gap-0.5 rounded-full pl-2.5 pr-0.5 py-1 text-[11px] font-bold"
+                                style={{ background: "#ffe8f1", color: "#FF4FA3" }}
+                              >
+                                {n}
+                                <button
+                                  onClick={() => removeLike(s, e)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs"
+                                  style={{ background: "transparent", color: "#FF6B9D" }}
+                                  aria-label={`${n}の歌えるを取り消し`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   );

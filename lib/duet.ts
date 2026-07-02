@@ -100,6 +100,17 @@ export async function deleteSong(id: string): Promise<void> {
   if (!res.ok) throw new Error(`削除に失敗しました (${res.status})`);
 }
 
+// 1曲の最新 likes を取得（同時押しでの取りこぼし防止のため、更新直前に読む）
+export async function getLikes(id: string): Promise<string[]> {
+  const res = await fetch(`${endpoint()}?id=eq.${id}&select=likes`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`いいねの取得に失敗しました (${res.status})`);
+  const rows = (await res.json()) as Array<{ likes?: string[] }>;
+  return Array.isArray(rows) && rows[0] ? rows[0].likes ?? [] : [];
+}
+
 /* ── 端末ID・ニックネーム（localStorage）──────────────── */
 export function getDeviceId(): string {
   if (typeof window === "undefined") return "";
