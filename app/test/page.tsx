@@ -1602,7 +1602,7 @@ const features: Feature[] = [
     id: "profile",
     tab: "プロフィール",
     title: "メンバープロフィール",
-    description: "メンバーの自己紹介と近況コメントを全員で共有します。どなたでも編集できます。",
+    description: "",
     render: () => <ProfileFeature />,
   },
 ];
@@ -1670,7 +1670,9 @@ export default function TestPage() {
               <div className="card overflow-hidden animate-fade-up">
                 <div className="px-4 py-3 border-b" style={{ borderColor: "#f4f0ea" }}>
                   <p className="text-sm font-black" style={{ color: "#2c2c2c" }}>{active.title}</p>
-                  <p className="text-xs mt-1" style={{ color: "#aaa" }}>{active.description}</p>
+                  {active.description && (
+                    <p className="text-xs mt-1" style={{ color: "#aaa" }}>{active.description}</p>
+                  )}
                 </div>
                 <div className="px-4 py-6 flex justify-center">{active.render()}</div>
               </div>
