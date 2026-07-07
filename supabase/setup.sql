@@ -86,3 +86,30 @@ alter table public.homework_themes alter column month drop default;
 alter table public.homework_themes drop constraint if exists homework_themes_text_key;
 alter table public.homework_themes drop constraint if exists homework_themes_month_text_key;
 alter table public.homework_themes add constraint homework_themes_month_text_key unique (month, text);
+
+
+-- ============================================================
+-- メンバープロフィール（自己紹介・近況）：全員で共有・編集
+-- ============================================================
+create table if not exists public.member_profiles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,                     -- メンバー名
+  intro text not null default '',         -- 自己紹介
+  fav text not null default '',           -- 好きな曲・アーティスト（任意）
+  status text not null default '',        -- 近況コメント
+  owner_id text not null default '',      -- 登録した端末ID（記録用）
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.member_profiles enable row level security;
+
+drop policy if exists "mp anon read"   on public.member_profiles;
+drop policy if exists "mp anon insert" on public.member_profiles;
+drop policy if exists "mp anon update" on public.member_profiles;
+drop policy if exists "mp anon delete" on public.member_profiles;
+
+create policy "mp anon read"   on public.member_profiles for select using (true);
+create policy "mp anon insert" on public.member_profiles for insert with check (true);
+create policy "mp anon update" on public.member_profiles for update using (true) with check (true);
+create policy "mp anon delete" on public.member_profiles for delete using (true);

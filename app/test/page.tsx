@@ -26,6 +26,15 @@ import {
   deleteTheme as apiDeleteTheme,
   type ThemeRow,
 } from "@/lib/homework";
+import {
+  isProfilesConfigured,
+  listProfiles,
+  addProfile,
+  updateProfile,
+  deleteProfile,
+  ProfileSetupError,
+  type Profile,
+} from "@/lib/profiles";
 
 /* ============================================================
    動作確認ページ（タブ切り替え式）
@@ -1257,6 +1266,315 @@ function SingingOrderRoulette() {
   );
 }
 
+/* ── メンバープロフィール：自己紹介と近況を全員で共有 ──── */
+function ProfileFeature() {
+  const [me, setMe] = useState("");
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 追加フォーム（開閉式）
+  const [showAdd, setShowAdd] = useState(false);
+  const [aName, setAName] = useState("");
+  const [aIntro, setAIntro] = useState("");
+  const [aFav, setAFav] = useState("");
+  const [aStatus, setAStatus] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  // 編集
+  const [editId, setEditId] = useState<string | null>(null);
+  const [eName, setEName] = useState("");
+  const [eIntro, setEIntro] = useState("");
+  const [eFav, setEFav] = useState("");
+  const [eStatus, setEStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // 入力中はポーリングで一覧を上書きしない（編集・保存中の巻き込み防止）
+  const busyRef = useRef(false);
+  useEffect(() => {
+    busyRef.current = editId !== null || saving || adding;
+  }, [editId, saving, adding]);
+
+  const refresh = useCallback(async (force = false) => {
+    try {
+      const data = await listProfiles();
+      // 明示的な再取得(force=追加/保存/削除の直後)は編集中でも反映する。
+      // 背景ポーリングだけを busyRef でガードし、入力中の一覧上書きを防ぐ。
+      if (force || !busyRef.current) setProfiles(data);
+      setNeedsSetup(false);
+      setError(null);
+    } catch (e) {
+      if (e instanceof ProfileSetupError) setNeedsSetup(true);
+      else setError(e instanceof Error ? e.message : "読み込みに失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isProfilesConfigured()) {
+      setLoading(false);
+      return;
+    }
+    setMe(getDeviceId());
+    setAName(getNickname());
+    refresh();
+    const id = setInterval(() => refresh(), 5000); // 背景ポーリング（他メンバーの追加・近況更新を反映）
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  const canAdd = !!aName.trim() && !adding && !needsSetup;
+
+  async function handleAdd() {
+    if (!canAdd) return;
+    setAdding(true);
+    try {
+      const who = aName.trim();
+      setNickname(who);
+      await addProfile({
+        name: who,
+        intro: aIntro.trim(),
+        fav: aFav.trim(),
+        status: aStatus.trim(),
+        owner_id: me,
+      });
+      setAIntro("");
+      setAFav("");
+      setAStatus("");
+      setShowAdd(false);
+      await refresh(true);
+    } catch (e) {
+      if (e instanceof ProfileSetupError) setNeedsSetup(true);
+      else setError(e instanceof Error ? e.message : "追加に失敗しました");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  function startEdit(p: Profile) {
+    setEditId(p.id);
+    setEName(p.name);
+    setEIntro(p.intro);
+    setEFav(p.fav);
+    setEStatus(p.status);
+  }
+  async function saveEdit(id: string) {
+    const n = eName.trim();
+    if (!n) return;
+    setSaving(true);
+    try {
+      await updateProfile(id, {
+        name: n,
+        intro: eIntro.trim(),
+        fav: eFav.trim(),
+        status: eStatus.trim(),
+      });
+      setEditId(null);
+      await refresh(true);
+    } catch (e) {
+      if (e instanceof ProfileSetupError) setNeedsSetup(true);
+      else setError(e instanceof Error ? e.message : "更新に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`「${name || "このメンバー"}」のプロフィールを削除しますか？`)) return;
+    try {
+      await deleteProfile(id);
+      if (editId === id) setEditId(null);
+      await refresh(true);
+    } catch (e) {
+      if (e instanceof ProfileSetupError) setNeedsSetup(true);
+      else setError(e instanceof Error ? e.message : "削除に失敗しました");
+    }
+  }
+
+  const inputStyle = { background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent" } as const;
+
+  // 未接続：セットアップ案内
+  if (!isProfilesConfigured()) {
+    return (
+      <div className="w-full">
+        <div className="rounded-xl px-4 py-4" style={{ background: "#fffbe6" }}>
+          <p className="text-sm font-bold mb-1" style={{ color: "#92400e" }}>データベース未接続</p>
+          <p className="text-xs leading-relaxed" style={{ color: "#a16207" }}>
+            みんなで共有するには Supabase の接続設定が必要です。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full flex flex-col gap-4">
+      {error && (
+        <p className="text-xs px-3 py-2 rounded-lg" style={{ background: "#fff0f0", color: "#c0392b" }}>
+          {error}
+        </p>
+      )}
+
+      {/* 追加フォーム（開閉式） */}
+      <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #efe9e1" }}>
+        <button
+          onClick={() => setShowAdd((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3"
+          style={{ background: "#faf8f5" }}
+        >
+          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
+            自己紹介を追加する
+          </span>
+          <span className="text-xs font-black" style={{ color: "#FF4FA3" }}>
+            {showAdd ? "閉じる" : "開く"}
+          </span>
+        </button>
+        {showAdd && (
+          <div className="px-4 py-3 flex flex-col gap-2" style={{ background: "#fff" }}>
+            <input
+              value={aName}
+              onChange={(e) => setAName(e.target.value)}
+              placeholder="お名前（必須）"
+              disabled={needsSetup}
+              className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+              style={inputStyle}
+            />
+            <textarea
+              value={aIntro}
+              onChange={(e) => setAIntro(e.target.value)}
+              placeholder="自己紹介（カラオケ歴・好きなジャンルなど）"
+              rows={2}
+              disabled={needsSetup}
+              className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none"
+              style={inputStyle}
+            />
+            <input
+              value={aFav}
+              onChange={(e) => setAFav(e.target.value)}
+              placeholder="好きな曲・アーティスト（任意）"
+              disabled={needsSetup}
+              className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+              style={inputStyle}
+            />
+            <textarea
+              value={aStatus}
+              onChange={(e) => setAStatus(e.target.value)}
+              placeholder="近況（最近ハマっている曲・ひとことなど）"
+              rows={2}
+              disabled={needsSetup}
+              className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none"
+              style={inputStyle}
+            />
+            <button
+              onClick={handleAdd}
+              disabled={!canAdd}
+              className="w-full mt-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity"
+              style={{
+                background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)",
+                boxShadow: "0 3px 10px rgba(255,107,157,0.3)",
+                opacity: canAdd ? 1 : 0.4,
+              }}
+            >
+              {adding ? "追加中…" : "＋ メンバーを追加"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 一覧 */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>メンバー</p>
+        <span className="text-[11px]" style={{ color: "#ccc" }}>{profiles.length}人</span>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-center py-6" style={{ color: "#bbb" }}>読み込み中…</p>
+      ) : profiles.length === 0 ? (
+        needsSetup ? (
+          <p className="text-sm text-center py-6 leading-relaxed" style={{ color: "#bbb" }}>
+            共有設定が完了すると、ここにメンバーの自己紹介が表示されます。
+          </p>
+        ) : (
+          <p className="text-sm text-center py-6 leading-relaxed" style={{ color: "#bbb" }}>
+            まだメンバーがいません。
+            <br />
+            上の「自己紹介を追加する」から登録しましょう。
+          </p>
+        )
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {profiles.map((p) => {
+            if (editId === p.id) {
+              return (
+                <div key={p.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #FF6B9D55" }}>
+                  <input value={eName} onChange={(e) => setEName(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="お名前（必須）" />
+                  <textarea value={eIntro} onChange={(e) => setEIntro(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" style={inputStyle} placeholder="自己紹介" />
+                  <input value={eFav} onChange={(e) => setEFav(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="好きな曲・アーティスト（任意）" />
+                  <textarea value={eStatus} onChange={(e) => setEStatus(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" style={inputStyle} placeholder="近況" />
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => saveEdit(p.id)} disabled={saving || !eName.trim()} className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: saving || !eName.trim() ? 0.4 : 1 }}>
+                      {saving ? "保存中…" : "保存"}
+                    </button>
+                    <button onClick={() => setEditId(null)} className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "#f4f0ea", color: "#888" }}>取消</button>
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div key={p.id} className="rounded-2xl p-3.5" style={{ background: "#fff", border: "1px solid #efe9e1" }}>
+                <div className="flex items-center gap-3">
+                  <span className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-base font-black text-white" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }}>
+                    {(p.name.trim() || "?").charAt(0)}
+                  </span>
+                  <p className="flex-1 min-w-0 text-base font-black break-words" style={{ color: "#2c2c2c" }}>
+                    {p.name.trim() || "（名前なし）"}
+                  </p>
+                  <div className="flex-shrink-0 flex gap-1">
+                    <button onClick={() => startEdit(p)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
+                    <button onClick={() => handleDelete(p.id, p.name)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>削除</button>
+                  </div>
+                </div>
+
+                {p.intro.trim() && (
+                  <p className="text-sm mt-2.5 leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#555" }}>
+                    {p.intro.trim()}
+                  </p>
+                )}
+
+                {p.fav.trim() && (
+                  <div className="flex items-baseline gap-1.5 mt-2 flex-wrap">
+                    <span className="flex-shrink-0 text-[10px] font-black tracking-wider" style={{ color: "#bbb" }}>好き</span>
+                    <span className="text-xs font-bold break-words" style={{ color: "#845ef7" }}>{p.fav.trim()}</span>
+                  </div>
+                )}
+
+                {p.status.trim() && (
+                  <div className="mt-2.5 rounded-xl px-3 py-2" style={{ background: "#fff0f6", border: "1px solid #ffd9e9" }}>
+                    <p className="text-[10px] font-black tracking-widest uppercase mb-0.5" style={{ color: "#FF4FA3" }}>近況</p>
+                    <p className="text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#2c2c2c" }}>
+                      {p.status.trim()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {needsSetup ? (
+        <p className="text-[11px] text-center leading-relaxed" style={{ color: "#bbb" }}>
+          共有設定が未完了です（プロフィールを全員で共有するには member_profiles テーブルの作成が必要です）
+        </p>
+      ) : (
+        <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
+          自己紹介と近況は全員に共有され、約5秒ごとに自動更新されます。どなたでも編集・削除できます（みんなで管理）。
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ── 機能一覧（ここに追加していく）──────────────────── */
 const features: Feature[] = [
   {
@@ -1279,6 +1597,13 @@ const features: Feature[] = [
     title: "歌唱順ルーレット",
     description: "参加者からスロット形式で最初に歌う人を抽選し、右回り／左回りの進行方向を決めます。",
     render: () => <SingingOrderRoulette />,
+  },
+  {
+    id: "profile",
+    tab: "プロフィール",
+    title: "メンバープロフィール",
+    description: "メンバーの自己紹介と近況コメントを全員で共有します。どなたでも編集できます。",
+    render: () => <ProfileFeature />,
   },
 ];
 
