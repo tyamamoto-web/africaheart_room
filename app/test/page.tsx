@@ -32,6 +32,7 @@ import {
   addProfile,
   updateProfile,
   deleteProfile,
+  getLatestUpdatedAt,
   ProfileSetupError,
   type Profile,
 } from "@/lib/profiles";
@@ -47,12 +48,16 @@ import {
    これだけでタブが1つ増え、切り替えて表示できます。
    ============================================================ */
 
+type RenderCtx = {
+  sinceSeen: string; // この時刻より後に更新されたプロフィールを「新着」扱いにする基準
+  onLatest: (iso: string) => void; // 表示中に判明したDBの最終更新時刻を親へ通知（未読判定を即時化）
+};
 type Feature = {
   id: string;
   tab: string;          // タブに表示する短い名前
   title: string;        // 機能の正式名称
   description: string;  // 機能の説明
-  render: () => ReactNode;
+  render: (ctx: RenderCtx) => ReactNode;
 };
 
 /* ── デュエット：歌いたいデュエット曲を登録・いいね ──── */
@@ -177,11 +182,13 @@ function DuetFeature() {
     setName(who);
     const entry = makeLike(me, who); // 端末ID＋名前で一意（同名でも別端末なら別スタンプ）
     // 同時押しでの取りこぼしを防ぐため、書き込み直前に最新のlikesを取得
-    let base = s.likes;
+    let base: string[];
     try {
       base = await getLikes(s.id);
     } catch {
-      /* 取得失敗時はローカルのlikesで続行 */
+      // 取得に失敗したら古いスナップショットで配列全体を上書きしない（他メンバーのスタンプを消さない）
+      setError("通信が不安定なため反映できませんでした。もう一度お試しください。");
+      return;
     }
     if (base.includes(entry)) {
       // 同じ端末＆同名は既にスタンプ済み。最新を反映して終了（重複させない）
@@ -199,11 +206,13 @@ function DuetFeature() {
 
   // 特定のスタンプ（entry）だけを取り消し（同名が別にいても巻き込まない）
   async function removeLike(s: DuetSong, entry: string) {
-    let base = s.likes;
+    let base: string[];
     try {
       base = await getLikes(s.id);
     } catch {
-      /* 取得失敗時はローカルのlikesで続行 */
+      // 取得に失敗したら配列全体を上書きしない（他メンバーのスタンプを巻き込まない）
+      setError("通信が不安定なため取り消せませんでした。もう一度お試しください。");
+      return;
     }
     const next = base.filter((e) => e !== entry);
     setSongs((prev) => prev.map((x) => (x.id === s.id ? { ...x, likes: next } : x))); // 楽観更新
@@ -529,7 +538,6 @@ function HomeworkRoulette() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const busyRef = useRef(false); // スピン中・保存中はポーリングで上書きしない
-  const migratedRef = useRef(false); // 端末の結果をDBへ一度だけ引き継ぐ
 
   // 現在の月を初期選択（ハイドレーション差異を避けるためマウント後に設定）
   useEffect(() => {
@@ -580,23 +588,10 @@ function HomeworkRoulette() {
       const hw = await getHomework();
       setLastBy(hw.updatedBy);
       if (!busyRef.current) {
-        // DBが空でも端末に結果が残っていれば、一度だけDBへ引き継ぐ
-        if (hw.themes.length === 0 && !migratedRef.current) {
-          const local = loadLocalResult();
-          if (local.length > 0) {
-            migratedRef.current = true;
-            setDecided(local);
-            void saveResult(local);
-          } else {
-            migratedRef.current = true;
-            setDecided(hw.themes);
-            saveLocalResult(hw.themes);
-          }
-        } else {
-          migratedRef.current = true;
-          setDecided(hw.themes);
-          saveLocalResult(hw.themes);
-        }
+        // 共有DBの結果を常に正とする。端末の控えはDBに追従させるだけで、
+        // 端末に残った古い結果をDBへ再アップロードしない（リセットの巻き戻し防止）。
+        setDecided(hw.themes);
+        saveLocalResult(hw.themes);
       }
     } catch (e) {
       if (e instanceof HomeworkSetupError) setupMissing = true;
@@ -606,7 +601,7 @@ function HomeworkRoulette() {
     setNeedsSetup(setupMissing);
     setSyncErr(errMsg);
     setLoading(false);
-  }, [saveResult]);
+  }, []);
 
   useEffect(() => {
     // 端末に残る前回結果を即時表示（DB取得前でも表示が崩れない）
@@ -683,22 +678,28 @@ function HomeworkRoulette() {
       setSyncErr(`${selMonth}月は${MAX_PER_MONTH}件まで登録できます`);
       return;
     }
+    busyRef.current = true; // 楽観更新中はポーリングで一覧を上書きしない（追加チップの一瞬消え防止）
     setAllThemes((prev) => [...prev, { month: selMonth, text: t }]);
     try {
       await apiAddTheme(selMonth, t);
     } catch (e) {
       if (e instanceof HomeworkSetupError) setNeedsSetup(true);
       else setSyncErr(e instanceof Error ? e.message : "テーマの追加に失敗しました");
+    } finally {
+      busyRef.current = false;
     }
     refresh();
   }
   async function removeTheme(t: string) {
+    busyRef.current = true; // 楽観更新中はポーリングで一覧を上書きしない
     setAllThemes((prev) => prev.filter((x) => !(x.month === selMonth && x.text === t)));
     try {
       await apiDeleteTheme(selMonth, t);
     } catch (e) {
       if (e instanceof HomeworkSetupError) setNeedsSetup(true);
       else setSyncErr(e instanceof Error ? e.message : "テーマの削除に失敗しました");
+    } finally {
+      busyRef.current = false;
     }
     refresh();
   }
@@ -1267,7 +1268,33 @@ function SingingOrderRoulette() {
 }
 
 /* ── メンバープロフィール：自己紹介と近況を全員で共有 ──── */
-function ProfileFeature() {
+// プロフィールの「最後に見た時刻」をこの端末に記録し、それ以降の更新を新着として扱う
+const PROFILE_SEEN_KEY = "africaheart_profile_seen_v1";
+function loadProfileSeen(): string {
+  try {
+    return localStorage.getItem(PROFILE_SEEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+function saveProfileSeen(iso: string) {
+  try {
+    localStorage.setItem(PROFILE_SEEN_KEY, iso);
+  } catch {
+    /* 保存できなくても続行 */
+  }
+}
+// ISO文字列を数値(ms)に。未設定("")や不正値は -Infinity（＝常に「それより新しい」）
+function tMs(s: string): number {
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? -Infinity : t;
+}
+function isNewer(a: string, b: string): boolean {
+  return tMs(a) > tMs(b);
+}
+const BIRTH_MONTHS = Array.from({ length: 12 }, (_, i) => i + 1); // 1〜12月
+
+function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: (iso: string) => void }) {
   const [me, setMe] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1280,6 +1307,7 @@ function ProfileFeature() {
   const [aIntro, setAIntro] = useState("");
   const [aFav, setAFav] = useState("");
   const [aStatus, setAStatus] = useState("");
+  const [aBirth, setABirth] = useState(0); // 0=未設定, 1〜12
   const [adding, setAdding] = useState(false);
 
   // 編集
@@ -1288,7 +1316,9 @@ function ProfileFeature() {
   const [eIntro, setEIntro] = useState("");
   const [eFav, setEFav] = useState("");
   const [eStatus, setEStatus] = useState("");
+  const [eBirth, setEBirth] = useState(0); // 0=未設定, 1〜12
   const [saving, setSaving] = useState(false);
+  const editOrigRef = useRef<Profile | null>(null); // 編集開始時のスナップショット（差分だけ保存するため）
 
   // 入力中はポーリングで一覧を上書きしない（編集・保存中の巻き込み防止）
   const busyRef = useRef(false);
@@ -1301,7 +1331,12 @@ function ProfileFeature() {
       const data = await listProfiles();
       // 明示的な再取得(force=追加/保存/削除の直後)は編集中でも反映する。
       // 背景ポーリングだけを busyRef でガードし、入力中の一覧上書きを防ぐ。
-      if (force || !busyRef.current) setProfiles(data);
+      if (force || !busyRef.current) {
+        setProfiles(data);
+        // 実際に表示した内容の最終更新時刻を親へ通知（未読ドットの即時解消に使う）
+        const maxU = data.reduce((m, p) => (isNewer(p.updated_at, m) ? p.updated_at : m), "");
+        if (maxU) onLatest(maxU);
+      }
       setNeedsSetup(false);
       setError(null);
     } catch (e) {
@@ -1310,7 +1345,7 @@ function ProfileFeature() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onLatest]);
 
   useEffect(() => {
     if (!isProfilesConfigured()) {
@@ -1337,11 +1372,13 @@ function ProfileFeature() {
         intro: aIntro.trim(),
         fav: aFav.trim(),
         status: aStatus.trim(),
+        birth_month: aBirth || null,
         owner_id: me,
       });
       setAIntro("");
       setAFav("");
       setAStatus("");
+      setABirth(0);
       setShowAdd(false);
       await refresh(true);
     } catch (e) {
@@ -1353,23 +1390,33 @@ function ProfileFeature() {
   }
 
   function startEdit(p: Profile) {
+    editOrigRef.current = p; // 編集開始時点のスナップショットを保持
     setEditId(p.id);
     setEName(p.name);
     setEIntro(p.intro);
     setEFav(p.fav);
     setEStatus(p.status);
+    setEBirth(p.birth_month ?? 0);
   }
   async function saveEdit(id: string) {
     const n = eName.trim();
     if (!n) return;
+    // 変更した項目だけを送る（未変更項目は送らない＝他メンバーの同時編集を上書きしない）
+    const orig = editOrigRef.current;
+    const birth = eBirth || null;
+    const patch: Partial<Pick<Profile, "name" | "intro" | "fav" | "status" | "birth_month">> = {};
+    if (!orig || n !== orig.name) patch.name = n;
+    if (!orig || eIntro.trim() !== orig.intro) patch.intro = eIntro.trim();
+    if (!orig || eFav.trim() !== orig.fav) patch.fav = eFav.trim();
+    if (!orig || eStatus.trim() !== orig.status) patch.status = eStatus.trim();
+    if (!orig || birth !== (orig.birth_month ?? null)) patch.birth_month = birth;
+    if (Object.keys(patch).length === 0) {
+      setEditId(null); // 変更なしなら書き込まない
+      return;
+    }
     setSaving(true);
     try {
-      await updateProfile(id, {
-        name: n,
-        intro: eIntro.trim(),
-        fav: eFav.trim(),
-        status: eStatus.trim(),
-      });
+      await updateProfile(id, patch);
       setEditId(null);
       await refresh(true);
     } catch (e) {
@@ -1456,6 +1503,21 @@ function ProfileFeature() {
               className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none"
               style={inputStyle}
             />
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={inputStyle}>
+              <span className="text-xs font-bold flex-shrink-0" style={{ color: "#888" }}>誕生月（任意）</span>
+              <select
+                value={aBirth}
+                onChange={(e) => setABirth(Number(e.target.value))}
+                disabled={needsSetup}
+                className="flex-1 text-sm font-bold bg-transparent focus:outline-none"
+                style={{ color: "#2c2c2c" }}
+              >
+                <option value={0}>未設定</option>
+                {BIRTH_MONTHS.map((m) => (
+                  <option key={m} value={m}>{m}月</option>
+                ))}
+              </select>
+            </div>
             <textarea
               value={aStatus}
               onChange={(e) => setAStatus(e.target.value)}
@@ -1510,6 +1572,15 @@ function ProfileFeature() {
                   <input value={eName} onChange={(e) => setEName(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="お名前（必須）" />
                   <textarea value={eIntro} onChange={(e) => setEIntro(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" style={inputStyle} placeholder="自己紹介" />
                   <input value={eFav} onChange={(e) => setEFav(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="好きな曲・アーティスト（任意）" />
+                  <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={inputStyle}>
+                    <span className="text-xs font-bold flex-shrink-0" style={{ color: "#888" }}>誕生月（任意）</span>
+                    <select value={eBirth} onChange={(e) => setEBirth(Number(e.target.value))} className="flex-1 text-sm font-bold bg-transparent focus:outline-none" style={{ color: "#2c2c2c" }}>
+                      <option value={0}>未設定</option>
+                      {BIRTH_MONTHS.map((m) => (
+                        <option key={m} value={m}>{m}月</option>
+                      ))}
+                    </select>
+                  </div>
                   <textarea value={eStatus} onChange={(e) => setEStatus(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" style={inputStyle} placeholder="近況" />
                   <div className="flex items-center gap-2">
                     <button onClick={() => saveEdit(p.id)} disabled={saving || !eName.trim()} className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: saving || !eName.trim() ? 0.4 : 1 }}>
@@ -1520,15 +1591,24 @@ function ProfileFeature() {
                 </div>
               );
             }
+            const isNew = isNewer(p.updated_at, sinceSeen);
+            const birthLabel = p.birth_month ? `${p.birth_month}月` : "";
             return (
-              <div key={p.id} className="rounded-2xl p-3.5" style={{ background: "#fff", border: "1px solid #efe9e1" }}>
+              <div key={p.id} className="rounded-2xl p-3.5" style={{ background: "#fff", border: isNew ? "1.5px solid #ffb3d1" : "1px solid #efe9e1" }}>
                 <div className="flex items-center gap-3">
                   <span className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-base font-black text-white" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }}>
                     {(p.name.trim() || "?").charAt(0)}
                   </span>
-                  <p className="flex-1 min-w-0 text-base font-black break-words" style={{ color: "#2c2c2c" }}>
-                    {p.name.trim() || "（名前なし）"}
-                  </p>
+                  <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                    <p className="text-base font-black break-words" style={{ color: "#2c2c2c" }}>
+                      {p.name.trim() || "（名前なし）"}
+                    </p>
+                    {isNew && (
+                      <span className="flex-shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: "#ff3b6b" }}>
+                        新着
+                      </span>
+                    )}
+                  </div>
                   <div className="flex-shrink-0 flex gap-1">
                     <button onClick={() => startEdit(p)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
                     <button onClick={() => handleDelete(p.id, p.name)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>削除</button>
@@ -1541,10 +1621,20 @@ function ProfileFeature() {
                   </p>
                 )}
 
-                {p.fav.trim() && (
-                  <div className="flex items-baseline gap-1.5 mt-2 flex-wrap">
-                    <span className="flex-shrink-0 text-[10px] font-black tracking-wider" style={{ color: "#bbb" }}>好き</span>
-                    <span className="text-xs font-bold break-words" style={{ color: "#845ef7" }}>{p.fav.trim()}</span>
+                {(birthLabel || p.fav.trim()) && (
+                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-2">
+                    {birthLabel && (
+                      <span className="inline-flex items-baseline gap-1.5">
+                        <span className="text-[10px] font-black tracking-wider" style={{ color: "#bbb" }}>誕生月</span>
+                        <span className="text-xs font-bold" style={{ color: "#FF4FA3" }}>{birthLabel}</span>
+                      </span>
+                    )}
+                    {p.fav.trim() && (
+                      <span className="inline-flex items-baseline gap-1.5 min-w-0">
+                        <span className="flex-shrink-0 text-[10px] font-black tracking-wider" style={{ color: "#bbb" }}>好き</span>
+                        <span className="text-xs font-bold break-words" style={{ color: "#845ef7" }}>{p.fav.trim()}</span>
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -1603,13 +1693,66 @@ const features: Feature[] = [
     tab: "プロフィール",
     title: "メンバープロフィール",
     description: "",
-    render: () => <ProfileFeature />,
+    render: (ctx) => <ProfileFeature sinceSeen={ctx.sinceSeen} onLatest={ctx.onLatest} />,
   },
 ];
 
 export default function TestPage() {
   const [activeId, setActiveId] = useState<string>(features[0]?.id ?? "");
   const active = features.find((f) => f.id === activeId);
+
+  // プロフィールの新着（未読）検知：この端末が最後に見た時刻と、DB上の最終更新時刻を比較
+  const [seenAt, setSeenAt] = useState(""); // この端末が確認済みの最終更新時刻
+  const [latestAt, setLatestAt] = useState(""); // DB上の最終更新時刻（ポーリング）
+  const [sinceSeen, setSinceSeen] = useState(""); // カードの「新着」判定基準（タブを開いた時点でスナップショット）
+
+  // 端末の保存値を読み込み（初回）
+  useEffect(() => {
+    const s = loadProfileSeen();
+    setSeenAt(s);
+    setSinceSeen(s);
+  }, []);
+
+  // DBの最終更新時刻を定期取得（他メンバーの追加/編集を検知）
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const latest = await getLatestUpdatedAt();
+        if (alive) setLatestAt(latest);
+      } catch {
+        /* 未設定/一時的な失敗は無視（ドットを出さない） */
+      }
+    };
+    check();
+    const id = setInterval(check, 15000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  // プロフィールタブを見ている間は「確認済み」を最新へ追従（離れても未読ドットが残らない）
+  useEffect(() => {
+    if (activeId === "profile" && isNewer(latestAt, seenAt)) {
+      setSeenAt(latestAt);
+      saveProfileSeen(latestAt);
+    }
+  }, [activeId, latestAt, seenAt]);
+
+  // プロフィール表示中(5秒ポーリング)に判明した最終更新時刻を即時反映（15秒待ちの隙で未読が誤点灯するのを防ぐ）
+  const reportLatest = useCallback((iso: string) => {
+    setLatestAt((prev) => (isNewer(iso, prev) ? iso : prev));
+  }, []);
+
+  // 未読の更新があるか（タブのドット用。プロフィール表示中は出さない）
+  const profileUnseen = isNewer(latestAt, seenAt);
+
+  function selectTab(id: string) {
+    // プロフィールを開く瞬間に「新着」判定の基準を確定（開いた後の追従で消えないように）
+    if (id === "profile") setSinceSeen(seenAt);
+    setActiveId(id);
+  }
 
   return (
     <main className="min-h-screen fun-bg pb-16">
@@ -1618,7 +1761,7 @@ export default function TestPage() {
         <Link href="/" className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl card" style={{ color: "#555" }}>
           ← 戻る
         </Link>
-        <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>動作確認</h1>
+        <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>会員メニュー</h1>
         <Link
           href="/admin"
           className="ml-auto text-sm font-semibold px-3 py-2 rounded-xl card"
@@ -1632,7 +1775,7 @@ export default function TestPage() {
         {/* 説明 */}
         <div className="card px-4 py-4">
           <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-            新しい機能を試すためのページです。{features.length > 1 ? "上のタブで機能を切り替えて確認できます。" : ""}
+            アフリカハートの会員メニューです。{features.length > 1 ? "上のタブで各機能を切り替えられます。" : ""}
           </p>
         </div>
 
@@ -1642,16 +1785,17 @@ export default function TestPage() {
           </div>
         ) : (
           <>
-            {/* 機能タブ（2つ以上のときだけ表示） */}
+            {/* 機能メニュー（2つ以上のときだけ表示）。横スクロールで隠れないよう2列グリッドで全部見せる */}
             {features.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <div className="grid grid-cols-2 gap-2">
               {features.map((f) => {
                 const sel = f.id === activeId;
+                const showDot = f.id === "profile" && profileUnseen && activeId !== "profile";
                 return (
                   <button
                     key={f.id}
-                    onClick={() => setActiveId(f.id)}
-                    className="flex-shrink-0 px-4 py-2.5 rounded-2xl text-sm font-black transition-all"
+                    onClick={() => selectTab(f.id)}
+                    className="relative w-full px-3 py-3 rounded-2xl text-sm font-black transition-all text-center"
                     style={{
                       background: sel ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
                       color: sel ? "#fff" : "#aaa",
@@ -1659,6 +1803,13 @@ export default function TestPage() {
                     }}
                   >
                     {f.tab}
+                    {showDot && (
+                      <span
+                        className="absolute top-1.5 right-2 w-2.5 h-2.5 rounded-full"
+                        style={{ background: "#ff3b6b", border: "1.5px solid #f0ece5" }}
+                        aria-label="新着あり"
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -1674,7 +1825,7 @@ export default function TestPage() {
                     <p className="text-xs mt-1" style={{ color: "#aaa" }}>{active.description}</p>
                   )}
                 </div>
-                <div className="px-4 py-6 flex justify-center">{active.render()}</div>
+                <div className="px-4 py-6 flex justify-center">{active.render({ sinceSeen, onLatest: reportLatest })}</div>
               </div>
             )}
           </>

@@ -35,6 +35,7 @@ export type Profile = {
   intro: string; // 自己紹介
   fav: string; // 好きな曲・アーティスト（任意）
   status: string; // 近況コメント
+  birth_month: number | null; // 誕生月（任意・1〜12）。未設定は null
   updated_at: string;
 };
 
@@ -63,10 +64,24 @@ function looksMissingTable(status: number, txt: string): boolean {
 
 /** 全メンバーのプロフィールを取得（登録順） */
 export async function listProfiles(): Promise<Profile[]> {
-  const res = await fetch(
-    `${ENDPOINT}?select=id,name,intro,fav,status,updated_at&order=created_at.asc`,
+  const order = "&order=created_at.asc";
+  let res = await fetch(
+    `${ENDPOINT}?select=id,name,intro,fav,status,birth_month,updated_at${order}`,
     { headers: headers(), cache: "no-store" }
   );
+  // birth_month 列が未追加でも壊れないよう、その列だけ外して再取得
+  // 注意: 列欠落エラー文にも "does not exist" が含まれるため、列判定を先に行う
+  if (!res.ok) {
+    const txt = await readText(res);
+    if (/birth_month/i.test(txt)) {
+      res = await fetch(
+        `${ENDPOINT}?select=id,name,intro,fav,status,updated_at${order}`,
+        { headers: headers(), cache: "no-store" }
+      );
+    } else if (looksMissingTable(res.status, txt)) {
+      throw new ProfileSetupError();
+    }
+  }
   if (!res.ok) {
     const txt = await readText(res);
     if (looksMissingTable(res.status, txt)) throw new ProfileSetupError();
@@ -80,9 +95,53 @@ export async function listProfiles(): Promise<Profile[]> {
         intro: r.intro ?? "",
         fav: r.fav ?? "",
         status: r.status ?? "",
+        birth_month: typeof r.birth_month === "number" ? r.birth_month : null,
         updated_at: r.updated_at ?? "",
       }))
     : [];
+}
+
+/** 直近の更新時刻（＝最後に誰かがプロフィールを追加/編集した時刻）を取得。無ければ "" */
+export async function getLatestUpdatedAt(): Promise<string> {
+  const res = await fetch(`${ENDPOINT}?select=updated_at&order=updated_at.desc&limit=1`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const txt = await readText(res);
+    if (looksMissingTable(res.status, txt)) throw new ProfileSetupError();
+    throw new Error(`更新状況の取得に失敗しました (${res.status})`);
+  }
+  const rows = (await res.json()) as Array<{ updated_at?: string }>;
+  return Array.isArray(rows) && rows[0]?.updated_at ? rows[0].updated_at : "";
+}
+
+// birth_month 列が未作成でも壊れないよう、エラー時はその列を外して再送する
+async function sendWithBirthFallback(
+  method: "POST" | "PATCH",
+  url: string,
+  body: Record<string, unknown>,
+  failMsg: string
+): Promise<void> {
+  const send = (b: Record<string, unknown>) =>
+    fetch(url, { method, headers: headers({ Prefer: "return=minimal" }), body: JSON.stringify(b) });
+  let res = await send(body);
+  // 注意: 列欠落エラー文にも "does not exist" が含まれるため、列判定を先に行う
+  if (!res.ok && "birth_month" in body) {
+    const txt = await readText(res);
+    if (/birth_month/i.test(txt)) {
+      const { birth_month: _omit, ...rest } = body;
+      void _omit;
+      res = await send(rest);
+    } else if (looksMissingTable(res.status, txt)) {
+      throw new ProfileSetupError();
+    }
+  }
+  if (!res.ok) {
+    const txt = await readText(res);
+    if (looksMissingTable(res.status, txt)) throw new ProfileSetupError();
+    throw new Error(`${failMsg} (${res.status})`);
+  }
 }
 
 /** メンバーを追加 */
@@ -91,35 +150,23 @@ export async function addProfile(input: {
   intro: string;
   fav: string;
   status: string;
+  birth_month: number | null;
   owner_id: string;
 }): Promise<void> {
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: headers({ Prefer: "return=minimal" }),
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const txt = await readText(res);
-    if (looksMissingTable(res.status, txt)) throw new ProfileSetupError();
-    throw new Error(`プロフィールの追加に失敗しました (${res.status})`);
-  }
+  await sendWithBirthFallback("POST", ENDPOINT, { ...input }, "プロフィールの追加に失敗しました");
 }
 
-/** プロフィールを更新（自己紹介・近況など） */
+/** プロフィールを更新（自己紹介・近況・誕生月など） */
 export async function updateProfile(
   id: string,
-  patch: Partial<Pick<Profile, "name" | "intro" | "fav" | "status">>
+  patch: Partial<Pick<Profile, "name" | "intro" | "fav" | "status" | "birth_month">>
 ): Promise<void> {
-  const res = await fetch(`${ENDPOINT}?id=eq.${id}`, {
-    method: "PATCH",
-    headers: headers({ Prefer: "return=minimal" }),
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
-  });
-  if (!res.ok) {
-    const txt = await readText(res);
-    if (looksMissingTable(res.status, txt)) throw new ProfileSetupError();
-    throw new Error(`プロフィールの更新に失敗しました (${res.status})`);
-  }
+  await sendWithBirthFallback(
+    "PATCH",
+    `${ENDPOINT}?id=eq.${id}`,
+    { ...patch, updated_at: new Date().toISOString() },
+    "プロフィールの更新に失敗しました"
+  );
 }
 
 /** メンバーを削除 */

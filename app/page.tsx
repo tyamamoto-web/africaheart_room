@@ -16,8 +16,8 @@ export default function Home() {
           style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", boxShadow: "0 4px 14px rgba(255,107,157,0.35)" }}
         >
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-black leading-tight">動作確認ページ</p>
-            <p className="text-[11px] opacity-85 leading-tight">デュエット曲リストなど新機能はこちら</p>
+            <p className="text-sm font-black leading-tight">会員メニュー</p>
+            <p className="text-[11px] opacity-85 leading-tight">デュエット曲・宿題ルーレット・プロフィールはこちら</p>
           </div>
           <span className="text-lg opacity-90">›</span>
         </Link>

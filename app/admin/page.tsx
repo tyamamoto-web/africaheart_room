@@ -299,7 +299,7 @@ export default function AdminPage() {
             className="flex-1 py-3.5 rounded-xl text-sm font-semibold text-center"
             style={{ background: "#f4f0ea", color: "#888" }}
           >
-            動作確認ページ
+            会員メニュー
           </Link>
         </div>
 

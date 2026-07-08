@@ -97,10 +97,15 @@ create table if not exists public.member_profiles (
   intro text not null default '',         -- 自己紹介
   fav text not null default '',           -- 好きな曲・アーティスト（任意）
   status text not null default '',        -- 近況コメント
+  birth_month smallint check (birth_month between 1 and 12), -- 誕生月（任意・1〜12・未設定はnull）
   owner_id text not null default '',      -- 登録した端末ID（記録用）
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- 既にテーブルがある場合に誕生月カラムを追加（後から追加した場合用）
+alter table public.member_profiles
+  add column if not exists birth_month smallint check (birth_month between 1 and 12);
 
 alter table public.member_profiles enable row level security;
 
