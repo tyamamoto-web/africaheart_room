@@ -1775,7 +1775,7 @@ export default function TestPage() {
         {/* 説明 */}
         <div className="card px-4 py-4">
           <p className="text-sm leading-relaxed" style={{ color: "#666" }}>
-            アフリカハートの会員メニューです。{features.length > 1 ? "上のタブで各機能を切り替えられます。" : ""}
+            アフリカハートの会員メニューです。{features.length > 1 ? "下のメニューから各機能を切り替えられます。" : ""}
           </p>
         </div>
 
