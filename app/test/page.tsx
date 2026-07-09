@@ -1306,9 +1306,24 @@ const PROFILE_SORTS: { id: ProfileSort; label: string }[] = [
   { id: "birthEarly", label: "誕生月が早い順" },
   { id: "birthLate", label: "誕生月が遅い順" },
 ];
-// 名前の50音順（近似）。かな・カナは正しく並ぶ。漢字/ローマ字は読みが無いため近似。
+// 50音順の読み補正：表示名のままでは正しい位置に並ばない人（漢字/ローマ字/一部カナ）の読み。
+// 未登録の名前は表示名そのままで比較（かな名はこれで正しく並ぶ）。新規メンバーで
+// 読みがズレる場合はここに追記する。
+const NAME_YOMI: Record<string, string> = {
+  Take: "たけ",
+  ノリ: "のり",
+  ハッシー: "はっしー",
+  ヒィ: "ひぃ",
+  次元: "じげん",
+  青空: "あおぞら",
+};
+function nameSortKey(p: Profile): string {
+  const n = p.name.trim();
+  return NAME_YOMI[n] ?? n;
+}
+// 名前の50音順。NAME_YOMI に読みがあればそれで、無ければ表示名で比較。
 function byName(a: Profile, b: Profile): number {
-  return a.name.localeCompare(b.name, "ja");
+  return nameSortKey(a).localeCompare(nameSortKey(b), "ja");
 }
 // 並び替え結果を返す（元配列は変更しない）。誕生月・未設定(null)は常に末尾。同月内は名前で安定化。
 function sortProfiles(list: Profile[], sort: ProfileSort): Profile[] {
