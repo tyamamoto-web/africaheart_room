@@ -1294,12 +1294,45 @@ function isNewer(a: string, b: string): boolean {
 }
 const BIRTH_MONTHS = Array.from({ length: 12 }, (_, i) => i + 1); // 1〜12月
 
+// プロフィール一覧の並び替え
+type ProfileSort = "name" | "birthEarly" | "birthLate";
+const PROFILE_SORTS: { id: ProfileSort; label: string }[] = [
+  { id: "name", label: "名前（50音）" },
+  { id: "birthEarly", label: "誕生月が早い順" },
+  { id: "birthLate", label: "誕生月が遅い順" },
+];
+// 名前の50音順（近似）。かな・カナは正しく並ぶ。漢字/ローマ字は読みが無いため近似。
+function byName(a: Profile, b: Profile): number {
+  return a.name.localeCompare(b.name, "ja");
+}
+// 並び替え結果を返す（元配列は変更しない）。誕生月・未設定(null)は常に末尾。同月内は名前で安定化。
+function sortProfiles(list: Profile[], sort: ProfileSort): Profile[] {
+  const arr = [...list];
+  if (sort === "name") {
+    arr.sort(byName);
+    return arr;
+  }
+  arr.sort((a, b) => {
+    const na = a.birth_month == null;
+    const nb = b.birth_month == null;
+    if (na && nb) return byName(a, b);
+    if (na) return 1; // 未設定は後ろ
+    if (nb) return -1;
+    const ma = a.birth_month as number;
+    const mb = b.birth_month as number;
+    if (ma !== mb) return sort === "birthEarly" ? ma - mb : mb - ma;
+    return byName(a, b);
+  });
+  return arr;
+}
+
 function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: (iso: string) => void }) {
   const [me, setMe] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<ProfileSort>("name"); // 並び替え（既定：名前50音順）
 
   // 追加フォーム（開閉式）
   const [showAdd, setShowAdd] = useState(false);
@@ -1440,6 +1473,9 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
 
   const inputStyle = { background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent" } as const;
 
+  // 表示用に並び替えた一覧（元の profiles は保持）
+  const shown = useMemo(() => sortProfiles(profiles, sortBy), [profiles, sortBy]);
+
   // 未接続：セットアップ案内
   if (!isProfilesConfigured()) {
     return (
@@ -1544,9 +1580,33 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
       </div>
 
       {/* 一覧 */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>メンバー</p>
-        <span className="text-[11px]" style={{ color: "#ccc" }}>{profiles.length}人</span>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>メンバー</p>
+          <span className="text-[11px]" style={{ color: "#ccc" }}>{profiles.length}人</span>
+        </div>
+        {profiles.length > 1 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "#ccc" }}>並び替え</span>
+            {PROFILE_SORTS.map((s) => {
+              const on = sortBy === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setSortBy(s.id)}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-bold transition-all"
+                  style={{
+                    background: on ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+                    color: on ? "#fff" : "#999",
+                    boxShadow: on ? "0 2px 6px rgba(255,107,157,0.3)" : "none",
+                  }}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -1565,7 +1625,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
         )
       ) : (
         <div className="flex flex-col gap-2.5">
-          {profiles.map((p) => {
+          {shown.map((p) => {
             if (editId === p.id) {
               return (
                 <div key={p.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #FF6B9D55" }}>
