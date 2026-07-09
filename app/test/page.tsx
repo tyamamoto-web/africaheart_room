@@ -1297,7 +1297,7 @@ const BIRTH_MONTHS = Array.from({ length: 12 }, (_, i) => i + 1); // 1〜12月
 // プロフィール一覧の並び替え
 type ProfileSort = "name" | "birthEarly" | "birthLate";
 const PROFILE_SORTS: { id: ProfileSort; label: string }[] = [
-  { id: "name", label: "名前（50音）" },
+  { id: "name", label: "名前（50音順）" },
   { id: "birthEarly", label: "誕生月が早い順" },
   { id: "birthLate", label: "誕生月が遅い順" },
 ];
