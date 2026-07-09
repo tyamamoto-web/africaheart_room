@@ -1270,6 +1270,11 @@ function SingingOrderRoulette() {
 /* ── メンバープロフィール：自己紹介と近況を全員で共有 ──── */
 // プロフィールの「最後に見た時刻」をこの端末に記録し、それ以降の更新を新着として扱う
 const PROFILE_SEEN_KEY = "africaheart_profile_seen_v1";
+// 新着判定の基準（下限）。この時刻【以前】の更新は新着扱いしない。
+// 既存の登録済みプロフィール（2026-07-09の一括登録・最新 updated_at は 01:17:26Z）を
+// 新着にしないため、その直後をベースラインに固定。保存値が無い/これより古い端末でも
+// 既存分は新着にならず、この時刻より後の追加・編集だけが新着になる。
+const PROFILE_NEW_BASELINE = "2026-07-09T01:20:00.000+00:00";
 function loadProfileSeen(): string {
   try {
     return localStorage.getItem(PROFILE_SEEN_KEY) || "";
@@ -1766,11 +1771,13 @@ export default function TestPage() {
   const [latestAt, setLatestAt] = useState(""); // DB上の最終更新時刻（ポーリング）
   const [sinceSeen, setSinceSeen] = useState(""); // カードの「新着」判定基準（タブを開いた時点でスナップショット）
 
-  // 端末の保存値を読み込み（初回）
+  // 端末の保存値を読み込み（初回）。基準時刻（PROFILE_NEW_BASELINE）を下限にして、
+  // 既存プロフィールが新着扱いにならないようにする（保存値が無い初回端末でも既存分は非新着）。
   useEffect(() => {
-    const s = loadProfileSeen();
-    setSeenAt(s);
-    setSinceSeen(s);
+    const stored = loadProfileSeen();
+    const base = isNewer(PROFILE_NEW_BASELINE, stored) ? PROFILE_NEW_BASELINE : stored;
+    setSeenAt(base);
+    setSinceSeen(base);
   }, []);
 
   // DBの最終更新時刻を定期取得（他メンバーの追加/編集を検知）
