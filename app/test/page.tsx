@@ -1297,6 +1297,14 @@ function tMs(s: string): number {
 function isNewer(a: string, b: string): boolean {
   return tMs(a) > tMs(b);
 }
+// 新着マークの表示期間。更新から2週間(14日)を過ぎたら新着扱いを解除する。
+const PROFILE_NEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+// updated_at が現在時刻から2週間以内なら true（それより古い更新・未設定は新着にしない）。
+function withinNewWindow(iso: string, nowMs: number): boolean {
+  const t = tMs(iso);
+  if (t === -Infinity) return false;
+  return nowMs - t <= PROFILE_NEW_WINDOW_MS;
+}
 const BIRTH_MONTHS = Array.from({ length: 12 }, (_, i) => i + 1); // 1〜12月
 
 // プロフィール一覧の並び替え
@@ -1671,7 +1679,8 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                 </div>
               );
             }
-            const isNew = isNewer(p.updated_at, sinceSeen);
+            // 新着＝未読 かつ 更新から2週間以内（2週間を過ぎたらマークを消す）
+            const isNew = isNewer(p.updated_at, sinceSeen) && withinNewWindow(p.updated_at, Date.now());
             const birthLabel = p.birth_month ? `${p.birth_month}月` : "";
             return (
               <div key={p.id} className="rounded-2xl p-3.5" style={{ background: "#fff", border: isNew ? "1.5px solid #ffb3d1" : "1px solid #efe9e1" }}>
@@ -1827,8 +1836,9 @@ export default function TestPage() {
     setLatestAt((prev) => (isNewer(iso, prev) ? iso : prev));
   }, []);
 
-  // 未読の更新があるか（タブのドット用。プロフィール表示中は出さない）
-  const profileUnseen = isNewer(latestAt, seenAt);
+  // 未読の更新があるか（タブのドット用。プロフィール表示中は出さない）。
+  // カードの新着マークと同様に、更新から2週間を過ぎた更新ではドットも出さない。
+  const profileUnseen = isNewer(latestAt, seenAt) && withinNewWindow(latestAt, Date.now());
 
   function selectTab(id: string) {
     // プロフィールを開く瞬間に「新着」判定の基準を確定（開いた後の追従で消えないように）
