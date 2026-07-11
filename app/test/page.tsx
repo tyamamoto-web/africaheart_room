@@ -377,8 +377,8 @@ function DuetFeature() {
                           <span className="text-[8px] font-bold mt-0.5" style={{ color: "#bbb" }}>キー</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold truncate" style={{ color: "#2c2c2c" }}>{s.title}</p>
-                          <p className="text-xs truncate" style={{ color: "#999" }}>{s.artist || "—"}</p>
+                          <p className="text-sm font-bold break-words" style={{ color: "#2c2c2c" }}>{s.title}</p>
+                          <p className="text-xs break-words" style={{ color: "#999" }}>{s.artist || "—"}</p>
                           {s.part && s.part.trim() && (
                             <p className="text-[11px] font-semibold mt-0.5 leading-relaxed break-words" style={{ color: "#845ef7" }}>
                               {s.part.trim()} を歌ってほしい
