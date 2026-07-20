@@ -36,6 +36,7 @@ import {
   ProfileSetupError,
   type Profile,
 } from "@/lib/profiles";
+import { defaultMembers } from "@/lib/data";
 
 /* ============================================================
    動作確認ページ（タブ切り替え式）
@@ -959,11 +960,12 @@ function HomeworkRoulette() {
 }
 
 /* ── 歌唱順ルーレット：参加者からスタート者をスロットで抽選＋進行方向 ── */
-const SING_KEY = "africaheart_singers_v1"; // 参加者（席順・この端末）
+const SING_KEY = "africaheart_singers_v2"; // 参加者（席順・この端末）
 const SING_DIR_KEY = "africaheart_sing_dir_v1"; // 進行方向（right/left）
 const CELL_H = 52; // スロット1行の高さ(px)
-// 実名が未確定のため、初期は「参加者1〜6」を仮置き（後日リネームして使う）
-const DEFAULT_SINGERS = Array.from({ length: 6 }, (_, i) => `参加者${i + 1}`);
+// 初期の参加者は 7/26 の参加者（lib/data.ts の defaultMembers）を登録。
+// この端末で追加/削除して調整可（並び順は抽選に無関係）。
+const DEFAULT_SINGERS = defaultMembers.map((m) => m.nickname);
 
 // 縦スクロールのスロット。key(=spin回数)で張り替え、マウント時に一度だけ回す。
 function SlotReel({
