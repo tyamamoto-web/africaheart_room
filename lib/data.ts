@@ -23,7 +23,9 @@ export const eventInfo = {
   title: "アフリカハート",
   subtitle: "カラオケオフ会",
   date: "2026年7月26日（日）",
-  startTime: "12:20",
+  startTime: "12:20", // 集合
+  openTime: "12:30",  // スタート
+  endTime: "20:00",   // 終了
   venue: "ジャパレン松本店",
 };
 

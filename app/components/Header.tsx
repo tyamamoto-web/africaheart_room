@@ -38,6 +38,19 @@ export default function Header() {
         <p className="text-xs font-semibold tracking-widest" style={{ color: "rgba(255,255,255,0.8)" }}>
           {eventInfo.subtitle}
         </p>
+
+        {/* 開催日時 */}
+        <div className="mt-3.5 flex flex-col items-center gap-1">
+          <span
+            className="px-4 py-1 rounded-full text-sm font-black text-white"
+            style={{ background: "rgba(255,255,255,0.22)" }}
+          >
+            {eventInfo.date}
+          </span>
+          <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+            集合 {eventInfo.startTime} ／ {eventInfo.openTime}〜{eventInfo.endTime}
+          </span>
+        </div>
       </div>
 
       {/* Wave divider */}
