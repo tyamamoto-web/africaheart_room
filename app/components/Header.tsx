@@ -52,21 +52,6 @@ export default function Header() {
           </span>
         </div>
       </div>
-
-      {/* Wave divider */}
-      <div style={{ background: "#f0ece5", marginTop: -1 }}>
-        <svg viewBox="0 0 375 20" preserveAspectRatio="none" style={{ display: "block", height: 20 }}>
-          <path d="M0,0 C60,20 120,0 187.5,10 C255,20 315,0 375,10 L375,0 Z" fill="url(#wGrad)" />
-          <defs>
-            <linearGradient id="wGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%"   stopColor="#FF6B9D" />
-              <stop offset="35%"  stopColor="#FF5FA3" />
-              <stop offset="70%"  stopColor="#FF8C3F" />
-              <stop offset="100%" stopColor="#FFD166" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>
     </header>
   );
 }
