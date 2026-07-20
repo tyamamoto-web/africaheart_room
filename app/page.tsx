@@ -6,7 +6,7 @@ import RotationTable from "./components/RotationTable";
 
 export default function Home() {
   return (
-    <main className="min-h-screen fun-bg">
+    <main className="min-h-screen bg-white">
       <Header />
 
       {/* ロゴバナー下：動作確認ページへの導線 */}
