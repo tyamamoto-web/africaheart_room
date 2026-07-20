@@ -373,7 +373,7 @@ export default function DownloadTableButton() {
           opacity: busy ? 0.6 : 1,
         }}
       >
-        {busy ? "作成中…" : "部屋割り表をダウンロード（透明PNG）"}
+        {busy ? "作成中…" : "部屋割り表をダウンロード"}
       </button>
       <p className="text-[11px] text-center mt-1.5" style={{ color: "#aaa" }}>
         チラシ用・背景透明／高解像度。iPhoneは開いた画像を長押しで保存
