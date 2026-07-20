@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Header from "./components/Header";
+import RotationTable from "./components/RotationTable";
 
 export default function Home() {
   return (
@@ -23,14 +24,9 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* 次回案内（6/27の部屋割りはアーカイブへ移動済み） */}
-      <div className="px-4 pt-4 max-w-lg mx-auto">
-        <div className="card px-5 py-9 text-center">
-          <p className="text-base font-black" style={{ color: "#2c2c2c" }}>次回のオフ会をお楽しみに！</p>
-          <p className="text-sm mt-1.5 leading-relaxed" style={{ color: "#999" }}>
-            部屋割りは決まり次第、こちらに表示されます。
-          </p>
-        </div>
+      {/* 本日のタイムテーブル・部屋割り（7/26） */}
+      <div className="pt-4">
+        <RotationTable />
       </div>
 
       <footer className="text-center pb-10 pt-6 px-4">
