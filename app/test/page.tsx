@@ -814,7 +814,7 @@ function HomeworkRoulette() {
             <span className="text-sm font-bold" style={{ color: "#c2b6a6" }}>
               ボタンを押して
               <br />
-              次回の宿題テーマを決めよう
+              今回の宿題テーマを決めよう
             </span>
           )}
         </div>
@@ -828,13 +828,13 @@ function HomeworkRoulette() {
             style={{ background: "#fff0f6", border: "1.5px solid #ffd0e4" }}
           >
             <p className="text-sm font-black" style={{ color: "#FF4FA3" }}>
-              次回の宿題テーマが決定しました
+              今回の宿題テーマが決定しました
             </p>
             <p className="text-base font-black mt-1.5" style={{ color: "#2c2c2c" }}>
               {decided.join(" / ")}
             </p>
             <p className="text-xs mt-2 leading-relaxed" style={{ color: "#c98aae" }}>
-              次回のオフ会までに、各テーマに合う持ち歌を1曲ずつ準備してきてください。
+              今回のオフ会までに、各テーマに合う持ち歌を1曲ずつ準備してきてください。
             </p>
           </div>
           <button
@@ -1769,7 +1769,7 @@ const features: Feature[] = [
     id: "homework",
     tab: "宿題ルーレット",
     title: "宿題ルーレット",
-    description: "ここで決まった3つが次回の宿題テーマです。各テーマに合う持ち歌を1曲ずつ、次回のオフ会までに準備してきてください。",
+    description: "ここで決まった3つが今回の宿題テーマです。各テーマに合う持ち歌を1曲ずつ、今回のオフ会までに準備してきてください。",
     render: () => <HomeworkRoulette />,
   },
   {
