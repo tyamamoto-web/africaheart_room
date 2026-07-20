@@ -1790,6 +1790,16 @@ export default function TestPage() {
   const [activeId, setActiveId] = useState<string>(features[0]?.id ?? "");
   const active = features.find((f) => f.id === activeId);
 
+  // TOPの宿題/デュエットカードなどから ?tab=<id> で該当タブを開く（初回のみ）
+  useEffect(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get("tab");
+      if (t && features.some((f) => f.id === t)) setActiveId(t);
+    } catch {
+      /* 取得できなくても既定タブで続行 */
+    }
+  }, []);
+
   // プロフィールの新着（未読）検知：この端末が最後に見た時刻と、DB上の最終更新時刻を比較
   const [seenAt, setSeenAt] = useState(""); // この端末が確認済みの最終更新時刻
   const [latestAt, setLatestAt] = useState(""); // DB上の最終更新時刻（ポーリング）

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { timeSlots, defaultMembers } from "@/lib/data";
 import { getMembers } from "@/lib/memberStore";
 import { getEventSetup } from "@/lib/eventStore";
@@ -28,6 +29,12 @@ const eventShad: Record<string, string> = {
   blue:   "rgba(59,130,246,0.3)",
   pink:   "rgba(236,72,153,0.3)",
   green:  "rgba(16,185,129,0.3)",
+};
+
+// 会員メニュー(/test)の該当タブへのリンク（宿題タイム→宿題ルーレット等）
+const featureLink: Record<string, { href: string; hint: string }> = {
+  homework: { href: "/test?tab=homework", hint: "タップで宿題ルーレットへ" },
+  duet:     { href: "/test?tab=duet",     hint: "タップでデュエット曲リストへ" },
 };
 
 export default function RotationTable() {
@@ -75,12 +82,9 @@ export default function RotationTable() {
           if (slot.type !== "rotation") {
             const grad   = slot.color ? eventGrad[slot.color]  : "linear-gradient(135deg,#aaa,#ccc)";
             const shadow = slot.color ? eventShad[slot.color] : "rgba(0,0,0,0.1)";
-            return (
-              <div
-                key={slot.id}
-                className="rounded-2xl px-5 py-4 text-white animate-fade-up"
-                style={{ background: grad, boxShadow: `0 4px 16px ${shadow}` }}
-              >
+            const link   = featureLink[slot.id];
+            const body = (
+              <>
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 rounded-xl px-3 py-2 text-center" style={{ background: "rgba(255,255,255,0.25)", minWidth: "76px" }}>
                     <p className="text-sm font-black">{slot.startTime}</p>
@@ -94,7 +98,36 @@ export default function RotationTable() {
                       </p>
                     )}
                   </div>
+                  {link && <span className="flex-shrink-0 self-center text-2xl font-black opacity-90">›</span>}
                 </div>
+                {link && (
+                  <div className="mt-2.5 flex justify-center">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold" style={{ background: "rgba(255,255,255,0.25)" }}>
+                      {link.hint} ›
+                    </span>
+                  </div>
+                )}
+              </>
+            );
+            if (link) {
+              return (
+                <Link
+                  key={slot.id}
+                  href={link.href}
+                  className="block rounded-2xl px-5 py-4 text-white animate-fade-up transition-transform active:scale-[0.99]"
+                  style={{ background: grad, boxShadow: `0 4px 16px ${shadow}` }}
+                >
+                  {body}
+                </Link>
+              );
+            }
+            return (
+              <div
+                key={slot.id}
+                className="rounded-2xl px-5 py-4 text-white animate-fade-up"
+                style={{ background: grad, boxShadow: `0 4px 16px ${shadow}` }}
+              >
+                {body}
               </div>
             );
           }
