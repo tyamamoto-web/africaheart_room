@@ -1857,9 +1857,9 @@ export default function TestPage() {
   }
 
   return (
-    <main className="min-h-screen fun-bg pb-16">
+    <main className="min-h-screen bg-white pb-16">
       {/* Top bar */}
-      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ background: "#f0ece5" }}>
+      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ background: "#fff", borderBottom: "1px solid #f0ece5" }}>
         <Link href="/" className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl card" style={{ color: "#555" }}>
           ← 戻る
         </Link>
