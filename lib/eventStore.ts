@@ -9,7 +9,7 @@ export type EventSetup = {
   rotations: Record<string, Record<string, RoomKey>>;
 };
 
-const STORAGE_KEY = "africaheart_event_v13";
+const STORAGE_KEY = "africaheart_event_v14";
 
 function defaultSetup(): EventSetup {
   // 出席者 = いずれかのコマで部屋に割り当てられているメンバー
