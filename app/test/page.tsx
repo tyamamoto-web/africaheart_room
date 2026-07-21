@@ -960,7 +960,7 @@ function HomeworkRoulette() {
 }
 
 /* ── 歌唱順ルーレット：参加者からスタート者をスロットで抽選＋進行方向 ── */
-const SING_KEY = "africaheart_singers_v2"; // 参加者（席順・この端末）
+const SING_KEY = "africaheart_singers_v3"; // 参加者（席順・この端末）
 const SING_DIR_KEY = "africaheart_sing_dir_v1"; // 進行方向（right/left）
 const CELL_H = 52; // スロット1行の高さ(px)
 // 初期の参加者は 7/26 の参加者（lib/data.ts の defaultMembers）を登録。
