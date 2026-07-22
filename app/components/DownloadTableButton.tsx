@@ -367,9 +367,9 @@ export default function DownloadTableButton() {
         }}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold transition-all active:scale-[0.98]"
         style={{
-          background: "linear-gradient(135deg,#3a3a3a,#5e5c58)",
+          background: "linear-gradient(135deg,#C81E77,#E14D93)",
           color: "#fff",
-          boxShadow: "0 3px 12px rgba(0,0,0,0.18)",
+          boxShadow: "0 3px 12px rgba(200,30,119,0.28)",
           opacity: busy ? 0.6 : 1,
         }}
       >

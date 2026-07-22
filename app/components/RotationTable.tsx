@@ -9,26 +9,31 @@ import DownloadTableButton from "./DownloadTableButton";
 import type { Member } from "@/lib/data";
 import type { EventSetup, RoomKey } from "@/lib/eventStore";
 
-// コマ表はモノトーン（イベントカードのカラーを引き立てるため）
+// コマ表：クロス表と同じピンク〜赤紫（#C81E77 基調）で統一
 const roomCfg = {
-  A: { gradient: "linear-gradient(135deg,#6b6b6b,#8a8a8a)", bg: "#f6f5f3", color: "#555" },
-  B: { gradient: "linear-gradient(135deg,#7e7e7e,#9e9e9e)", bg: "#f3f2f0", color: "#555" },
-  C: { gradient: "linear-gradient(135deg,#909090,#b0b0b0)", bg: "#f1f0ee", color: "#555" },
+  A: { gradient: "linear-gradient(135deg,#C81E77,#DB4A90)", bg: "#FBEAF2", color: "#7A1247" },
+  B: { gradient: "linear-gradient(135deg,#D63A87,#E766A4)", bg: "#FCEFF5", color: "#7A1247" },
+  C: { gradient: "linear-gradient(135deg,#E0559A,#EF86BB)", bg: "#FDF4F8", color: "#7A1247" },
 } as const;
 
 const eventGrad: Record<string, string> = {
-  yellow: "linear-gradient(135deg,#f59e0b,#fbbf24)",
-  orange: "linear-gradient(135deg,#f97316,#fb923c)",
-  blue:   "linear-gradient(135deg,#3b82f6,#60a5fa)",
-  pink:   "linear-gradient(135deg,#ec4899,#f472b6)",
-  green:  "linear-gradient(135deg,#10b981,#34d399)",
+  yellow:  "linear-gradient(135deg,#f59e0b,#fbbf24)",
+  orange:  "linear-gradient(135deg,#f97316,#fb923c)",
+  blue:    "linear-gradient(135deg,#3b82f6,#60a5fa)",
+  pink:    "linear-gradient(135deg,#ec4899,#f472b6)",
+  green:   "linear-gradient(135deg,#10b981,#34d399)",
+  // 全員集合：クロス表のピンク〜赤紫に合わせる（宿題=ローズ／デュエット=濃い赤紫）
+  rose:    "linear-gradient(135deg,#D63A87,#EC6FAA)",
+  magenta: "linear-gradient(135deg,#A8175F,#C81E77)",
 };
 const eventShad: Record<string, string> = {
-  yellow: "rgba(245,158,11,0.3)",
-  orange: "rgba(249,115,22,0.3)",
-  blue:   "rgba(59,130,246,0.3)",
-  pink:   "rgba(236,72,153,0.3)",
-  green:  "rgba(16,185,129,0.3)",
+  yellow:  "rgba(245,158,11,0.3)",
+  orange:  "rgba(249,115,22,0.3)",
+  blue:    "rgba(59,130,246,0.3)",
+  pink:    "rgba(236,72,153,0.3)",
+  green:   "rgba(16,185,129,0.3)",
+  rose:    "rgba(214,58,135,0.32)",
+  magenta: "rgba(168,23,95,0.34)",
 };
 
 // 会員メニュー(/test)の該当タブへのリンク（宿題タイム→宿題ルーレット等）
@@ -148,9 +153,9 @@ export default function RotationTable() {
           return (
             <div key={slot.id} className="card overflow-hidden animate-fade-up">
               {/* Header（時間帯のみ） */}
-              <div className="px-4 py-3 border-b" style={{ borderColor: "#f0ece5" }}>
+              <div className="px-4 py-3 border-b" style={{ borderColor: "#F5DCE8" }}>
                 <p className="text-lg font-black" style={{ color: "#2c2c2c" }}>
-                  {slot.startTime}<span className="mx-1 font-bold" style={{ color: "#bbb" }}>〜</span>{slot.endTime}
+                  {slot.startTime}<span className="mx-1 font-bold" style={{ color: "#D89BB8" }}>〜</span>{slot.endTime}
                 </p>
               </div>
 
@@ -170,9 +175,9 @@ export default function RotationTable() {
                     const names = groups[room];
                     return (
                       <div key={room} style={{ background: cfg.bg }}>
-                        <div className="flex items-center justify-center py-2.5 gap-1.5" style={{ background: cfg.gradient }}>
+                        <div className="flex items-center justify-center py-2.5 gap-1.5" style={{ background: cfg.gradient, textShadow: "0 1px 2px rgba(122,8,58,0.35)" }}>
                           <span className="text-base font-black text-white">{room}</span>
-                          <span className="text-xs font-bold text-white/80">ルーム</span>
+                          <span className="text-xs font-bold text-white/85">ルーム</span>
                         </div>
                         <div className="px-2 py-3 flex flex-col gap-2 min-h-[52px]">
                           {names.map((m) => (

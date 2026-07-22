@@ -7,7 +7,7 @@ export type Member = {
 };
 
 export type SlotType = "opening" | "rotation" | "all" | "end";
-export type SlotColor = "yellow" | "pink" | "blue" | "green" | "orange";
+export type SlotColor = "yellow" | "pink" | "blue" | "green" | "orange" | "rose" | "magenta";
 
 export type TimeSlot = {
   id: string;
@@ -65,7 +65,7 @@ export const timeSlots: TimeSlot[] = [
     type: "all",
     label: "宿題タイム",
     detail: "全員で1部屋に集合して宿題タイム。",
-    color: "green",
+    color: "rose",
   },
   {
     id: "duet",
@@ -74,7 +74,7 @@ export const timeSlots: TimeSlot[] = [
     type: "all",
     label: "デュエットタイム",
     detail: "全員で1部屋に集合してデュエット。",
-    color: "pink",
+    color: "magenta",
   },
   { id: "koma3", startTime: "17:00", endTime: "18:00", type: "rotation", label: "コマ ③" },
   { id: "koma4", startTime: "18:00", endTime: "19:00", type: "rotation", label: "コマ ④" },
