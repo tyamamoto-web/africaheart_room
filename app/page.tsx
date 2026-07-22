@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Header from "./components/Header";
 import RotationTable from "./components/RotationTable";
+import CrossTable from "./components/CrossTable";
 
 export default function Home() {
   return (
@@ -28,6 +29,9 @@ export default function Home() {
       <div className="pt-4">
         <RotationTable />
       </div>
+
+      {/* 部屋割りの一番下：同席クロス表 */}
+      <CrossTable />
 
       <footer className="text-center pb-10 pt-6 px-4">
         <p className="text-xs" style={{ color: "#bbb" }}>
