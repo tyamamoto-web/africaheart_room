@@ -118,7 +118,6 @@ export default function CrossTable() {
                     <div
                       style={{
                         writingMode: "vertical-rl",
-                        transform: "rotate(180deg)",
                         fontSize: 10,
                         fontWeight: 700,
                         margin: "0 auto",
