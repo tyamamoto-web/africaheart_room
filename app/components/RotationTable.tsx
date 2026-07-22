@@ -83,6 +83,38 @@ export default function RotationTable() {
             );
           }
 
+          /* ── opening（集合・スタート）：赤紫の枠線のみ（塗りなし） ── */
+          if (slot.type === "opening") {
+            return (
+              <div
+                key={slot.id}
+                className="rounded-2xl px-5 py-4 animate-fade-up"
+                style={{ background: "#fff", border: "2px solid #C81E77" }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex-shrink-0 rounded-xl px-3 py-2 text-center"
+                    style={{ background: "#FBEAF2", minWidth: "76px" }}
+                  >
+                    <p className="text-sm font-black" style={{ color: "#7A1247" }}>{slot.startTime}</p>
+                    <p className="text-xs" style={{ color: "#B76A93" }}>〜{slot.endTime}</p>
+                  </div>
+                  <div className="flex-1 pt-0.5">
+                    <p className="font-black text-lg leading-tight" style={{ color: "#C81E77" }}>{slot.label}</p>
+                    {slot.detail && (
+                      <p
+                        className="text-sm mt-1 leading-relaxed"
+                        style={{ whiteSpace: "pre-line", color: "#7A5068" }}
+                      >
+                        {slot.detail}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           /* ── special event ── */
           if (slot.type !== "rotation") {
             const grad   = slot.color ? eventGrad[slot.color]  : "linear-gradient(135deg,#aaa,#ccc)";
