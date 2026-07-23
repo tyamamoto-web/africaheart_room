@@ -9,11 +9,11 @@ import DownloadTableButton from "./DownloadTableButton";
 import type { Member } from "@/lib/data";
 import type { EventSetup, RoomKey } from "@/lib/eventStore";
 
-// コマ表：クロス表と同じピンク〜赤紫（#C81E77 基調）で統一
+// コマ表：デュエットタイムの濃い赤紫（#A8175F〜#C81E77）を基調に統一
 const roomCfg = {
-  A: { gradient: "linear-gradient(135deg,#C81E77,#DB4A90)", bg: "#FBEAF2", color: "#7A1247" },
-  B: { gradient: "linear-gradient(135deg,#D63A87,#E766A4)", bg: "#FCEFF5", color: "#7A1247" },
-  C: { gradient: "linear-gradient(135deg,#E0559A,#EF86BB)", bg: "#FDF4F8", color: "#7A1247" },
+  A: { gradient: "linear-gradient(135deg,#8E1252,#A8175F)", bg: "#F6E1EB", color: "#6E0F44" },
+  B: { gradient: "linear-gradient(135deg,#A8175F,#C81E77)", bg: "#F9E6EF", color: "#6E0F44" },
+  C: { gradient: "linear-gradient(135deg,#C0246F,#D6478E)", bg: "#FCEDF4", color: "#6E0F44" },
 } as const;
 
 const eventGrad: Record<string, string> = {
@@ -22,8 +22,8 @@ const eventGrad: Record<string, string> = {
   blue:    "linear-gradient(135deg,#3b82f6,#60a5fa)",
   pink:    "linear-gradient(135deg,#ec4899,#f472b6)",
   green:   "linear-gradient(135deg,#10b981,#34d399)",
-  // 全員集合：クロス表のピンク〜赤紫に合わせる（宿題=ローズ／デュエット=濃い赤紫）
-  rose:    "linear-gradient(135deg,#D63A87,#EC6FAA)",
+  // 全員集合：デュエットの濃い赤紫に統一（宿題=やや明るい赤紫／デュエット=最も濃い赤紫）
+  rose:    "linear-gradient(135deg,#B81D6C,#D6398A)",
   magenta: "linear-gradient(135deg,#A8175F,#C81E77)",
 };
 const eventShad: Record<string, string> = {
@@ -32,7 +32,7 @@ const eventShad: Record<string, string> = {
   blue:    "rgba(59,130,246,0.3)",
   pink:    "rgba(236,72,153,0.3)",
   green:   "rgba(16,185,129,0.3)",
-  rose:    "rgba(214,58,135,0.32)",
+  rose:    "rgba(184,29,108,0.32)",
   magenta: "rgba(168,23,95,0.34)",
 };
 
@@ -89,18 +89,18 @@ export default function RotationTable() {
               <div
                 key={slot.id}
                 className="rounded-2xl px-5 py-4 animate-fade-up"
-                style={{ background: "#fff", border: "2px solid #C81E77" }}
+                style={{ background: "#fff", border: "2px solid #A8175F" }}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className="flex-shrink-0 rounded-xl px-3 py-2 text-center"
-                    style={{ background: "#FBEAF2", minWidth: "76px" }}
+                    style={{ background: "#F6E1EB", minWidth: "76px" }}
                   >
-                    <p className="text-sm font-black" style={{ color: "#7A1247" }}>{slot.startTime}</p>
-                    <p className="text-xs" style={{ color: "#B76A93" }}>〜{slot.endTime}</p>
+                    <p className="text-sm font-black" style={{ color: "#6E0F44" }}>{slot.startTime}</p>
+                    <p className="text-xs" style={{ color: "#A05A82" }}>〜{slot.endTime}</p>
                   </div>
                   <div className="flex-1 pt-0.5">
-                    <p className="font-black text-lg leading-tight" style={{ color: "#C81E77" }}>{slot.label}</p>
+                    <p className="font-black text-lg leading-tight" style={{ color: "#A8175F" }}>{slot.label}</p>
                     {slot.detail && (
                       <p
                         className="text-sm mt-1 leading-relaxed"
@@ -183,11 +183,11 @@ export default function RotationTable() {
           const hasAny = usedRooms.length > 0;
 
           return (
-            <div key={slot.id} className="card overflow-hidden animate-fade-up">
+            <div key={slot.id} className="card overflow-hidden animate-fade-up" style={{ border: "1px solid #EAEAEA" }}>
               {/* Header（時間帯のみ） */}
-              <div className="px-4 py-3 border-b" style={{ borderColor: "#F5DCE8" }}>
+              <div className="px-4 py-3 border-b" style={{ borderColor: "#EAEAEA" }}>
                 <p className="text-lg font-black" style={{ color: "#2c2c2c" }}>
-                  {slot.startTime}<span className="mx-1 font-bold" style={{ color: "#D89BB8" }}>〜</span>{slot.endTime}
+                  {slot.startTime}<span className="mx-1 font-bold" style={{ color: "#C06A97" }}>〜</span>{slot.endTime}
                 </p>
               </div>
 
@@ -199,14 +199,14 @@ export default function RotationTable() {
                 </div>
               ) : (
                 <div
-                  className="grid divide-x divide-gray-100"
+                  className="grid divide-x divide-gray-200"
                   style={{ gridTemplateColumns: `repeat(${usedRooms.length}, minmax(0, 1fr))` }}
                 >
                   {usedRooms.map((room) => {
                     const cfg = roomCfg[room];
                     const names = groups[room];
                     return (
-                      <div key={room} style={{ background: cfg.bg }}>
+                      <div key={room} style={{ background: "#fff" }}>
                         <div className="flex items-center justify-center py-2.5 gap-1.5" style={{ background: cfg.gradient, textShadow: "0 1px 2px rgba(122,8,58,0.35)" }}>
                           <span className="text-base font-black text-white">{room}</span>
                           <span className="text-xs font-bold text-white/85">ルーム</span>

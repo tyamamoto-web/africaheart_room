@@ -15,7 +15,7 @@ export default function Home() {
         <Link
           href="/test"
           className="flex items-center gap-3 px-4 py-3 rounded-2xl text-white active:scale-[0.99] transition-transform"
-          style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", boxShadow: "0 4px 14px rgba(255,107,157,0.35)" }}
+          style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", boxShadow: "0 4px 14px rgba(168,23,95,0.34)" }}
         >
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black leading-tight">会員メニュー</p>

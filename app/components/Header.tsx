@@ -7,7 +7,7 @@ export default function Header() {
   return (
     <header
       className="relative overflow-hidden"
-      style={{ background: "#C81E77" }}
+      style={{ background: "linear-gradient(140deg,#8E1252 0%,#A8175F 50%,#C81E77 100%)" }}
     >
       <div className="absolute top-4 right-4 z-10">
         <Link

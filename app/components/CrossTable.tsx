@@ -91,7 +91,7 @@ export default function CrossTable() {
                 className="px-4 py-1.5 rounded-full text-xs font-bold transition-colors"
                 style={
                   mode === key
-                    ? { background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", color: "#fff" }
+                    ? { background: "linear-gradient(135deg,#A8175F,#C81E77)", color: "#fff" }
                     : { background: "transparent", color: "#999" }
                 }
               >
@@ -122,7 +122,7 @@ export default function CrossTable() {
                         fontWeight: 700,
                         margin: "0 auto",
                         whiteSpace: "nowrap",
-                        color: m.role === "guest" ? "#FF4FA3" : "#888",
+                        color: m.role === "guest" ? "#C81E77" : "#888",
                       }}
                     >
                       {m.nickname}
@@ -142,7 +142,7 @@ export default function CrossTable() {
                       fontSize: 10.5,
                       fontWeight: 700,
                       whiteSpace: "nowrap",
-                      color: row.role === "guest" ? "#FF4FA3" : "#555",
+                      color: row.role === "guest" ? "#C81E77" : "#555",
                     }}
                   >
                     {row.nickname}
@@ -159,7 +159,7 @@ export default function CrossTable() {
                             height: CELL,
                             borderRadius: 4,
                             background:
-                              "repeating-linear-gradient(45deg,#f3f0ec,#f3f0ec 3px,#e9e4dd 3px,#e9e4dd 6px)",
+                              "linear-gradient(45deg, transparent calc(50% - 0.6px), #D8D0C8 calc(50% - 0.6px), #D8D0C8 calc(50% + 0.6px), transparent calc(50% + 0.6px))",
                           }}
                         />
                       );
@@ -211,7 +211,7 @@ export default function CrossTable() {
                           borderRadius: 4,
                           background: fill[v] ?? fill[5],
                           color: ink[v] ?? "#fff",
-                          outline: isMax ? "2px solid #FF4FA3" : "none",
+                          outline: isMax ? "2px solid #5C0E38" : "none",
                           outlineOffset: -2,
                         }}
                       >
@@ -260,7 +260,7 @@ export default function CrossTable() {
             </span>
           )}
           <span className="inline-flex items-center gap-1">
-            <span style={{ color: "#FF4FA3", fontWeight: 700 }}>G</span>ゲスト
+            <span style={{ color: "#C81E77", fontWeight: 700 }}>G</span>ゲスト
           </span>
         </div>
       </div>
