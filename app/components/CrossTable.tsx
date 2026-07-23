@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { timeSlots, defaultMembers, allSlotAbsent } from "@/lib/data";
 import { getMembers } from "@/lib/memberStore";
 import { getEventSetup } from "@/lib/eventStore";
@@ -32,8 +32,41 @@ export default function CrossTable() {
     setSetup(getEventSetup());
   }, []);
 
+  // 対角（自分×自分）に沿って、セルの隙間で途切れない“1本”の斜線を SVG で重ねる。
+  // 左上の対角セルの左上角 → 右下の対角セルの右下角 を1ストロークで結ぶ。
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [diag, setDiag] = useState<{ x1: number; y1: number; x2: number; y2: number; w: number; h: number } | null>(null);
+
+  const measureDiag = useCallback(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const cells = wrap.querySelectorAll<HTMLElement>("[data-diag]");
+    if (cells.length === 0) {
+      setDiag(null);
+      return;
+    }
+    const wr = wrap.getBoundingClientRect();
+    const first = cells[0].getBoundingClientRect();
+    const last = cells[cells.length - 1].getBoundingClientRect();
+    setDiag({
+      x1: first.left - wr.left,
+      y1: first.top - wr.top,
+      x2: last.right - wr.left,
+      y2: last.bottom - wr.top,
+      w: wrap.scrollWidth,
+      h: wrap.scrollHeight,
+    });
+  }, []);
+
   const attendSet = new Set(setup.attendanceIds);
   const people = members.filter((m) => attendSet.has(m.id));
+
+  // 人数やモードが変わったら斜線を測り直す（リサイズにも追従）
+  useEffect(() => {
+    measureDiag();
+    window.addEventListener("resize", measureDiag);
+    return () => window.removeEventListener("resize", measureDiag);
+  }, [measureDiag, people.length, mode]);
 
   // 同席回数を集計
   const counts = new Map<string, number>();
@@ -108,7 +141,8 @@ export default function CrossTable() {
         </p>
 
         {/* 表（横スクロール可） */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto text-center">
+          <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }}>
           <table style={{ borderCollapse: "separate", borderSpacing: 2, margin: "0 auto" }}>
             <thead>
               <tr>
@@ -154,13 +188,8 @@ export default function CrossTable() {
                       return (
                         <td
                           key={col.id}
-                          style={{
-                            width: CELL,
-                            height: CELL,
-                            borderRadius: 4,
-                            background:
-                              "linear-gradient(45deg, transparent calc(50% - 0.6px), #D8D0C8 calc(50% - 0.6px), #D8D0C8 calc(50% + 0.6px), transparent calc(50% + 0.6px))",
-                          }}
+                          data-diag
+                          style={{ width: CELL, height: CELL }}
                         />
                       );
                     if (v === 0)
@@ -223,6 +252,24 @@ export default function CrossTable() {
               ))}
             </tbody>
           </table>
+          {diag && (
+            <svg
+              width={diag.w}
+              height={diag.h}
+              style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
+            >
+              <line
+                x1={diag.x1}
+                y1={diag.y1}
+                x2={diag.x2}
+                y2={diag.y2}
+                stroke="#D8D0C8"
+                strokeWidth={1.2}
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+          </div>
         </div>
 
         {/* 凡例 */}
