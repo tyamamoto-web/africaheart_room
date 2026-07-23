@@ -136,7 +136,7 @@ export default function CrossTable() {
 
         <p className="text-[11px] leading-relaxed text-center mb-3" style={{ color: "#999" }}>
           {mode === "koma"
-            ? "小部屋（コマ①〜⑤）での同席回数。最多3回で調整（宿題・デュエットは除く）"
+            ? "小部屋（コマ①〜⑤）での同席回数（宿題・デュエットは除く）"
             : "宿題・デュエット（全員集合）を含む総同席回数。0＝未同席"}
         </p>
 
