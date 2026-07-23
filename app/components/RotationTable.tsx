@@ -85,6 +85,13 @@ export default function RotationTable() {
 
           /* ── opening（集合・スタート）：赤紫の枠線のみ（塗りなし） ── */
           if (slot.type === "opening") {
+            // detail を「集合/スタート行」と「退席リスト」に分解し、視認性を上げる
+            const openLines = slot.detail ? slot.detail.split("\n") : [];
+            const scheduleLine = openLines.find((l) => !l.includes("【退席】")) ?? "";
+            const leaveLine = openLines.find((l) => l.includes("【退席】"));
+            const leaves = leaveLine
+              ? leaveLine.replace("【退席】", "").split("／").map((s) => s.trim()).filter(Boolean)
+              : [];
             return (
               <div
                 key={slot.id}
@@ -101,11 +108,33 @@ export default function RotationTable() {
                   </div>
                   <div className="flex-1 pt-0.5">
                     <p className="font-black text-lg leading-tight" style={{ color: "#A8175F" }}>{slot.label}</p>
-                    {slot.detail && (
-                      <p
-                        className="text-sm mt-1 leading-relaxed"
-                        style={{ whiteSpace: "pre-line", color: "#7A5068" }}
-                      >
+
+                    {scheduleLine && (
+                      <p className="text-sm font-bold mt-1.5 leading-relaxed" style={{ color: "#2C2130" }}>
+                        {scheduleLine}
+                      </p>
+                    )}
+
+                    {leaves.length > 0 && (
+                      <div className="mt-2.5">
+                        <p className="text-xs font-black mb-1.5 tracking-wide" style={{ color: "#A8175F" }}>退席時間</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {leaves.map((item, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center rounded-lg px-2 py-1 text-xs font-bold"
+                              style={{ background: "#FBEAF2", color: "#4A1230", border: "1px solid #EFC9DD" }}
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* フォーマット外の detail はそのまま表示（フォールバック） */}
+                    {!scheduleLine && !leaves.length && slot.detail && (
+                      <p className="text-sm mt-1 leading-relaxed" style={{ whiteSpace: "pre-line", color: "#2C2130" }}>
                         {slot.detail}
                       </p>
                     )}
