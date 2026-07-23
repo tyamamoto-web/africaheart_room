@@ -275,7 +275,7 @@ function DuetFeature() {
           {rows.map((r, i) => (
             <div key={i} className="rounded-xl p-2" style={{ background: "#fff", border: "1px solid #efe9e1" }}>
               <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white" style={{ background: "#FF6B9D" }}>{i + 1}</span>
+                <span className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white" style={{ background: "#C81E77" }}>{i + 1}</span>
                 <input
                   value={r.title} onChange={(e) => setRow(i, { title: e.target.value })} placeholder="曲名"
                   className="flex-1 min-w-0 rounded-lg px-2.5 py-2 text-sm focus:outline-none" style={inputStyle}
@@ -315,8 +315,8 @@ function DuetFeature() {
           onClick={handleAdd} disabled={!canSubmit}
           className="w-full mt-2 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity"
           style={{
-            background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)",
-            boxShadow: "0 3px 10px rgba(255,107,157,0.3)",
+            background: "linear-gradient(135deg,#A8175F,#C81E77)",
+            boxShadow: "0 3px 10px rgba(168,23,95,0.3)",
             opacity: canSubmit ? 1 : 0.4,
           }}
         >
@@ -340,7 +340,7 @@ function DuetFeature() {
             <div key={owner}>
               {/* 名前セクション見出し */}
               <div className="flex items-center gap-2 mb-2">
-                <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }}>
+                <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)" }}>
                   {owner.charAt(0)}
                 </span>
                 <p className="text-sm font-black" style={{ color: "#2c2c2c" }}>{owner}</p>
@@ -353,7 +353,7 @@ function DuetFeature() {
 
                   if (editId === s.id) {
                     return (
-                      <div key={s.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #FF6B9D55" }}>
+                      <div key={s.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #C81E7755" }}>
                         <input value={eTitle} onChange={(e) => setETitle(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="曲名" />
                         <input value={eArtist} onChange={(e) => setEArtist(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="アーティスト名" />
                         <input value={ePart} onChange={(e) => setEPart(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="歌ってほしいパート（任意）" />
@@ -364,7 +364,7 @@ function DuetFeature() {
                               {KEY_OPTS.map((k) => <option key={k} value={k}>{keyLabel(k)}</option>)}
                             </select>
                           </div>
-                          <button onClick={() => saveEdit(s.id)} className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }}>保存</button>
+                          <button onClick={() => saveEdit(s.id)} className="flex-1 py-2 rounded-lg text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)" }}>保存</button>
                           <button onClick={() => setEditId(null)} className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "#f4f0ea", color: "#888" }}>取消</button>
                         </div>
                       </div>
@@ -374,14 +374,14 @@ function DuetFeature() {
                     <div key={s.id} className="rounded-2xl p-3" style={{ background: "#fff", border: "1px solid #efe9e1" }}>
                       <div className="flex items-center gap-3">
                         <div className="flex-shrink-0 w-12 h-12 rounded-xl flex flex-col items-center justify-center" style={{ background: "#f4f0ea" }}>
-                          <span className="text-sm font-black leading-none" style={{ color: "#FF4FA3" }}>{keyLabel(s.key_offset)}</span>
+                          <span className="text-sm font-black leading-none" style={{ color: "#C81E77" }}>{keyLabel(s.key_offset)}</span>
                           <span className="text-[8px] font-bold mt-0.5" style={{ color: "#bbb" }}>キー</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold break-words" style={{ color: "#2c2c2c" }}>{s.title}</p>
                           <p className="text-xs break-words" style={{ color: "#999" }}>{s.artist || "—"}</p>
                           {s.part && s.part.trim() && (
-                            <p className="text-[11px] font-semibold mt-0.5 leading-relaxed break-words" style={{ color: "#845ef7" }}>
+                            <p className="text-[11px] font-semibold mt-0.5 leading-relaxed break-words" style={{ color: "#A8175F" }}>
                               {s.part.trim()} を歌ってほしい
                             </p>
                           )}
@@ -389,11 +389,11 @@ function DuetFeature() {
                         <button
                           onClick={() => addLike(s)}
                           className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
-                          style={{ background: likeEntries.length ? "#ffe8f1" : "#f4f0ea", border: `1.5px solid ${likeEntries.length ? "#FF6B9D" : "transparent"}` }}
+                          style={{ background: likeEntries.length ? "#FBEAF2" : "#f4f0ea", border: `1.5px solid ${likeEntries.length ? "#C81E77" : "transparent"}` }}
                           title="「歌える！」を表明（複数人OK）"
                         >
-                          <span className="text-xs font-black" style={{ color: likeEntries.length ? "#FF4FA3" : "#888" }}>歌える</span>
-                          <span className="text-xs font-black" style={{ color: likeEntries.length ? "#FF4FA3" : "#bbb" }}>{likeEntries.length}</span>
+                          <span className="text-xs font-black" style={{ color: likeEntries.length ? "#C81E77" : "#888" }}>歌える</span>
+                          <span className="text-xs font-black" style={{ color: likeEntries.length ? "#C81E77" : "#bbb" }}>{likeEntries.length}</span>
                         </button>
                         <div className="flex-shrink-0 flex gap-1">
                           <button onClick={() => startEdit(s)} className="px-2 py-2 rounded-lg text-[11px] font-bold" style={{ background: "#f4f0ea", color: "#888" }}>編集</button>
@@ -409,13 +409,13 @@ function DuetFeature() {
                               <span
                                 key={e}
                                 className="inline-flex items-center gap-0.5 rounded-full pl-2.5 pr-0.5 py-1 text-[11px] font-bold"
-                                style={{ background: "#ffe8f1", color: "#FF4FA3" }}
+                                style={{ background: "#FBEAF2", color: "#C81E77" }}
                               >
                                 {n}
                                 <button
                                   onClick={() => removeLike(s, e)}
                                   className="w-6 h-6 rounded-full flex items-center justify-center text-xs"
-                                  style={{ background: "transparent", color: "#FF6B9D" }}
+                                  style={{ background: "transparent", color: "#C81E77" }}
                                   aria-label={`${n}の歌えるを取り消し`}
                                 >
                                   ×
@@ -466,7 +466,7 @@ const DEFAULT_THEMES = [
   "懐かしのJ-POP",
   "デュエット曲",
 ];
-const CONFETTI_COLORS = ["#FF6B9D", "#845ef7", "#339af0", "#f59e0b", "#10b981", "#FF4FA3"];
+const CONFETTI_COLORS = ["#C81E77", "#845ef7", "#339af0", "#f59e0b", "#10b981", "#E0559A"];
 
 // 抽選結果のローカル控え（DB未設定でも端末内で結果を保持・表示できる）
 function loadLocalResult(): string[] {
@@ -738,9 +738,9 @@ function HomeworkRoulette() {
                 onClick={() => setSelMonth(m)}
                 className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-black transition-all"
                 style={{
-                  background: sel ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+                  background: sel ? "linear-gradient(135deg,#A8175F,#C81E77)" : "#f0ece5",
                   color: sel ? "#fff" : "#aaa",
-                  boxShadow: sel ? "0 3px 10px rgba(255,107,157,0.3)" : "none",
+                  boxShadow: sel ? "0 3px 10px rgba(168,23,95,0.3)" : "none",
                 }}
               >
                 {m}月{count > 0 ? `・${count}` : ""}
@@ -760,7 +760,7 @@ function HomeworkRoulette() {
               className={`rounded-2xl px-2 py-3 flex flex-col items-center justify-center text-center min-h-[78px] ${t ? "slot-pop" : ""}`}
               style={
                 t
-                  ? { background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", boxShadow: "0 4px 12px rgba(255,107,157,0.3)" }
+                  ? { background: "linear-gradient(135deg,#A8175F,#C81E77)", boxShadow: "0 4px 12px rgba(168,23,95,0.3)" }
                   : { background: "#faf8f5", border: "1.5px dashed #e7ddd1" }
               }
             >
@@ -790,16 +790,16 @@ function HomeworkRoulette() {
           }`}
           style={{
             background: landed
-              ? "linear-gradient(135deg,#fff0f6,#ffe3ef)"
+              ? "linear-gradient(135deg,#FCEFF5,#F9E6EF)"
               : "linear-gradient(135deg,#faf8f5,#f4f0ea)",
-            border: `2px solid ${landed ? "#FF6B9D" : "#efe9e1"}`,
+            border: `2px solid ${landed ? "#C81E77" : "#efe9e1"}`,
           }}
         >
           {display ? (
             <>
               <span
                 className="text-[11px] font-bold tracking-widest uppercase mb-1"
-                style={{ color: spinning ? "#cbb" : "#FF4FA3" }}
+                style={{ color: spinning ? "#cbb" : "#C81E77" }}
               >
                 {spinning ? "抽選中" : landed ? "決定" : "前回のテーマ"}
               </span>
@@ -825,9 +825,9 @@ function HomeworkRoulette() {
         <div className="flex flex-col gap-2">
           <div
             className="rounded-2xl px-4 py-3 text-center"
-            style={{ background: "#fff0f6", border: "1.5px solid #ffd0e4" }}
+            style={{ background: "#FCEFF5", border: "1.5px solid #F3CFE1" }}
           >
-            <p className="text-sm font-black" style={{ color: "#FF4FA3" }}>
+            <p className="text-sm font-black" style={{ color: "#C81E77" }}>
               今回の宿題テーマが決定しました
             </p>
             <p className="text-base font-black mt-1.5" style={{ color: "#2c2c2c" }}>
@@ -853,8 +853,8 @@ function HomeworkRoulette() {
             disabled={!canSpin}
             className="flex-1 py-3.5 rounded-2xl text-sm font-black text-white transition-opacity"
             style={{
-              background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)",
-              boxShadow: "0 4px 14px rgba(255,107,157,0.35)",
+              background: "linear-gradient(135deg,#A8175F,#C81E77)",
+              boxShadow: "0 4px 14px rgba(168,23,95,0.34)",
               opacity: canSpin ? 1 : 0.4,
             }}
           >
@@ -899,7 +899,7 @@ function HomeworkRoulette() {
           <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
             {selMonth}月の宿題リスト（{monthThemes.length}/{MAX_PER_MONTH}）
           </span>
-          <span className="text-xs font-black" style={{ color: "#FF4FA3" }}>
+          <span className="text-xs font-black" style={{ color: "#C81E77" }}>
             {showEdit ? "閉じる" : "開く"}
           </span>
         </button>
@@ -944,7 +944,7 @@ function HomeworkRoulette() {
                 onClick={addTheme}
                 disabled={!newTheme.trim() || needsSetup || monthFull}
                 className="px-4 rounded-xl text-sm font-bold text-white transition-opacity"
-                style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: newTheme.trim() && !needsSetup && !monthFull ? 1 : 0.4 }}
+                style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: newTheme.trim() && !needsSetup && !monthFull ? 1 : 0.4 }}
               >
                 追加
               </button>
@@ -1030,7 +1030,7 @@ function SlotReel({
       {/* 中央のセレクトライン */}
       <div
         className="absolute left-2 right-2 rounded-2xl pointer-events-none"
-        style={{ top: CELL_H, height: CELL_H, border: "2px solid #FF6B9D", background: "rgba(255,107,157,0.07)" }}
+        style={{ top: CELL_H, height: CELL_H, border: "2px solid #C81E77", background: "rgba(168,23,95,0.07)" }}
       />
       {/* 上下フェード（スロットらしさ） */}
       <div className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: CELL_H, background: "linear-gradient(#f6f2ec,rgba(246,242,236,0))" }} />
@@ -1134,9 +1134,9 @@ function SingingOrderRoulette() {
 
   const inputStyle = { background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent" } as const;
   const dirBtnStyle = (active: boolean) => ({
-    background: active ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+    background: active ? "linear-gradient(135deg,#A8175F,#C81E77)" : "#f0ece5",
     color: active ? "#fff" : "#aaa",
-    boxShadow: active ? "0 3px 10px rgba(255,107,157,0.3)" : "none",
+    boxShadow: active ? "0 3px 10px rgba(168,23,95,0.3)" : "none",
   });
 
   return (
@@ -1182,7 +1182,7 @@ function SingingOrderRoulette() {
         onClick={spin}
         disabled={!canSpin}
         className="w-full py-3.5 rounded-2xl text-sm font-black text-white transition-opacity"
-        style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", boxShadow: "0 4px 14px rgba(255,107,157,0.35)", opacity: canSpin ? 1 : 0.4 }}
+        style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", boxShadow: "0 4px 14px rgba(168,23,95,0.34)", opacity: canSpin ? 1 : 0.4 }}
       >
         {spinning ? "抽選中…" : landed ? "もう一度ルーレット" : "ルーレット開始"}
       </button>
@@ -1194,16 +1194,16 @@ function SingingOrderRoulette() {
 
       {/* 結果：最初に歌う人と進行方向 */}
       {landed && starter && (
-        <div className="rounded-2xl p-4 slot-pop text-center" style={{ background: "#fff0f6", border: "1.5px solid #ffd0e4" }}>
-          <p className="text-xs font-bold tracking-widest uppercase mb-1" style={{ color: "#FF4FA3" }}>
+        <div className="rounded-2xl p-4 slot-pop text-center" style={{ background: "#FCEFF5", border: "1.5px solid #F3CFE1" }}>
+          <p className="text-xs font-bold tracking-widest uppercase mb-1" style={{ color: "#C81E77" }}>
             最初に歌う人
           </p>
           <p className="text-2xl font-black mb-3" style={{ color: "#2c2c2c" }}>
             {starter}
           </p>
-          <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{ background: "#fff", border: "1px solid #ffd0e4" }}>
+          <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{ background: "#fff", border: "1px solid #F3CFE1" }}>
             <span className="text-xs font-bold" style={{ color: "#c98aae" }}>このあとの進行</span>
-            <span className="text-sm font-black" style={{ color: "#FF4FA3" }}>
+            <span className="text-sm font-black" style={{ color: "#C81E77" }}>
               {dir === "right" ? "右回り（右へ）" : "左回り（左へ）"}
             </span>
           </div>
@@ -1216,7 +1216,7 @@ function SingingOrderRoulette() {
           <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
             参加者（{singers.length}人）
           </span>
-          <span className="text-xs font-black" style={{ color: "#FF4FA3" }}>
+          <span className="text-xs font-black" style={{ color: "#C81E77" }}>
             {showList ? "閉じる" : "開く"}
           </span>
         </button>
@@ -1255,7 +1255,7 @@ function SingingOrderRoulette() {
                 className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm focus:outline-none"
                 style={inputStyle}
               />
-              <button onClick={addName} disabled={!newName.trim()} className="px-4 rounded-xl text-sm font-bold text-white transition-opacity" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: newName.trim() ? 1 : 0.4 }}>
+              <button onClick={addName} disabled={!newName.trim()} className="px-4 rounded-xl text-sm font-bold text-white transition-opacity" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: newName.trim() ? 1 : 0.4 }}>
                 追加
               </button>
             </div>
@@ -1538,7 +1538,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
           <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
             自己紹介を追加する
           </span>
-          <span className="text-xs font-black" style={{ color: "#FF4FA3" }}>
+          <span className="text-xs font-black" style={{ color: "#C81E77" }}>
             {showAdd ? "閉じる" : "開く"}
           </span>
         </button>
@@ -1598,8 +1598,8 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
               disabled={!canAdd}
               className="w-full mt-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity"
               style={{
-                background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)",
-                boxShadow: "0 3px 10px rgba(255,107,157,0.3)",
+                background: "linear-gradient(135deg,#A8175F,#C81E77)",
+                boxShadow: "0 3px 10px rgba(168,23,95,0.3)",
                 opacity: canAdd ? 1 : 0.4,
               }}
             >
@@ -1626,9 +1626,9 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                   onClick={() => setSortBy(s.id)}
                   className="px-2.5 py-1 rounded-full text-[11px] font-bold transition-all"
                   style={{
-                    background: on ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+                    background: on ? "linear-gradient(135deg,#A8175F,#C81E77)" : "#f0ece5",
                     color: on ? "#fff" : "#999",
-                    boxShadow: on ? "0 2px 6px rgba(255,107,157,0.3)" : "none",
+                    boxShadow: on ? "0 2px 6px rgba(168,23,95,0.3)" : "none",
                   }}
                 >
                   {s.label}
@@ -1658,7 +1658,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
           {shown.map((p) => {
             if (editId === p.id) {
               return (
-                <div key={p.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #FF6B9D55" }}>
+                <div key={p.id} className="rounded-2xl p-3 flex flex-col gap-2" style={{ background: "#fff", border: "2px solid #C81E7755" }}>
                   <input value={eName} onChange={(e) => setEName(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="お名前（必須）" />
                   <textarea value={eIntro} onChange={(e) => setEIntro(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" style={inputStyle} placeholder="自己紹介" />
                   <input value={eFav} onChange={(e) => setEFav(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none" style={inputStyle} placeholder="好きな曲・アーティスト（任意）" />
@@ -1673,7 +1673,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                   </div>
                   <textarea value={eStatus} onChange={(e) => setEStatus(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" style={inputStyle} placeholder="近況" />
                   <div className="flex items-center gap-2">
-                    <button onClick={() => saveEdit(p.id)} disabled={saving || !eName.trim()} className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", opacity: saving || !eName.trim() ? 0.4 : 1 }}>
+                    <button onClick={() => saveEdit(p.id)} disabled={saving || !eName.trim()} className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: saving || !eName.trim() ? 0.4 : 1 }}>
                       {saving ? "保存中…" : "保存"}
                     </button>
                     <button onClick={() => setEditId(null)} className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "#f4f0ea", color: "#888" }}>取消</button>
@@ -1685,9 +1685,9 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
             const isNew = isNewer(p.updated_at, sinceSeen) && withinNewWindow(p.updated_at, Date.now());
             const birthLabel = p.birth_month ? `${p.birth_month}月` : "";
             return (
-              <div key={p.id} className="rounded-2xl p-3.5" style={{ background: "#fff", border: isNew ? "1.5px solid #ffb3d1" : "1px solid #efe9e1" }}>
+              <div key={p.id} className="rounded-2xl p-3.5" style={{ background: "#fff", border: isNew ? "1.5px solid #EFC9DD" : "1px solid #efe9e1" }}>
                 <div className="flex items-center gap-3">
-                  <span className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-base font-black text-white" style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)" }}>
+                  <span className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-base font-black text-white" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)" }}>
                     {(p.name.trim() || "?").charAt(0)}
                   </span>
                   <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
@@ -1717,7 +1717,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                     {birthLabel && (
                       <span className="inline-flex items-baseline gap-1.5">
                         <span className="text-[10px] font-black tracking-wider" style={{ color: "#bbb" }}>誕生月</span>
-                        <span className="text-xs font-bold" style={{ color: "#FF4FA3" }}>{birthLabel}</span>
+                        <span className="text-xs font-bold" style={{ color: "#C81E77" }}>{birthLabel}</span>
                       </span>
                     )}
                     {p.fav.trim() && (
@@ -1730,8 +1730,8 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                 )}
 
                 {p.status.trim() && (
-                  <div className="mt-2.5 rounded-xl px-3 py-2" style={{ background: "#fff0f6", border: "1px solid #ffd9e9" }}>
-                    <p className="text-[10px] font-black tracking-widest uppercase mb-0.5" style={{ color: "#FF4FA3" }}>近況</p>
+                  <div className="mt-2.5 rounded-xl px-3 py-2" style={{ background: "#FCEFF5", border: "1px solid #ffd9e9" }}>
+                    <p className="text-[10px] font-black tracking-widest uppercase mb-0.5" style={{ color: "#C81E77" }}>近況</p>
                     <p className="text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#2c2c2c" }}>
                       {p.status.trim()}
                     </p>
@@ -1901,9 +1901,9 @@ export default function TestPage() {
                     onClick={() => selectTab(f.id)}
                     className="relative w-full px-3 py-3 rounded-2xl text-sm font-black transition-all text-center"
                     style={{
-                      background: sel ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+                      background: sel ? "linear-gradient(135deg,#A8175F,#C81E77)" : "#f0ece5",
                       color: sel ? "#fff" : "#aaa",
-                      boxShadow: sel ? "0 3px 10px rgba(255,107,157,0.3)" : "none",
+                      boxShadow: sel ? "0 3px 10px rgba(168,23,95,0.3)" : "none",
                     }}
                   >
                     {f.tab}

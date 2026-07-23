@@ -8,9 +8,9 @@ import { getEventSetup, setAttendance, setMemberRoom } from "@/lib/eventStore";
 import type { RoomKey } from "@/lib/eventStore";
 
 const roomCfg = {
-  A: { gradient: "linear-gradient(135deg,#ff6b6b,#ff9a5c)", color: "#ff6b6b", bg: "#fff4f4" },
-  B: { gradient: "linear-gradient(135deg,#845ef7,#cc5de8)", color: "#845ef7", bg: "#f7f3ff" },
-  C: { gradient: "linear-gradient(135deg,#339af0,#22d3ee)", color: "#339af0", bg: "#f0f8ff" },
+  A: { gradient: "linear-gradient(135deg,#8E1252,#A8175F)", color: "#A8175F", bg: "#F6E1EB" },
+  B: { gradient: "linear-gradient(135deg,#A8175F,#C81E77)", color: "#C81E77", bg: "#F9E6EF" },
+  C: { gradient: "linear-gradient(135deg,#C0246F,#D6478E)", color: "#C0246F", bg: "#FCEDF4" },
 } as const;
 
 const roleConfig: Record<MemberRole, { label: string; bg: string; text: string }> = {
@@ -113,7 +113,7 @@ export default function AdminPage() {
         <button
           onClick={openAdd}
           className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
-          style={{ background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)", boxShadow: "0 3px 10px rgba(255,107,157,0.3)" }}
+          style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", boxShadow: "0 3px 10px rgba(168,23,95,0.3)" }}
         >
           ＋ 追加
         </button>
@@ -182,9 +182,9 @@ export default function AdminPage() {
                     onClick={() => setActiveSlot(slot.id)}
                     className="flex-shrink-0 px-4 py-2.5 rounded-2xl text-sm font-black transition-all"
                     style={{
-                      background: isSel ? "linear-gradient(135deg,#FF6B9D,#FF4FA3)" : "#f0ece5",
+                      background: isSel ? "linear-gradient(135deg,#A8175F,#C81E77)" : "#f0ece5",
                       color: isSel ? "white" : "#aaa",
-                      boxShadow: isSel ? "0 3px 10px rgba(255,107,157,0.3)" : "none",
+                      boxShadow: isSel ? "0 3px 10px rgba(168,23,95,0.3)" : "none",
                     }}
                   >
                     {slot.label}
@@ -340,7 +340,7 @@ export default function AdminPage() {
                 placeholder="例：よしの助"
                 className="w-full rounded-xl px-4 py-3.5 text-base font-medium focus:outline-none"
                 style={{ background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent" }}
-                onFocus={(e) => (e.target.style.border = "2px solid #FF6B9D60")}
+                onFocus={(e) => (e.target.style.border = "2px solid #C81E7760")}
                 onBlur={(e)  => (e.target.style.border = "2px solid transparent")}
                 autoFocus
               />
@@ -377,8 +377,8 @@ export default function AdminPage() {
                 disabled={!form.nickname.trim()}
                 className="flex-1 py-3.5 rounded-xl text-base font-bold text-white transition-opacity"
                 style={{
-                  background: "linear-gradient(135deg,#FF6B9D,#FF4FA3)",
-                  boxShadow: "0 3px 10px rgba(255,107,157,0.3)",
+                  background: "linear-gradient(135deg,#A8175F,#C81E77)",
+                  boxShadow: "0 3px 10px rgba(168,23,95,0.3)",
                   opacity: form.nickname.trim() ? 1 : 0.4,
                 }}
               >
