@@ -118,3 +118,7 @@ create policy "mp anon read"   on public.member_profiles for select using (true)
 create policy "mp anon insert" on public.member_profiles for insert with check (true);
 create policy "mp anon update" on public.member_profiles for update using (true) with check (true);
 create policy "mp anon delete" on public.member_profiles for delete using (true);
+
+-- ※ 当日の実部屋番号(A/B/C)は新テーブルを作らず、既存の homework_result を
+--    間借りして保存する（宿題=id=1 / 部屋番号=id=2、themes[]に[A,B,C]）。SQL不要。
+--    実装は lib/roomNumbers.ts を参照。

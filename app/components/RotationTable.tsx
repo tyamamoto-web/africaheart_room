@@ -5,6 +5,7 @@ import Link from "next/link";
 import { timeSlots, defaultMembers } from "@/lib/data";
 import { getMembers } from "@/lib/memberStore";
 import { getEventSetup } from "@/lib/eventStore";
+import { getRoomNumbers, saveRoomNumbers, EMPTY_ROOM_NUMBERS, type RoomNumbers } from "@/lib/roomNumbers";
 import DownloadTableButton from "./DownloadTableButton";
 import type { Member } from "@/lib/data";
 import type { EventSetup, RoomKey } from "@/lib/eventStore";
@@ -49,10 +50,60 @@ export default function RotationTable() {
     rotations: {},
   });
 
+  // 当日リーダーが登録する「実際の部屋番号」（A/B/C→番号）。全員で共有するため
+  // Supabase から取得し、他端末の更新を反映できるよう約5秒ごとにポーリング。
+  const [roomNos, setRoomNos] = useState<RoomNumbers>(EMPTY_ROOM_NUMBERS);
+  // TOPページから直接入力するための編集状態
+  const [editingNos, setEditingNos] = useState(false);
+  const [draftNos, setDraftNos] = useState<{ A: string; B: string; C: string }>({ A: "", B: "", C: "" });
+  const [savingNos, setSavingNos] = useState(false);
+  const [nosMsg, setNosMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   useEffect(() => {
     setMembers(getMembers());
     setSetup(getEventSetup());
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      getRoomNumbers()
+        .then((r) => {
+          if (alive) setRoomNos(r);
+        })
+        .catch(() => {
+          /* 表示優先：取得失敗時は番号なしのまま */
+        });
+    };
+    load();
+    const timer = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  function openNosEditor() {
+    setDraftNos({ A: roomNos.A, B: roomNos.B, C: roomNos.C }); // 現在の共有値を初期表示
+    setNosMsg(null);
+    setEditingNos(true);
+  }
+
+  async function handleSaveNos() {
+    setSavingNos(true);
+    setNosMsg(null);
+    try {
+      await saveRoomNumbers(draftNos, "TOP");
+      setRoomNos((prev) => ({ ...prev, A: draftNos.A.trim(), B: draftNos.B.trim(), C: draftNos.C.trim() })); // 即時反映
+      setNosMsg({ ok: true, text: "保存しました（全員のページに反映されます）" });
+    } catch {
+      setNosMsg({ ok: false, text: "保存に失敗しました。通信状況をご確認ください。" });
+    } finally {
+      setSavingNos(false);
+    }
+  }
+
+  const anyRoomNo = !!(roomNos.A || roomNos.B || roomNos.C);
 
   return (
     <section className="px-4 pb-4">
@@ -63,6 +114,66 @@ export default function RotationTable() {
       </div>
 
       <DownloadTableButton />
+
+      {/* 当日の部屋番号：TOPから直接入力→全員に共有（初期値は空白） */}
+      <div className="max-w-lg mx-auto mb-4">
+        <div className="card px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-black" style={{ color: "#2c2c2c" }}>当日の部屋番号</p>
+              <p className="text-xs mt-0.5 leading-relaxed" style={{ color: "#aaa" }}>
+                {anyRoomNo
+                  ? `A：${roomNos.A || "—"} ／ B：${roomNos.B || "—"} ／ C：${roomNos.C || "—"}`
+                  : "未設定（当日ここで入力すると各コマの表と全員のページに反映されます）"}
+              </p>
+            </div>
+            <button
+              onClick={() => (editingNos ? setEditingNos(false) : openNosEditor())}
+              className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg"
+              style={{ background: "#F6E1EB", color: "#A8175F" }}
+            >
+              {editingNos ? "閉じる" : anyRoomNo ? "変更" : "設定"}
+            </button>
+          </div>
+
+          {editingNos && (
+            <div className="mt-3 pt-3 flex flex-col gap-2.5" style={{ borderTop: "1px solid #f0e6ee" }}>
+              {(["A", "B", "C"] as const).map((r) => (
+                <div key={r} className="flex items-center gap-2.5">
+                  <span
+                    className="flex-shrink-0 inline-flex items-center justify-center rounded-lg text-white text-sm font-black"
+                    style={{ width: 36, height: 36, background: roomCfg[r].gradient }}
+                  >
+                    {r}
+                  </span>
+                  <input
+                    value={draftNos[r]}
+                    onChange={(e) => setDraftNos((p) => ({ ...p, [r]: e.target.value }))}
+                    placeholder="例：305号室 / 大部屋 など"
+                    maxLength={20}
+                    inputMode="text"
+                    className="flex-1 min-w-0 px-3 py-2.5 rounded-xl text-sm"
+                    style={{ border: "1px solid #e5e7eb", background: "#fff", color: "#2c2c2c" }}
+                  />
+                </div>
+              ))}
+              <button
+                onClick={handleSaveNos}
+                disabled={savingNos}
+                className="mt-1 py-2.5 rounded-xl text-sm font-bold text-white"
+                style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: savingNos ? 0.6 : 1 }}
+              >
+                {savingNos ? "保存中…" : "保存して全員に共有"}
+              </button>
+              {nosMsg && (
+                <p className="text-xs font-bold leading-relaxed" style={{ color: nosMsg.ok ? "#10b981" : "#ff6b6b" }}>
+                  {nosMsg.text}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="max-w-lg mx-auto flex flex-col gap-4">
         {timeSlots.map((slot) => {
@@ -234,11 +345,22 @@ export default function RotationTable() {
                   {usedRooms.map((room) => {
                     const cfg = roomCfg[room];
                     const names = groups[room];
+                    const roomNo = roomNos[room];
                     return (
                       <div key={room} style={{ background: "#fff" }}>
-                        <div className="flex items-center justify-center py-2.5 gap-1.5" style={{ background: cfg.gradient, textShadow: "0 1px 2px rgba(122,8,58,0.35)" }}>
-                          <span className="text-base font-black text-white">{room}</span>
-                          <span className="text-xs font-bold text-white/85">ルーム</span>
+                        <div className="flex flex-col items-center justify-center py-2 gap-0.5" style={{ background: cfg.gradient, textShadow: "0 1px 2px rgba(122,8,58,0.35)" }}>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base font-black text-white">{room}</span>
+                            <span className="text-xs font-bold text-white/85">ルーム</span>
+                          </div>
+                          {roomNo && (
+                            <span
+                              className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-black text-white"
+                              style={{ background: "rgba(255,255,255,0.22)", textShadow: "none" }}
+                            >
+                              {roomNo}
+                            </span>
+                          )}
                         </div>
                         <div className="px-2 py-3 flex flex-col gap-2 min-h-[52px]">
                           {names.map((m) => (

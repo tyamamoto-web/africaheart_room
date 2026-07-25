@@ -6,6 +6,7 @@ import { timeSlots, defaultMembers, type Member, type MemberRole } from "@/lib/d
 import { getMembers, addMember, updateMember, deleteMember, resetToDefault } from "@/lib/memberStore";
 import { getEventSetup, setAttendance, setMemberRoom } from "@/lib/eventStore";
 import type { RoomKey } from "@/lib/eventStore";
+import { getRoomNumbers, saveRoomNumbers, RoomNumbersSetupError } from "@/lib/roomNumbers";
 
 const roomCfg = {
   A: { gradient: "linear-gradient(135deg,#8E1252,#A8175F)", color: "#A8175F", bg: "#F6E1EB" },
@@ -33,6 +34,10 @@ export default function AdminPage() {
   const [modal,        setModal]        = useState<{ open: boolean; editId: string | null }>({ open: false, editId: null });
   const [form,         setForm]         = useState<FormState>({ nickname: "", role: "regular" });
   const [confirmReset, setConfirmReset] = useState(false);
+  // 当日の実部屋番号（A/B/C→番号）。Supabaseで全員共有。
+  const [roomNos,      setRoomNos]      = useState<{ A: string; B: string; C: string }>({ A: "", B: "", C: "" });
+  const [roomSaving,   setRoomSaving]   = useState(false);
+  const [roomMsg,      setRoomMsg]      = useState<{ kind: "ok" | "err" | "setup"; text: string } | null>(null);
 
   useEffect(() => {
     const m = getMembers();
@@ -40,7 +45,27 @@ export default function AdminPage() {
     const setup = getEventSetup();
     setAttState(new Set(setup.attendanceIds));
     setRotations(setup.rotations);
+    getRoomNumbers()
+      .then((r) => setRoomNos({ A: r.A, B: r.B, C: r.C }))
+      .catch(() => {});
   }, []);
+
+  async function handleSaveRoomNumbers() {
+    setRoomSaving(true);
+    setRoomMsg(null);
+    try {
+      await saveRoomNumbers(roomNos, "管理");
+      setRoomMsg({ kind: "ok", text: "保存しました（TOPの部屋割り表に反映・全員に共有）" });
+    } catch (e) {
+      if (e instanceof RoomNumbersSetupError) {
+        setRoomMsg({ kind: "setup", text: "room_numbers テーブルが未作成です。Supabaseのセットアップが必要です。" });
+      } else {
+        setRoomMsg({ kind: "err", text: "保存に失敗しました。通信状況をご確認ください。" });
+      }
+    } finally {
+      setRoomSaving(false);
+    }
+  }
 
   function refreshMembers() { setMembers(getMembers()); }
 
@@ -120,6 +145,52 @@ export default function AdminPage() {
       </div>
 
       <div className="px-4 pt-3 max-w-lg mx-auto flex flex-col gap-4">
+
+        {/* ── 部屋番号（当日の実部屋番号を全員に共有）── */}
+        <div className="card overflow-hidden">
+          <div className="px-4 py-4 border-b" style={{ borderColor: "#f4f0ea" }}>
+            <p className="text-base font-black" style={{ color: "#2c2c2c" }}>部屋番号（当日）</p>
+            <p className="text-sm mt-0.5 leading-relaxed" style={{ color: "#aaa" }}>
+              A / B / C の実際の部屋番号を入力して保存すると、TOPの部屋割り表に表示され、全員がこのアプリから確認できます。
+            </p>
+          </div>
+          <div className="px-4 py-4 flex flex-col gap-3">
+            {(["A", "B", "C"] as const).map((r) => (
+              <div key={r} className="flex items-center gap-3">
+                <span
+                  className="flex-shrink-0 inline-flex items-center justify-center rounded-lg text-white text-sm font-black"
+                  style={{ width: 40, height: 40, background: roomCfg[r].gradient }}
+                >
+                  {r}
+                </span>
+                <input
+                  value={roomNos[r]}
+                  onChange={(e) => setRoomNos((p) => ({ ...p, [r]: e.target.value }))}
+                  placeholder="例：305号室 / 大部屋 など"
+                  maxLength={20}
+                  className="flex-1 min-w-0 px-3 py-2.5 rounded-xl text-sm"
+                  style={{ border: "1px solid #e5e7eb", background: "#fff", color: "#2c2c2c" }}
+                />
+              </div>
+            ))}
+            <button
+              onClick={handleSaveRoomNumbers}
+              disabled={roomSaving}
+              className="mt-1 py-2.5 rounded-xl text-sm font-bold text-white"
+              style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: roomSaving ? 0.6 : 1 }}
+            >
+              {roomSaving ? "保存中…" : "保存して全員に共有"}
+            </button>
+            {roomMsg && (
+              <p
+                className="text-xs font-bold leading-relaxed"
+                style={{ color: roomMsg.kind === "ok" ? "#10b981" : roomMsg.kind === "setup" ? "#A8175F" : "#ff6b6b" }}
+              >
+                {roomMsg.text}
+              </p>
+            )}
+          </div>
+        </div>
 
         {/* ── 出欠確認 ── */}
         <div className="card overflow-hidden">
