@@ -103,9 +103,9 @@ export default function AdminPage() {
   const assignedCount  = attendingList.filter((m) => activeAssign[m.id]).length;
 
   return (
-    <main className="min-h-screen fun-bg pb-16">
+    <main className="min-h-screen pb-16" style={{ background: "#ffffff" }}>
       {/* Top bar */}
-      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ background: "#f0ece5" }}>
+      <div className="sticky top-0 z-50 px-4 py-3 flex items-center gap-3" style={{ background: "#ffffff", borderBottom: "1px solid #eee" }}>
         <Link href="/" className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl card" style={{ color: "#555" }}>
           ← 戻る
         </Link>
@@ -129,7 +129,7 @@ export default function AdminPage() {
               <p className="text-sm mt-0.5" style={{ color: "#aaa" }}>参加：{attendingCount}名 / 全{members.length}名</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setAll(true)}  className="text-sm px-3 py-2.5 rounded-xl font-bold" style={{ background: "#f0fff4", color: "#10b981" }}>全員参加</button>
+              <button onClick={() => setAll(true)}  className="text-sm px-3 py-2.5 rounded-xl font-bold" style={{ background: "#f3f4f6", color: "#6b7280" }}>全員参加</button>
               <button onClick={() => setAll(false)} className="text-sm px-3 py-2.5 rounded-xl font-bold" style={{ background: "#fff0f0", color: "#ff6b6b" }}>全員不参加</button>
             </div>
           </div>
@@ -142,8 +142,8 @@ export default function AdminPage() {
                   onClick={() => toggleAttendance(m.id)}
                   className="flex items-center gap-2.5 px-3 py-3.5 rounded-2xl text-left transition-all duration-150"
                   style={{
-                    background: isAtt ? "#f0fff4" : "#f4f4f4",
-                    border: `2px solid ${isAtt ? "#10b981" : "transparent"}`,
+                    background: isAtt ? "#ffffff" : "#f4f4f4",
+                    border: `2px solid ${isAtt ? "#6b7280" : "transparent"}`,
                   }}
                 >
                   <span
@@ -151,11 +151,11 @@ export default function AdminPage() {
                     style={{
                       width: 18,
                       height: 18,
-                      background: isAtt ? "#10b981" : "transparent",
-                      border: `2px solid ${isAtt ? "#10b981" : "#cfcfcf"}`,
+                      background: isAtt ? "#6b7280" : "transparent",
+                      border: `2px solid ${isAtt ? "#6b7280" : "#cfcfcf"}`,
                     }}
                   />
-                  <span className="text-sm font-semibold truncate" style={{ color: isAtt ? "#065f46" : "#888" }}>
+                  <span className="text-sm font-semibold truncate" style={{ color: isAtt ? "#374151" : "#888" }}>
                     {m.nickname}
                   </span>
                 </button>
