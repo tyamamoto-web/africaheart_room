@@ -92,6 +92,12 @@ function DuetFeature() {
   const [eKey, setEKey] = useState(0);
   const [ePart, setEPart] = useState("");
 
+  // 表示の折りたたみ（登録が増えてページが縦長になり過ぎないように）
+  const [showAdd, setShowAdd] = useState(false); // 登録フォームの開閉（既定：閉じる）
+  const [openOwners, setOpenOwners] = useState<Set<string>>(new Set()); // 開いている人（名前）
+  const [myName, setMyName] = useState(""); // この端末の名前（自分の曲を先頭・自動で開く）
+  const didInitOpenRef = useRef(false); // 自分の曲を一度だけ自動オープン
+
   const refresh = useCallback(async () => {
     try {
       const data = await listSongs();
@@ -111,12 +117,13 @@ function DuetFeature() {
     }
     setMe(getDeviceId());
     setName(getNickname());
+    setMyName(getNickname().trim());
     refresh();
     const id = setInterval(refresh, 4000); // 常に最新を反映
     return () => clearInterval(id);
   }, [refresh]);
 
-  // 名前ごとにグループ化
+  // 名前ごとにグループ化（自分の曲を先頭に固定）
   const groups = useMemo(() => {
     const m = new Map<string, DuetSong[]>();
     for (const s of songs) {
@@ -124,8 +131,39 @@ function DuetFeature() {
       if (!m.has(key)) m.set(key, []);
       m.get(key)!.push(s);
     }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0], "ja"));
+    return Array.from(m.entries()).sort((a, b) => {
+      const aMine = a[0] === myName;
+      const bMine = b[0] === myName;
+      if (aMine && !bMine) return -1; // 自分の曲を先頭へ
+      if (bMine && !aMine) return 1;
+      return a[0].localeCompare(b[0], "ja");
+    });
+  }, [songs, myName]);
+
+  // 自分の曲だけ最初から開いておく（1回だけ）。他の人は閉じた状態＝ページを短く保つ。
+  useEffect(() => {
+    if (didInitOpenRef.current || songs.length === 0) return;
+    didInitOpenRef.current = true;
+    const my = getNickname().trim();
+    if (!my) return;
+    const owners = new Set(songs.map((s) => s.owner_name.trim() || "（名前なし）"));
+    if (owners.has(my)) setOpenOwners(new Set([my]));
   }, [songs]);
+
+  // 開閉トグル
+  function toggleOwner(key: string) {
+    setOpenOwners((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+  const allKeys = groups.map(([k]) => k);
+  const allOpen = allKeys.length > 0 && allKeys.every((k) => openOwners.has(k));
+  function toggleAll() {
+    setOpenOwners(allOpen ? new Set() : new Set(allKeys));
+  }
 
   // 未接続：セットアップ案内
   if (!isDuetConfigured()) {
@@ -160,6 +198,8 @@ function DuetFeature() {
     try {
       const who = name.trim();
       setNickname(who);
+      setMyName(who);
+      setOpenOwners((prev) => new Set(prev).add(who)); // 登録後は自分の曲を開いて見せる
       for (const r of filledRows) {
         await addSong({
           title: r.title.trim(),
@@ -269,11 +309,19 @@ function DuetFeature() {
         </p>
       )}
 
-      {/* 一括登録フォーム */}
-      <div className="rounded-2xl p-3.5" style={{ background: "#faf8f5", border: "1px solid #efe9e1" }}>
-        <p className="text-xs font-bold tracking-widest uppercase mb-2.5" style={{ color: "#bbb" }}>
-          歌いたいデュエット曲を登録（最大{MAX_ROWS}曲）
-        </p>
+      {/* 登録フォーム（開閉式・既定は閉じてページを短く保つ） */}
+      <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #efe9e1" }}>
+        <button
+          onClick={() => setShowAdd((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3.5"
+          style={{ background: showAdd ? "#faf8f5" : "linear-gradient(135deg,#A8175F,#C81E77)" }}
+        >
+          <span className="text-sm font-black" style={{ color: showAdd ? "#888" : "#fff" }}>＋ 歌いたいデュエット曲を登録</span>
+          <span className="text-xs font-black" style={{ color: showAdd ? "#C81E77" : "rgba(255,255,255,0.95)" }}>{showAdd ? "閉じる" : "開く"}</span>
+        </button>
+        {showAdd && (
+          <div className="px-3.5 pb-3.5 pt-2" style={{ background: "#faf8f5" }}>
+            <p className="text-[11px] mb-2.5 leading-relaxed" style={{ color: "#bbb" }}>お名前と、歌いたい曲（最大{MAX_ROWS}曲）を入力してください。</p>
         <input
           value={name} onChange={(e) => setName(e.target.value)} placeholder="あなたの名前（必須）"
           className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-2" style={inputStyle}
@@ -329,6 +377,8 @@ function DuetFeature() {
         >
           {adding ? "登録中…" : `＋ ${filledRows.length || ""}曲を登録する`}
         </button>
+          </div>
+        )}
       </div>
 
       {/* 一覧（名前ごと） */}
@@ -342,19 +392,40 @@ function DuetFeature() {
       ) : songs.length === 0 ? (
         <p className="text-sm text-center py-6" style={{ color: "#bbb" }}>まだ登録がありません。最初の1曲を登録しましょう！</p>
       ) : (
-        <div className="flex flex-col gap-4">
-          {groups.map(([owner, list]) => (
-            <div key={owner}>
-              {/* 名前セクション見出し */}
-              <div className="flex items-center gap-2 mb-2">
-                <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)" }}>
+        <>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] leading-snug" style={{ color: "#aaa" }}>名前をタップすると、その人の曲が開きます</span>
+          <button onClick={toggleAll} className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "#f0ece5", color: "#888" }}>
+            {allOpen ? "すべて閉じる" : "すべて開く"}
+          </button>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {groups.map(([owner, list]) => {
+            const isMine = owner === myName;
+            const open = openOwners.has(owner);
+            return (
+            <div key={owner} className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${isMine ? "#EFC9DD" : "#efe9e1"}` }}>
+              {/* 名前セクション見出し（タップで開閉） */}
+              <button
+                onClick={() => toggleOwner(owner)}
+                className="w-full flex items-center gap-3 px-3 py-3"
+                style={{ background: open ? "#FBEAF2" : "#fff" }}
+              >
+                <span className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-black text-white" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)" }}>
                   {owner.charAt(0)}
                 </span>
-                <p className="text-sm font-black" style={{ color: "#2c2c2c" }}>{owner}</p>
-                <span className="text-[11px]" style={{ color: "#ccc" }}>{list.length}曲</span>
-              </div>
+                <span className="flex-1 min-w-0 flex items-center gap-2 flex-wrap text-left">
+                  <span className="text-sm font-black" style={{ color: "#2c2c2c" }}>{owner}</span>
+                  {isMine && (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: "#C81E77" }}>あなたの曲</span>
+                  )}
+                  <span className="text-[11px] font-bold" style={{ color: "#c98aae" }}>{list.length}曲</span>
+                </span>
+                <span className="flex-shrink-0 text-xs font-black" style={{ color: "#C81E77" }}>{open ? "閉じる" : "開く"}</span>
+              </button>
 
-              <div className="flex flex-col gap-2">
+              {open && (
+              <div className="flex flex-col gap-2 px-3 pb-3 pt-1">
                 {list.map((s) => {
                   const likeEntries = s.likes.filter((e) => likeName(e).trim()); // 名前ありのスタンプ
 
@@ -436,12 +507,15 @@ function DuetFeature() {
                   );
                 })}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
+        </>
       )}
       <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-        「歌える」を押して名前を入れると意思表示できます。曲はどなたでも編集・削除できます（みんなで管理）。内容は全員に共有され、約4秒ごとに自動更新されます。
+        「歌える」を押して名前を入れると意思表示できます。曲はどなたでも編集・削除できます（みんなで管理）。内容は全員に共有され、約4秒ごとに自動更新されます。名前をタップすると、その人の曲を開けます。
       </p>
     </div>
   );
