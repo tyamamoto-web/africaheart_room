@@ -36,6 +36,13 @@ import {
   ProfileSetupError,
   type Profile,
 } from "@/lib/profiles";
+import {
+  listReactions,
+  addReaction,
+  removeReaction,
+  REACTION_MAX_LEN,
+  type Reaction,
+} from "@/lib/reactions";
 import { defaultMembers, defaultRotations } from "@/lib/data";
 
 /* ============================================================
@@ -1361,6 +1368,172 @@ function sortProfiles(list: Profile[], sort: ProfileSort): Profile[] {
   return arr;
 }
 
+/* ── 近況への「ツッコミ」（匿名リアクション・YouTubeコメント風）──── */
+// 投稿時刻を「たった今／n分前／n時間前／n日前／M月D日」の相対表記へ
+function timeAgo(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const s = Math.floor((Date.now() - t) / 1000);
+  if (s < 60) return "たった今";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}分前`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}時間前`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}日前`;
+  const dt = new Date(t);
+  return `${dt.getMonth() + 1}月${dt.getDate()}日`;
+}
+const REACTION_VISIBLE = 4; // 既定で見せる件数（それ以上は「以前のツッコミ…」で展開）
+
+// 匿名アバター（絵文字は使わずSVGの人型シルエット）
+function AnonAvatar() {
+  return (
+    <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "#efe7f2" }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#a487ba" aria-hidden>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 20c0-4 3.6-6 8-6s8 2 8 6v1H4z" />
+      </svg>
+    </span>
+  );
+}
+// 見出しの吹き出しアイコン（SVG）
+function BubbleIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="#C81E77" aria-hidden>
+      <path d="M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V5a1 1 0 0 1 1-1z" />
+    </svg>
+  );
+}
+
+function ReactionThread({
+  list,
+  myId,
+  onAdd,
+  onRemove,
+}: {
+  list: Reaction[]; // 古い→新しい順で渡す
+  myId: string;
+  onAdd: (text: string) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [openInput, setOpenInput] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const shown = showAll ? list : list.slice(-REACTION_VISIBLE);
+  const hidden = list.length - shown.length;
+  const canPost = !!text.trim() && !posting;
+
+  async function submit() {
+    const t = text.trim();
+    if (!t || posting) return;
+    setPosting(true);
+    try {
+      await onAdd(t);
+      setText("");
+      setOpenInput(false);
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 pl-1">
+      {/* 見出し */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <BubbleIcon />
+        <span className="text-[11px] font-black tracking-wide" style={{ color: "#C81E77" }}>ツッコミ</span>
+        {list.length > 0 && (
+          <span className="text-[11px] font-bold" style={{ color: "#c98aae" }}>{list.length}</span>
+        )}
+      </div>
+
+      {/* 一覧（YouTubeコメント風） */}
+      {hidden > 0 && (
+        <button onClick={() => setShowAll(true)} className="block text-[11px] font-bold mb-1.5" style={{ color: "#999" }}>
+          以前のツッコミ{hidden}件を表示
+        </button>
+      )}
+      {shown.length > 0 && (
+        <div className="flex flex-col gap-2 mb-2">
+          {shown.map((r) => {
+            const mine = !!myId && r.by === myId;
+            return (
+              <div key={r.id} className="flex items-start gap-2">
+                <AnonAvatar />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-bold" style={{ color: "#999" }}>匿名さん</span>
+                    {mine && (
+                      <span className="text-[9px] font-black px-1 py-0.5 rounded" style={{ background: "#FBEAF2", color: "#C81E77" }}>あなた</span>
+                    )}
+                    {r.at && <span className="text-[10px]" style={{ color: "#ccc" }}>{timeAgo(r.at)}</span>}
+                  </div>
+                  <p className="text-sm leading-snug break-words whitespace-pre-wrap" style={{ color: "#2c2c2c" }}>{r.text}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm("このツッコミを削除しますか？")) onRemove(r.id);
+                  }}
+                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm"
+                  style={{ background: "transparent", color: "#ccc" }}
+                  aria-label="ツッコミを削除"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 入力（開閉式） */}
+      {openInput ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value.replace(/\n/g, "").slice(0, REACTION_MAX_LEN))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+              }}
+              maxLength={REACTION_MAX_LEN}
+              autoFocus
+              placeholder="あたたかいひとことを（匿名）"
+              className="flex-1 min-w-0 rounded-full px-3 py-2 text-sm focus:outline-none"
+              style={{ background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent" }}
+            />
+            <button
+              onClick={submit}
+              disabled={!canPost}
+              className="flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-black text-white transition-opacity"
+              style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: canPost ? 1 : 0.4 }}
+            >
+              {posting ? "送信中" : "送信"}
+            </button>
+          </div>
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px]" style={{ color: "#c98aae" }}>相手が笑顔になるツッコミで（匿名で送られます）</span>
+            <span className="text-[10px] font-bold" style={{ color: REACTION_MAX_LEN - text.length <= 3 ? "#ff6b6b" : "#ccc" }}>
+              {text.length}/{REACTION_MAX_LEN}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setOpenInput(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold"
+          style={{ background: "#f4f0ea", color: "#888" }}
+        >
+          ＋ ツッコミを入れる
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: (iso: string) => void }) {
   const [me, setMe] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -1368,6 +1541,20 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
   const [needsSetup, setNeedsSetup] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<ProfileSort>("name"); // 並び替え（既定：名前50音順）
+
+  // 近況へのツッコミ（匿名・全員分をまとめて取得し pid で振り分け）
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+  const reactionsByPid = useMemo(() => {
+    const m = new Map<string, Reaction[]>();
+    for (const r of reactions) {
+      if (!m.has(r.pid)) m.set(r.pid, []);
+      m.get(r.pid)!.push(r);
+    }
+    m.forEach((arr) => {
+      arr.sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0)); // 古い→新しい
+    });
+    return m;
+  }, [reactions]);
 
   // 追加フォーム（開閉式）
   const [showAdd, setShowAdd] = useState(false);
@@ -1415,6 +1602,15 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
     }
   }, [onLatest]);
 
+  // ツッコミの取得（失敗時は既存表示を維持＝プロフィール表示を妨げない）
+  const refreshReactions = useCallback(async () => {
+    try {
+      setReactions(await listReactions());
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
   useEffect(() => {
     if (!isProfilesConfigured()) {
       setLoading(false);
@@ -1423,9 +1619,49 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
     setMe(getDeviceId());
     setAName(getNickname());
     refresh();
+    refreshReactions();
     const id = setInterval(() => refresh(), 5000); // 背景ポーリング（他メンバーの追加・近況更新を反映）
-    return () => clearInterval(id);
-  }, [refresh]);
+    const rid = setInterval(() => refreshReactions(), 5000); // ツッコミも最新へ
+    return () => {
+      clearInterval(id);
+      clearInterval(rid);
+    };
+  }, [refresh, refreshReactions]);
+
+  // ツッコミを追加（匿名）。楽観更新→サーバの全件で確定。
+  const addReactionTo = useCallback(
+    async (pid: string, body: string) => {
+      const temp: Reaction = {
+        id: `temp-${Date.now()}`,
+        pid,
+        text: body.trim().slice(0, REACTION_MAX_LEN),
+        by: me,
+        at: new Date().toISOString(),
+      };
+      setReactions((prev) => [...prev, temp]);
+      try {
+        setReactions(await addReaction(pid, body, me));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "ツッコミの送信に失敗しました");
+        refreshReactions(); // 楽観分を戻す
+      }
+    },
+    [me, refreshReactions]
+  );
+
+  // ツッコミを削除（誰でも可＝不適切なものを消せる。楽観更新→サーバの全件で確定）
+  const removeReactionById = useCallback(
+    async (rid: string) => {
+      setReactions((prev) => prev.filter((r) => r.id !== rid));
+      try {
+        setReactions(await removeReaction(rid));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "ツッコミの削除に失敗しました");
+        refreshReactions();
+      }
+    },
+    [refreshReactions]
+  );
 
   const canAdd = !!aName.trim() && !adding && !needsSetup;
 
@@ -1735,12 +1971,21 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                 )}
 
                 {p.status.trim() && (
-                  <div className="mt-2.5 rounded-xl px-3 py-2" style={{ background: "#FCEFF5", border: "1px solid #ffd9e9" }}>
-                    <p className="text-[10px] font-black tracking-widest uppercase mb-0.5" style={{ color: "#C81E77" }}>近況</p>
-                    <p className="text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#2c2c2c" }}>
-                      {p.status.trim()}
-                    </p>
-                  </div>
+                  <>
+                    <div className="mt-2.5 rounded-xl px-3 py-2" style={{ background: "#FCEFF5", border: "1px solid #ffd9e9" }}>
+                      <p className="text-[10px] font-black tracking-widest uppercase mb-0.5" style={{ color: "#C81E77" }}>近況</p>
+                      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ color: "#2c2c2c" }}>
+                        {p.status.trim()}
+                      </p>
+                    </div>
+                    {/* 近況へのツッコミ（匿名・YouTubeコメント風） */}
+                    <ReactionThread
+                      list={reactionsByPid.get(p.id) ?? []}
+                      myId={me}
+                      onAdd={(t) => addReactionTo(p.id, t)}
+                      onRemove={(rid) => removeReactionById(rid)}
+                    />
+                  </>
                 )}
               </div>
             );
@@ -1754,7 +1999,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
         </p>
       ) : (
         <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-          自己紹介と近況は全員に共有され、約5秒ごとに自動更新されます。どなたでも編集・削除できます（みんなで管理）。
+          自己紹介と近況は全員に共有され、約5秒ごとに自動更新されます。どなたでも編集・削除できます（みんなで管理）。近況には匿名でツッコミを付けられます（あたたかいひとことで）。
         </p>
       )}
     </div>
