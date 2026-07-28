@@ -29,6 +29,11 @@ export const eventInfo = {
   venue: "ジャパレン松本店",
 };
 
+// 次回イベントの状態。"scheduled"=開催内容（部屋割り・クロス表）を表示／
+// "adjusting"=TOPを「次回日程調整中」プレースホルダに切替（会員メニューは常時利用可）。
+// 次回告知時は "scheduled" に戻し、eventInfo・timeSlots・defaultRotations を更新する（版数+1）。
+export const eventStatus: "scheduled" | "adjusting" = "adjusting";
+
 export const defaultMembers: Member[] = [
   { id: "1",  nickname: "よしのすけ", role: "leader" },
   { id: "2",  nickname: "くる",       role: "subleader" },

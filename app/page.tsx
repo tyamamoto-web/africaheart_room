@@ -4,6 +4,7 @@ import Link from "next/link";
 import Header from "./components/Header";
 import RotationTable from "./components/RotationTable";
 import CrossTable from "./components/CrossTable";
+import { eventStatus } from "@/lib/data";
 
 export default function Home() {
   return (
@@ -25,13 +26,29 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* 本日のタイムテーブル・部屋割り（7/26） */}
-      <div className="pt-4">
-        <RotationTable />
-      </div>
+      {eventStatus === "scheduled" ? (
+        <>
+          {/* 本日のタイムテーブル・部屋割り */}
+          <div className="pt-4">
+            <RotationTable />
+          </div>
 
-      {/* 部屋割りの一番下：同席クロス表 */}
-      <CrossTable />
+          {/* 部屋割りの一番下：同席クロス表 */}
+          <CrossTable />
+        </>
+      ) : (
+        /* 次回日程調整中プレースホルダ */
+        <div className="px-4 pt-6 max-w-lg mx-auto">
+          <div className="card px-6 py-10 text-center">
+            <p className="text-lg font-black" style={{ color: "#A8175F" }}>次回のオフ会は日程調整中です</p>
+            <p className="text-sm mt-2.5 leading-relaxed" style={{ color: "#888" }}>
+              日程が決まり次第、部屋割りをこちらでお知らせします。
+              <br />
+              デュエット曲・宿題ルーレット・プロフィールは会員メニューから引き続きご利用いただけます。
+            </p>
+          </div>
+        </div>
+      )}
 
       <footer className="text-center pb-10 pt-6 px-4">
         <p className="text-xs" style={{ color: "#bbb" }}>
