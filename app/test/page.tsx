@@ -1368,7 +1368,7 @@ function sortProfiles(list: Profile[], sort: ProfileSort): Profile[] {
   return arr;
 }
 
-/* ── 近況への「ツッコミ」（匿名リアクション・YouTubeコメント風）──── */
+/* ── 近況への「リアクション」（匿名・YouTubeコメント風）──── */
 // 投稿時刻を「たった今／n分前／n時間前／n日前／M月D日」の相対表記へ
 function timeAgo(iso: string): string {
   const t = Date.parse(iso);
@@ -1384,7 +1384,7 @@ function timeAgo(iso: string): string {
   const dt = new Date(t);
   return `${dt.getMonth() + 1}月${dt.getDate()}日`;
 }
-const REACTION_VISIBLE = 4; // 既定で見せる件数（それ以上は「以前のツッコミ…」で展開）
+const REACTION_VISIBLE = 4; // 既定で見せる件数（それ以上は「以前のリアクション…」で展開）
 
 // 匿名アバター（絵文字は使わずSVGの人型シルエット）
 function AnonAvatar() {
@@ -1444,7 +1444,7 @@ function ReactionThread({
       {/* 見出し */}
       <div className="flex items-center gap-1.5 mb-1.5">
         <BubbleIcon />
-        <span className="text-[11px] font-black tracking-wide" style={{ color: "#C81E77" }}>ツッコミ</span>
+        <span className="text-[11px] font-black tracking-wide" style={{ color: "#C81E77" }}>リアクション</span>
         {list.length > 0 && (
           <span className="text-[11px] font-bold" style={{ color: "#c98aae" }}>{list.length}</span>
         )}
@@ -1453,7 +1453,7 @@ function ReactionThread({
       {/* 一覧（YouTubeコメント風） */}
       {hidden > 0 && (
         <button onClick={() => setShowAll(true)} className="block text-[11px] font-bold mb-1.5" style={{ color: "#999" }}>
-          以前のツッコミ{hidden}件を表示
+          以前のリアクション{hidden}件を表示
         </button>
       )}
       {shown.length > 0 && (
@@ -1475,11 +1475,11 @@ function ReactionThread({
                 </div>
                 <button
                   onClick={() => {
-                    if (confirm("このツッコミを削除しますか？")) onRemove(r.id);
+                    if (confirm("このリアクションを削除しますか？")) onRemove(r.id);
                   }}
                   className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm"
                   style={{ background: "transparent", color: "#ccc" }}
-                  aria-label="ツッコミを削除"
+                  aria-label="リアクションを削除"
                 >
                   ×
                 </button>
@@ -1515,7 +1515,7 @@ function ReactionThread({
             </button>
           </div>
           <div className="flex items-center justify-between px-1">
-            <span className="text-[10px]" style={{ color: "#c98aae" }}>相手が笑顔になるツッコミで（匿名で送られます）</span>
+            <span className="text-[10px]" style={{ color: "#c98aae" }}>相手が笑顔になるリアクションで（匿名で送られます）</span>
             <span className="text-[10px] font-bold" style={{ color: REACTION_MAX_LEN - text.length <= 3 ? "#ff6b6b" : "#ccc" }}>
               {text.length}/{REACTION_MAX_LEN}
             </span>
@@ -1527,7 +1527,7 @@ function ReactionThread({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold"
           style={{ background: "#f4f0ea", color: "#888" }}
         >
-          ＋ ツッコミを入れる
+          ＋ リアクションを入れる
         </button>
       )}
     </div>
@@ -1542,7 +1542,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<ProfileSort>("name"); // 並び替え（既定：名前50音順）
 
-  // 近況へのツッコミ（匿名・全員分をまとめて取得し pid で振り分け）
+  // 近況へのリアクション（匿名・全員分をまとめて取得し pid で振り分け）
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const reactionsByPid = useMemo(() => {
     const m = new Map<string, Reaction[]>();
@@ -1602,7 +1602,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
     }
   }, [onLatest]);
 
-  // ツッコミの取得（失敗時は既存表示を維持＝プロフィール表示を妨げない）
+  // リアクションの取得（失敗時は既存表示を維持＝プロフィール表示を妨げない）
   const refreshReactions = useCallback(async () => {
     try {
       setReactions(await listReactions());
@@ -1621,14 +1621,14 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
     refresh();
     refreshReactions();
     const id = setInterval(() => refresh(), 5000); // 背景ポーリング（他メンバーの追加・近況更新を反映）
-    const rid = setInterval(() => refreshReactions(), 5000); // ツッコミも最新へ
+    const rid = setInterval(() => refreshReactions(), 5000); // リアクションも最新へ
     return () => {
       clearInterval(id);
       clearInterval(rid);
     };
   }, [refresh, refreshReactions]);
 
-  // ツッコミを追加（匿名）。楽観更新→サーバの全件で確定。
+  // リアクションを追加（匿名）。楽観更新→サーバの全件で確定。
   const addReactionTo = useCallback(
     async (pid: string, body: string) => {
       const temp: Reaction = {
@@ -1642,21 +1642,21 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
       try {
         setReactions(await addReaction(pid, body, me));
       } catch (e) {
-        setError(e instanceof Error ? e.message : "ツッコミの送信に失敗しました");
+        setError(e instanceof Error ? e.message : "リアクションの送信に失敗しました");
         refreshReactions(); // 楽観分を戻す
       }
     },
     [me, refreshReactions]
   );
 
-  // ツッコミを削除（誰でも可＝不適切なものを消せる。楽観更新→サーバの全件で確定）
+  // リアクションを削除（誰でも可＝不適切なものを消せる。楽観更新→サーバの全件で確定）
   const removeReactionById = useCallback(
     async (rid: string) => {
       setReactions((prev) => prev.filter((r) => r.id !== rid));
       try {
         setReactions(await removeReaction(rid));
       } catch (e) {
-        setError(e instanceof Error ? e.message : "ツッコミの削除に失敗しました");
+        setError(e instanceof Error ? e.message : "リアクションの削除に失敗しました");
         refreshReactions();
       }
     },
@@ -1978,7 +1978,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                         {p.status.trim()}
                       </p>
                     </div>
-                    {/* 近況へのツッコミ（匿名・YouTubeコメント風） */}
+                    {/* 近況へのリアクション（匿名・YouTubeコメント風） */}
                     <ReactionThread
                       list={reactionsByPid.get(p.id) ?? []}
                       myId={me}
@@ -1999,7 +1999,7 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
         </p>
       ) : (
         <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-          自己紹介と近況は全員に共有され、約5秒ごとに自動更新されます。どなたでも編集・削除できます（みんなで管理）。近況には匿名でツッコミを付けられます（あたたかいひとことで）。
+          自己紹介と近況は全員に共有され、約5秒ごとに自動更新されます。どなたでも編集・削除できます（みんなで管理）。近況には匿名でリアクションを付けられます（あたたかいひとことで）。
         </p>
       )}
     </div>

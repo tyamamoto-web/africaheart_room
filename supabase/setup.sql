@@ -123,7 +123,7 @@ create policy "mp anon delete" on public.member_profiles for delete using (true)
 --    間借りして保存する（宿題=id=1 / 部屋番号=id=2、themes[]に[A,B,C]）。SQL不要。
 --    実装は lib/roomNumbers.ts を参照。
 --
--- ※ 近況への匿名ツッコミも同じく homework_result を間借り（id=3）。SQL不要。
---    全ツッコミを id=3 の themes[] に「1件＝JSON文字列」で格納する
+-- ※ 近況への匿名リアクションも同じく homework_result を間借り（id=3）。SQL不要。
+--    全リアクションを id=3 の themes[] に「1件＝JSON文字列」で格納する
 --    （宿題=id=1 / 部屋番号=id=2 とは別行なので衝突しない）。
 --    実装は lib/reactions.ts を参照。

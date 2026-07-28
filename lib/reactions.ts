@@ -1,17 +1,17 @@
 "use client";
 
 /* ============================================================
-   近況への「ツッコミ」（匿名リアクション）：Supabase(REST) データ層（依存ライブラリ不要）
+   近況への「リアクション」（匿名・YouTubeコメント風）：Supabase(REST) データ層（依存ライブラリ不要）
    ------------------------------------------------------------
    メンバープロフィールの「近況」に対して、他のメンバーが匿名で短い
-   ツッコミ（例「猫満御礼」「入場料いくらすかー？」）を付けられる。
+   リアクション（例「猫満御礼」「入場料いくらすかー？」）を付けられる。
    YouTubeのコメント欄のような使い心地。全員で共有・永続化する。
 
    ★ SQL不要（新テーブルを作らない）:
      既存の共有テーブル `homework_result` を間借りする。
-     宿題は id=1、当日の部屋番号は id=2、ツッコミは id=3 を使う（衝突しない）。
-     全ツッコミを id=3 の themes(text[]) に「1件＝JSON文字列」で格納する。
-   ※ member_profiles とは別テーブルなので、ツッコミを付けてもプロフィールの
+     宿題は id=1、当日の部屋番号は id=2、リアクションは id=3 を使う（衝突しない）。
+     全リアクションを id=3 の themes(text[]) に「1件＝JSON文字列」で格納する。
+   ※ member_profiles とは別テーブルなので、リアクションを付けてもプロフィールの
      updated_at は変わらない（＝「新着」バッジは点かない）。
    ============================================================ */
 
@@ -21,17 +21,17 @@ const SUPA_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "sb_publishable_7xk88rvHPopcdMd9MyyE_A_XKvS1MIi";
 
-// 宿題結果・部屋番号と同じテーブルを共用。ツッコミは id=3。
+// 宿題結果・部屋番号と同じテーブルを共用。リアクションは id=3。
 const ENDPOINT = `${SUPA_URL}/rest/v1/homework_result`;
-const ROW_ID = 3; // 宿題=1 / 部屋番号=2 / ツッコミ=3
+const ROW_ID = 3; // 宿題=1 / 部屋番号=2 / リアクション=3
 
-export const REACTION_MAX_LEN = 20; // ツッコミは20文字まで（メンバー要望「20文字程度」）
-export const REACTION_MAX_PER_PROFILE = 30; // 1人の近況に付けられるツッコミの上限
+export const REACTION_MAX_LEN = 20; // リアクションは20文字まで（メンバー要望「20文字程度」）
+export const REACTION_MAX_PER_PROFILE = 30; // 1人の近況に付けられるリアクションの上限
 
 export type Reaction = {
   id: string; // 一意ID（端末ID＋時刻＋乱数）。表示キー・削除に使う
   pid: string; // 対象プロフィールID（member_profiles.id）
-  text: string; // ツッコミ本文
+  text: string; // リアクション本文
   by: string; // 投稿者の端末ID（匿名。画面には出さず「あなた」判定にだけ使う）
   at: string; // 投稿時刻 ISO
 };
@@ -104,12 +104,12 @@ async function fetchRaw(): Promise<string[]> {
   return arr.filter((x): x is string => typeof x === "string");
 }
 
-// id=3 を upsert（themes に全ツッコミの生配列を丸ごと保存）。
+// id=3 を upsert（themes に全リアクションの生配列を丸ごと保存）。
 async function upsert(raw: string[]): Promise<void> {
   const body = {
     id: ROW_ID,
     themes: raw,
-    updated_by: "", // 行に投稿者名は持たせない（各ツッコミの by は要素側に格納）
+    updated_by: "", // 行に投稿者名は持たせない（各リアクションの by は要素側に格納）
     updated_at: new Date().toISOString(),
   };
   const res = await fetch(`${ENDPOINT}?on_conflict=id`, {
@@ -124,19 +124,19 @@ async function upsert(raw: string[]): Promise<void> {
     } catch {
       /* no-op */
     }
-    throw new Error(`ツッコミの保存に失敗しました (${res.status}) ${txt.slice(0, 120)}`);
+    throw new Error(`リアクションの保存に失敗しました (${res.status}) ${txt.slice(0, 120)}`);
   }
 }
 
-/** 全メンバー分のツッコミを取得（未設定・失敗時も例外を投げず空配列）。 */
+/** 全メンバー分のリアクションを取得（未設定・失敗時も例外を投げず空配列）。 */
 export async function listReactions(): Promise<Reaction[]> {
   const raw = await fetchRaw();
   return raw.map(parse).filter((r): r is Reaction => r !== null);
 }
 
 /**
- * 近況にツッコミを追加（匿名）。書き込み直前に最新を再取得してマージするため、
- * 同時に付いた他メンバーのツッコミを取りこぼしにくい。更新後の全件を返す。
+ * 近況にリアクションを追加（匿名）。書き込み直前に最新を再取得してマージするため、
+ * 同時に付いた他メンバーのリアクションを取りこぼしにくい。更新後の全件を返す。
  */
 export async function addReaction(
   pid: string,
@@ -148,7 +148,7 @@ export async function addReaction(
   const raw = await fetchRaw(); // 最新を土台にする（他の追加/削除を保持）
   const cur = raw.map(parse).filter((r): r is Reaction => r !== null);
   if (cur.filter((r) => r.pid === pid).length >= REACTION_MAX_PER_PROFILE) {
-    throw new Error(`このメンバーへのツッコミは${REACTION_MAX_PER_PROFILE}件までです`);
+    throw new Error(`このメンバーへのリアクションは${REACTION_MAX_PER_PROFILE}件までです`);
   }
   const entry: Reaction = { id: newId(by), pid, text: t, by, at: new Date().toISOString() };
   await upsert([...raw, encode(entry)]);
@@ -156,8 +156,8 @@ export async function addReaction(
 }
 
 /**
- * ツッコミを1件削除（id指定）。最新を再取得してから該当idだけ除外して保存するため、
- * 同時に付いた別のツッコミを巻き込まない。更新後の全件を返す。
+ * リアクションを1件削除（id指定）。最新を再取得してから該当idだけ除外して保存するため、
+ * 同時に付いた別のリアクションを巻き込まない。更新後の全件を返す。
  */
 export async function removeReaction(id: string): Promise<Reaction[]> {
   const raw = await fetchRaw();
