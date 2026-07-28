@@ -12,11 +12,13 @@ const roomCfg = {
 } as const;
 
 const eventGrad: Record<string, string> = {
-  yellow: "linear-gradient(135deg,#f59e0b,#fbbf24)",
-  orange: "linear-gradient(135deg,#f97316,#fb923c)",
-  blue:   "linear-gradient(135deg,#3b82f6,#60a5fa)",
-  pink:   "linear-gradient(135deg,#ec4899,#f472b6)",
-  green:  "linear-gradient(135deg,#10b981,#34d399)",
+  yellow:  "linear-gradient(135deg,#f59e0b,#fbbf24)",
+  orange:  "linear-gradient(135deg,#f97316,#fb923c)",
+  blue:    "linear-gradient(135deg,#3b82f6,#60a5fa)",
+  pink:    "linear-gradient(135deg,#ec4899,#f472b6)",
+  green:   "linear-gradient(135deg,#10b981,#34d399)",
+  rose:    "linear-gradient(135deg,#B81D6C,#D6398A)",
+  magenta: "linear-gradient(135deg,#A8175F,#C81E77)",
 };
 
 function EventDetail({ ev }: { ev: ArchivedEvent }) {
