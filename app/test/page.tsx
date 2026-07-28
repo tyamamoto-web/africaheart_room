@@ -40,6 +40,7 @@ import {
   listReactions,
   addReaction,
   removeReaction,
+  clearReactions,
   REACTION_MAX_LEN,
   type Reaction,
 } from "@/lib/reactions";
@@ -1792,9 +1793,28 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
       setEditId(null); // 変更なしなら書き込まない
       return;
     }
+    // 近況(status)を変更する場合、その近況に付いた（＝前の内容への）リアクションはリセットする。
+    // 消える件数がある時だけ確認する（勝手に消えて驚かないよう、本人の同意を取る）。
+    const statusChanged = patch.status !== undefined;
+    const reactionCount = statusChanged ? reactionsByPid.get(id)?.length ?? 0 : 0;
+    if (
+      reactionCount > 0 &&
+      !confirm(`近況を更新すると、今の近況へのリアクション${reactionCount}件もリセットされます。よろしいですか？`)
+    ) {
+      return; // 中止（編集は開いたまま）
+    }
     setSaving(true);
     try {
       await updateProfile(id, patch);
+      // 近況を更新したので、前の近況へのリアクションを消す（更新＝リセット）
+      if (statusChanged) {
+        setReactions((prev) => prev.filter((r) => r.pid !== id)); // 楽観的に消す
+        try {
+          await clearReactions(id);
+        } catch {
+          refreshReactions(); // 失敗時はサーバ状態に戻す
+        }
+      }
       setEditId(null);
       await refresh(true);
     } catch (e) {
@@ -1809,6 +1829,9 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
     try {
       await deleteProfile(id);
       if (editId === id) setEditId(null);
+      // プロフィール削除に合わせて、そのリアクションも後片付け（孤立データを残さない）
+      setReactions((prev) => prev.filter((r) => r.pid !== id));
+      clearReactions(id).catch(() => {});
       await refresh(true);
     } catch (e) {
       if (e instanceof ProfileSetupError) setNeedsSetup(true);
@@ -1987,6 +2010,11 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
                     </select>
                   </div>
                   <textarea value={eStatus} onChange={(e) => setEStatus(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" style={inputStyle} placeholder="近況" />
+                  {(reactionsByPid.get(p.id)?.length ?? 0) > 0 && (
+                    <p className="text-[10px] leading-snug -mt-1" style={{ color: "#c98aae" }}>
+                      近況を更新すると、今のリアクション{reactionsByPid.get(p.id)!.length}件はリセットされます。
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     <button onClick={() => saveEdit(p.id)} disabled={saving || !eName.trim()} className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity" style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: saving || !eName.trim() ? 0.4 : 1 }}>
                       {saving ? "保存中…" : "保存"}

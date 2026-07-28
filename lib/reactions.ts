@@ -168,3 +168,19 @@ export async function removeReaction(id: string): Promise<Reaction[]> {
   await upsert(kept);
   return kept.map(parse).filter((r): r is Reaction => r !== null);
 }
+
+/**
+ * あるプロフィールのリアクションを全消去（pid指定）。
+ * 近況(status)を更新した時に呼ぶ＝「前の近況」へのリアクションが新しい近況に残って
+ * 意味不明になるのを防ぐ（更新＝リアクションもリセット）。プロフィール削除時の後片付けにも使う。
+ * 変化が無ければ書き込まない。更新後の全件を返す。
+ */
+export async function clearReactions(pid: string): Promise<Reaction[]> {
+  const raw = await fetchRaw();
+  const kept = raw.filter((s) => {
+    const p = parse(s);
+    return !p || p.pid !== pid; // 対象プロフィール以外は保持
+  });
+  if (kept.length !== raw.length) await upsert(kept); // 消すものが無ければ書き込まない
+  return kept.map(parse).filter((r): r is Reaction => r !== null);
+}
