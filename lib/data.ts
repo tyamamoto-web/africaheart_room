@@ -29,10 +29,46 @@ export const eventInfo = {
   venue: "ジャパレン松本店",
 };
 
-// 次回イベントの状態。"scheduled"=開催内容（部屋割り・クロス表）を表示／
-// "adjusting"=TOPを「次回日程調整中」プレースホルダに切替（会員メニューは常時利用可）。
-// 次回告知時は "scheduled" に戻し、eventInfo・timeSlots・defaultRotations を更新する（版数+1）。
-export const eventStatus: "scheduled" | "adjusting" = "adjusting";
+// 次回イベントの状態。
+//  "scheduled"=開催内容（部屋割り・クロス表）を表示。
+//  "announced"=開催は決定だが部屋割りは無い回。イベント告知（nextEvent）をTOPに掲載。
+//  "adjusting"=TOPを「次回日程調整中」プレースホルダに切替（会員メニューは常時利用可）。
+// 部屋割り開催に戻す時は "scheduled" にし、eventInfo・timeSlots・defaultRotations を更新する（版数+1）。
+export const eventStatus: "scheduled" | "announced" | "adjusting" = "announced";
+
+// 次回イベント告知（部屋割りの無い回）。TOPの EventAnnounce で表示する。
+// 内容を差し替えるだけで告知を更新できる（チラシ「夏の歌宴 完全燃焼 in 諏訪」より）。
+export const nextEvent = {
+  catch: "大人の修学旅行だよ",
+  title: "夏の歌宴 完全燃焼 in 諏訪",
+  lead: "真夏の一日、歌って、笑って、遊び尽くそう。",
+  badge: "年間で一番盛大で楽しいイベント",
+  date: "2026年8月22日（土）",
+  timeRange: "13:00〜23:00",
+  place: "諏訪（諏訪湖周辺）",
+  // その日の3つの楽しみ（チラシの3本柱）
+  highlights: [
+    { label: "カラオケ", note: "みんなで歌って盛り上がろう", tone: "blue" as const },
+    { label: "焼肉", note: "高級焼肉でお腹いっぱい", tone: "pink" as const },
+    { label: "諏訪湖花火大会", note: "打ち上げ花火200発の感動体験", tone: "indigo" as const },
+  ],
+  // 当日のスケジュール（予定）。cost は「1人あたりの目安」。空文字は費用表示なし。
+  schedule: [
+    { time: "12:50", title: "集合", place: "JOJOY 諏訪インター店 ロビー集合", cost: "" },
+    { time: "13:00〜18:00", title: "カラオケ", place: "", cost: "2,500円" },
+    { time: "18:20〜19:50", title: "焼肉パーティー", place: "", cost: "5,000円" },
+    { time: "20:15〜20:45", title: "花火大会", place: "諏訪湖畔公園／打ち上げ花火200発", cost: "" },
+    { time: "21:00〜22:50", title: "カラオケバー", place: "カラオケバー・ミルユッテ", cost: "3,500円" },
+    { time: "23:05", title: "解散", place: "松本行 終電／上諏訪駅まで徒歩5分", cost: "" },
+  ],
+  feeNote: "料金はすべて1人あたりの目安です。",
+  estimateTotal: "11,300円",
+  estimateBridge: "上のスケジュール料金とお礼を合わせた目安です。",
+  estimateNote:
+    "あくまで予約前の概算です。お酒を飲む人・飲まない人や、料金込み以外の注文で一人あたりの金額は変わりますが、飲まない方はこの額より少なくなる見込みです。",
+  driverThanks: "車を出してくれた方へお礼：1人 300円（この概算に含みます）",
+  recruit: "参加受付は準備中です。みんなの参加を待っています。",
+};
 
 export const defaultMembers: Member[] = [
   { id: "1",  nickname: "よしのすけ", role: "leader" },

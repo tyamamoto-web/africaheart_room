@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { eventInfo, eventStatus } from "@/lib/data";
+import { eventInfo, eventStatus, nextEvent } from "@/lib/data";
 
 export default function Header() {
   return (
@@ -39,7 +39,7 @@ export default function Header() {
           {eventInfo.subtitle}
         </p>
 
-        {/* 開催日時（scheduled）／ 次回日程調整中（adjusting） */}
+        {/* 開催日時（scheduled）／ 次回イベント告知（announced）／ 次回日程調整中（adjusting） */}
         <div className="mt-3.5 flex flex-col items-center gap-1">
           {eventStatus === "scheduled" ? (
             <>
@@ -51,6 +51,18 @@ export default function Header() {
               </span>
               <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
                 集合 {eventInfo.startTime} ／ {eventInfo.openTime}〜{eventInfo.endTime}
+              </span>
+            </>
+          ) : eventStatus === "announced" ? (
+            <>
+              <span
+                className="px-4 py-1 rounded-full text-sm font-black text-white"
+                style={{ background: "rgba(255,255,255,0.22)" }}
+              >
+                {nextEvent.date}
+              </span>
+              <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+                {nextEvent.timeRange} ／ {nextEvent.place}
               </span>
             </>
           ) : (

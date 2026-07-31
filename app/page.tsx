@@ -4,6 +4,7 @@ import Link from "next/link";
 import Header from "./components/Header";
 import RotationTable from "./components/RotationTable";
 import CrossTable from "./components/CrossTable";
+import EventAnnounce from "./components/EventAnnounce";
 import { eventStatus } from "@/lib/data";
 
 export default function Home() {
@@ -36,6 +37,9 @@ export default function Home() {
           {/* 部屋割りの一番下：同席クロス表 */}
           <CrossTable />
         </>
+      ) : eventStatus === "announced" ? (
+        /* 次回イベント告知（部屋割りの無い回） */
+        <EventAnnounce />
       ) : (
         /* 次回日程調整中プレースホルダ */
         <div className="px-4 pt-6 max-w-lg mx-auto">
