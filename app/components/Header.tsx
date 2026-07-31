@@ -7,7 +7,13 @@ export default function Header() {
   return (
     <header
       className="relative overflow-hidden"
-      style={{ background: "linear-gradient(140deg,#8E1252 0%,#A8175F 50%,#C81E77 100%)" }}
+      style={{
+        // 花火大会の回だけ夜空調（半透明＝背後の花火が透ける）。他の回は従来の赤紫。
+        background:
+          eventStatus === "announced"
+            ? "linear-gradient(180deg, rgba(5,11,31,0.80) 0%, rgba(10,24,54,0.34) 100%)"
+            : "linear-gradient(140deg,#8E1252 0%,#A8175F 50%,#C81E77 100%)",
+      }}
     >
       <div className="absolute top-4 right-4 z-10">
         <Link

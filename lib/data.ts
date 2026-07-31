@@ -50,16 +50,17 @@ export const nextEvent = {
   highlights: [
     { label: "カラオケ", note: "みんなで歌って盛り上がろう", tone: "blue" as const },
     { label: "焼肉", note: "高級焼肉でお腹いっぱい", tone: "pink" as const },
-    { label: "諏訪湖花火大会", note: "打ち上げ花火200発の感動体験", tone: "indigo" as const },
+    { label: "諏訪湖花火大会", note: "打ち上げ花火200発の感動体験", tone: "gold" as const },
   ],
   // 当日のスケジュール（予定）。cost は「1人あたりの目安」。空文字は費用表示なし。
+  // map: タップで地図アプリを開く検索クエリ（店名＋住所）。空なら地図リンクを出さない。
   schedule: [
-    { time: "12:50", title: "集合", place: "JOJOY 諏訪インター店 ロビー集合", cost: "" },
-    { time: "13:00〜18:00", title: "カラオケ", place: "", cost: "2,500円" },
-    { time: "18:20〜19:50", title: "焼肉パーティー", place: "", cost: "5,000円" },
-    { time: "20:15〜20:45", title: "花火大会", place: "諏訪湖畔公園／打ち上げ花火200発", cost: "" },
-    { time: "21:00〜22:50", title: "カラオケバー", place: "カラオケバー・ミルユッテ", cost: "3,500円" },
-    { time: "23:05", title: "解散", place: "松本行 終電／上諏訪駅まで徒歩5分", cost: "" },
+    { time: "12:50", title: "集合", place: "JOJOY 諏訪インター店 ロビー集合", cost: "", map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2" },
+    { time: "13:00〜18:00", title: "カラオケ", place: "", cost: "2,500円", map: "" },
+    { time: "18:20〜19:50", title: "焼肉パーティー", place: "", cost: "5,000円", map: "" },
+    { time: "20:15〜20:45", title: "花火大会", place: "諏訪湖畔公園／打ち上げ花火200発", cost: "", map: "諏訪湖畔公園 長野県諏訪市" },
+    { time: "21:00〜22:50", title: "カラオケバー", place: "カラオケバー・ミルユッテ", cost: "3,500円", map: "カラオケバー ミルユッテ 長野県諏訪市大手2丁目1-4 大津屋ビル2F" },
+    { time: "23:05", title: "解散", place: "松本行 終電／上諏訪駅まで徒歩5分", cost: "", map: "上諏訪駅 長野県諏訪市" },
   ],
   feeNote: "料金はすべて1人あたりの目安です。",
   estimateTotal: "11,300円",
@@ -67,7 +68,8 @@ export const nextEvent = {
   estimateNote:
     "あくまで予約前の概算です。お酒を飲む人・飲まない人や、料金込み以外の注文で一人あたりの金額は変わりますが、飲まない方はこの額より少なくなる見込みです。",
   driverThanks: "車を出してくれた方へお礼：1人 300円（この概算に含みます）",
-  recruit: "参加受付は準備中です。みんなの参加を待っています。",
+  recruitStatus: "受付中",
+  recruit: "ただいま参加受付中です。みんなの参加を待っています。",
 };
 
 export const defaultMembers: Member[] = [

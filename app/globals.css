@@ -41,6 +41,16 @@ html, body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
 
+/* ── Night card（花火大会テーマ用：夜に馴染む半透明グラス）── */
+.night-card {
+  background: rgba(12,22,48,0.55);
+  border: 1px solid rgba(150,180,240,0.18);
+  border-radius: 16px;
+  box-shadow: 0 8px 26px rgba(3,8,22,0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
 /* ── Tab pill ── */
 .tab-active {
   background: #ffffff;
@@ -86,3 +96,201 @@ html, body {
   100% { transform: scale(1);    opacity: 1; }
 }
 .slot-pop { animation: slot-pop 0.45s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+
+/* ============================================================
+   花火大会テーマ（eventStatus === "announced" の回だけで使用）
+   夜の湖に浮かぶ打ち上げ花火のイメージ。会が終われば eventStatus を
+   "scheduled" / "adjusting" に戻すだけで、このテーマは一切使われなくなる。
+   ============================================================ */
+.night-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    #050b1f 0%,
+    #0a1836 36%,
+    #12285a 55%,
+    #0d2148 60%,
+    #09183a 63%,
+    #050f26 100%
+  );
+}
+/* 星空（湖より上だけ・ゆっくり瞬く） */
+.night-stars {
+  position: absolute;
+  inset: 0 0 40% 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1px 1px at 27% 33%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1.5px 1.5px at 41% 12%, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 58% 26%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 69% 15%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1.5px 1.5px at 82% 30%, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 91% 20%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 5% 40%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 35% 45%, rgba(255,255,255,0.55), transparent),
+    radial-gradient(1px 1px at 74% 42%, rgba(255,255,255,0.55), transparent);
+  animation: twinkle 4.5s ease-in-out infinite;
+}
+/* 湖面（下部）＋水平線のゆらぎ */
+.night-lake {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38%;
+  background: linear-gradient(
+    180deg,
+    rgba(9,24,54,0) 0%,
+    rgba(7,20,46,0.55) 22%,
+    rgba(4,12,30,0.92) 100%
+  );
+}
+.night-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 62%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(150,190,245,0.35), transparent);
+  animation: lake-shimmer 5.5s ease-in-out infinite;
+}
+/* 花火1発ぶんのコンテナ（大きさは --s で調整）。
+   破裂後に全体がわずかに舞い落ちる（散っていく儚さ）。 */
+.fw {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transform: scale(var(--s, 1));
+  animation: fw-drift var(--dur, 3s) ease-in var(--delay, 0s) infinite;
+}
+/* しだれ柳：破裂後に全体が大きくゆっくり下へ垂れる */
+.fw--willow {
+  animation: fw-gravity var(--dur, 3s) cubic-bezier(0.25, 0.6, 0.5, 1) var(--delay, 0s) infinite;
+}
+/* 花開く粒＝尾を引く光の筋（--a=角度 / --r=飛距離 / --c=色）。
+   丸い点ではなく、外へ伸びる細い光条にして「おしゃれな花火」に。 */
+.fw-p {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 17px;
+  height: 1.3px;
+  margin-top: -0.65px;
+  transform-origin: 0% 50%;
+  transform: rotate(var(--a)) translateX(0) scaleX(0.2);
+  background: linear-gradient(90deg, transparent 0%, var(--c, #fff) 62%, #fff 100%);
+  border-radius: 1px;
+  box-shadow: 0 0 5px var(--c, #fff);
+  opacity: 0;
+  animation: fw-burst var(--dur, 3s) cubic-bezier(0.1, 0.75, 0.28, 1) var(--delay, 0s) infinite;
+}
+/* しだれ柳は光条を長く（垂れる余韻を出す） */
+.fw--willow .fw-p {
+  width: 32px;
+}
+/* 破裂の瞬間の中心フラッシュ */
+.fw-core {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 12px 3px var(--c, #fff);
+  opacity: 0;
+  animation: fw-flash var(--dur, 3s) ease-out var(--delay, 0s) infinite;
+}
+/* 打ち上がる光の筋（加速して上がり、頂点で減速→破裂へ） */
+.fw-rise {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 22px;
+  margin: -11px -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, transparent, var(--c, #fff) 72%, #fff);
+  box-shadow: 0 0 8px var(--c, #fff);
+  opacity: 0;
+  animation: fw-rise var(--dur, 3s) cubic-bezier(0.2, 0.72, 0.34, 1) var(--delay, 0s) infinite;
+}
+/* 湖面に映る花火（ぼかした残光） */
+.fw-reflect {
+  position: absolute;
+  width: 64px;
+  height: 22px;
+  margin-left: -32px;
+  border-radius: 50%;
+  filter: blur(7px);
+  background: var(--c, #fff);
+  opacity: 0;
+  animation: fw-reflect var(--dur, 3s) ease-in-out var(--delay, 0s) infinite;
+}
+@keyframes fw-burst {
+  0%, 14% { transform: rotate(var(--a)) translateX(0) scaleX(0.2); opacity: 0; }
+  26%     { opacity: 1; }
+  /* 勢いよく満開まで開く */
+  46%     { transform: rotate(var(--a)) translateX(var(--r, 70px)) scaleX(1); opacity: 0.95; }
+  /* ここから儚く散る：ゆっくり外へ流れ、細く小さくなり、微かに明滅しながら消える */
+  62%     { opacity: 0.48; }
+  73%     { opacity: 0.6; }
+  85%     { opacity: 0.16; }
+  92%     { opacity: 0.26; }
+  100%    { transform: rotate(var(--a)) translateX(calc(var(--r, 70px) * 1.32)) scaleX(0.2); opacity: 0; }
+}
+@keyframes fw-flash {
+  0%, 22% { opacity: 0; transform: scale(0.4); }
+  27%     { opacity: 1; transform: scale(1.4); }
+  42%     { opacity: 0; transform: scale(0.6); }
+  100%    { opacity: 0; }
+}
+@keyframes fw-rise {
+  0%   { transform: translateY(80px) scaleY(0.5); opacity: 0; }
+  7%   { opacity: 1; }
+  19%  { transform: translateY(10px) scaleY(1.15); opacity: 1; }
+  25%  { transform: translateY(0) scaleY(0.35); opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+@keyframes lake-shimmer {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.6; }
+}
+@keyframes fw-reflect {
+  0%, 22% { opacity: 0; }
+  40%     { opacity: 0.3; }
+  72%     { opacity: 0.12; }
+  100%    { opacity: 0; }
+}
+/* 通常花火のわずかな舞い落ち（散っていく余韻） */
+@keyframes fw-drift {
+  0%, 30% { transform: scale(var(--s, 1)) translateY(0); }
+  100%    { transform: scale(var(--s, 1)) translateY(18px); }
+}
+/* しだれ柳の垂れ下がり（コンテナごとゆっくり落とす） */
+@keyframes fw-gravity {
+  0%, 26% { transform: scale(var(--s, 1)) translateY(0); }
+  100%    { transform: scale(var(--s, 1)) translateY(50px); }
+}
+/* 動きを控える設定の人には、静止した花火として見せる（チカチカさせない） */
+@media (prefers-reduced-motion: reduce) {
+  .fw-p {
+    animation: none;
+    opacity: 0.85;
+    transform: rotate(var(--a)) translateX(calc(var(--r, 70px) * 0.92)) scaleX(0.95);
+  }
+  .fw-core { animation: none; opacity: 0.9; transform: scale(1); }
+  .fw-rise { animation: none; opacity: 0; }
+  .fw-reflect { animation: none; opacity: 0.18; }
+  .fw, .fw--willow { animation: none; transform: scale(var(--s, 1)); }
+  .night-stars, .night-horizon { animation: none; }
+}
