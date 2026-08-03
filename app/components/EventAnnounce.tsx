@@ -193,6 +193,22 @@ export default function EventAnnounce() {
         >
           {e.driverThanks}
         </p>
+        <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "#98a4c0" }}>
+          ※ {e.changeNote}
+        </p>
+      </div>
+
+      {/* ── 雨天・持ち物 ── */}
+      <div className="night-card px-4 py-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-1.5 h-4 rounded-full" style={{ background: "#7ec8ff" }} />
+          <h3 className="text-sm font-black" style={{ color: "#bcd6ff" }}>
+            {e.rainTitle}
+          </h3>
+        </div>
+        <p className="text-[12px] leading-relaxed" style={{ color: "#cdd6ea" }}>
+          {e.rainNote}
+        </p>
       </div>
 
       {/* ── 参加受付の案内（受付中）── */}
