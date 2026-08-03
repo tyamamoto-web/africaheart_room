@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { eventInfo, eventStatus, nextEvent } from "@/lib/data";
+import { eventInfo, eventStatus } from "@/lib/data";
 
 export default function Header() {
   return (
@@ -45,41 +45,32 @@ export default function Header() {
           {eventInfo.subtitle}
         </p>
 
-        {/* 開催日時（scheduled）／ 次回イベント告知（announced）／ 次回日程調整中（adjusting） */}
-        <div className="mt-3.5 flex flex-col items-center gap-1">
-          {eventStatus === "scheduled" ? (
-            <>
+        {/* 開催日時（scheduled）／ 次回日程調整中（adjusting）。
+            announced（花火大会の告知回）は、日付・時間・場所を下のヒーローに一本化＝ヘッダーでは出さない（重複回避）。 */}
+        {eventStatus !== "announced" && (
+          <div className="mt-3.5 flex flex-col items-center gap-1">
+            {eventStatus === "scheduled" ? (
+              <>
+                <span
+                  className="px-4 py-1 rounded-full text-sm font-black text-white"
+                  style={{ background: "rgba(255,255,255,0.22)" }}
+                >
+                  {eventInfo.date}
+                </span>
+                <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+                  集合 {eventInfo.startTime} ／ {eventInfo.openTime}〜{eventInfo.endTime}
+                </span>
+              </>
+            ) : (
               <span
                 className="px-4 py-1 rounded-full text-sm font-black text-white"
                 style={{ background: "rgba(255,255,255,0.22)" }}
               >
-                {eventInfo.date}
+                次回日程調整中
               </span>
-              <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
-                集合 {eventInfo.startTime} ／ {eventInfo.openTime}〜{eventInfo.endTime}
-              </span>
-            </>
-          ) : eventStatus === "announced" ? (
-            <>
-              <span
-                className="px-4 py-1 rounded-full text-sm font-black text-white"
-                style={{ background: "rgba(255,255,255,0.22)" }}
-              >
-                {nextEvent.date}
-              </span>
-              <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
-                {nextEvent.timeRange} ／ {nextEvent.place}
-              </span>
-            </>
-          ) : (
-            <span
-              className="px-4 py-1 rounded-full text-sm font-black text-white"
-              style={{ background: "rgba(255,255,255,0.22)" }}
-            >
-              次回日程調整中
-            </span>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );
