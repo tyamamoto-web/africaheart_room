@@ -166,6 +166,32 @@ export default function EventAnnounce() {
                   地図を開く
                 </a>
               ) : null}
+
+              {/* 当日選べるコース・ドリンクの内訳（焼肉など）。price 付きは金額を右寄せで表示 */}
+              {s.detail && s.detail.length > 0 ? (
+                <div
+                  className="mt-2.5 flex flex-col gap-1 px-2.5 py-2 rounded-lg"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  {s.detail.map((d, di) => (
+                    <div key={di} className="flex items-baseline justify-between gap-3">
+                      <span className="text-[12px] leading-snug" style={{ color: "#c8d2e6" }}>
+                        {d.label}
+                      </span>
+                      {d.price ? (
+                        <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: "#ffd884" }}>
+                          {d.price}
+                        </span>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {s.note ? (
+                <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "#98a4c0" }}>
+                  {s.note}
+                </p>
+              ) : null}
             </div>
           ))}
         </div>

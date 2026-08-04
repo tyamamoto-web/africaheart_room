@@ -36,6 +36,18 @@ export const eventInfo = {
 // 部屋割り開催に戻す時は "scheduled" にし、eventInfo・timeSlots・defaultRotations を更新する（版数+1）。
 export const eventStatus: "scheduled" | "announced" | "adjusting" = "announced";
 
+// スケジュール1項目の型。detail=当日選べるコース/ドリンクの内訳、note=小さめの補足。
+//  price は追加分を表す時に「＋」を付ける（例："＋1,078円"）。price 無し＝料金に含む説明行。
+export type NextScheduleItem = {
+  time: string;
+  title: string;
+  place: string;
+  cost: string;
+  map: string;
+  detail?: { label: string; price?: string }[];
+  note?: string;
+};
+
 // 次回イベント告知（部屋割りの無い回）。TOPの EventAnnounce で表示する。
 // 内容を差し替えるだけで告知を更新できる（チラシ「夏の歌宴 完全燃焼 in 諏訪」より）。
 export const nextEvent = {
@@ -56,13 +68,47 @@ export const nextEvent = {
   // map: タップで地図アプリを開く検索クエリ（店名＋住所）。空なら地図リンクを出さない。
   schedule: [
     { time: "11:50", title: "集合", place: "JOYJOY 諏訪インター店 ロビー集合", cost: "", map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2" },
-    { time: "12:00〜17:40", title: "カラオケ", place: "JOYJOY 諏訪インター店（2部屋）", cost: "1,690円", map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2" },
-    { time: "18:00〜19:20", title: "焼肉パーティー", place: "焼肉 じゅうじゅうカルビ 上諏訪店（当日コース選択・飲み放題は自由）", cost: "5,500円", map: "じゅうじゅうカルビ 上諏訪店 長野県諏訪市" },
+    {
+      time: "12:00〜17:40",
+      title: "カラオケ",
+      place: "JOYJOY 諏訪インター店（2部屋）",
+      cost: "1,690円",
+      map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2",
+      detail: [
+        { label: "フリータイム", price: "1,200円" },
+        { label: "延長1時間", price: "＋490円" },
+      ],
+      note: "焼肉への移動のため17:40で終了予定です。",
+    },
+    {
+      time: "18:00〜19:20",
+      title: "焼肉パーティー",
+      place: "焼肉 じゅうじゅうカルビ 上諏訪店",
+      cost: "5,500円",
+      map: "じゅうじゅうカルビ 上諏訪店 長野県諏訪市",
+      detail: [
+        { label: "じゅうかるコース（140品・食べ放題）", price: "4,378円" },
+        { label: "大感激コース（120品・食べ放題）", price: "3,828円" },
+        { label: "飲み放題ライト（サワー・ハイボール・カクテル）", price: "＋1,078円" },
+        { label: "ソフトドリンクバー", price: "＋429円" },
+      ],
+      note: "当日どちらかのコースを全員で選択（メニューを揃える必要があります）。ドリンクは飲む・飲まないは自由。目安5,500円はコース＋飲み放題を含む多めの想定です。",
+    },
     { time: "19:20〜20:00", title: "移動・買い出し", place: "コンビニで各自、お酒・ジュース・おつまみを少量購入", cost: "", map: "" },
     { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市" },
-    { time: "21:00〜23:00", title: "カラオケバー", place: "カラオケバー・ミルユッテ", cost: "3,500円", map: "カラオケバー ミルユッテ 長野県諏訪市大手2丁目1-4 大津屋ビル2F" },
+    {
+      time: "21:00〜23:00",
+      title: "カラオケバー",
+      place: "カラオケバー・ミルユッテ",
+      cost: "3,500円",
+      map: "カラオケバー ミルユッテ 長野県諏訪市大手2丁目1-4 大津屋ビル2F",
+      detail: [
+        { label: "ハウスウイスキー・ロック・水割り＋ソフトドリンク付き" },
+      ],
+      note: "余分なものを追加で頼まなければこの料金です。",
+    },
     { time: "23:05", title: "解散", place: "松本行 終電／上諏訪駅まで徒歩5分", cost: "", map: "上諏訪駅 長野県諏訪市" },
-  ],
+  ] as NextScheduleItem[],
   feeNote: "料金はすべて1人あたりの目安です。",
   estimateTotal: "11,190円",
   estimateBridge: "上のスケジュール料金とお礼を合わせた目安です。",
