@@ -167,12 +167,17 @@ export default function EventAnnounce() {
                 </a>
               ) : null}
 
-              {/* 当日選べるコース・ドリンクの内訳（焼肉など）。price 付きは金額を右寄せで表示 */}
+              {/* 内訳（選べるコース／料金に含まれるもの等）。detailHeading でボックスの意味を明示 */}
               {s.detail && s.detail.length > 0 ? (
                 <div
                   className="mt-2.5 flex flex-col gap-1 px-2.5 py-2 rounded-lg"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
                 >
+                  {s.detailHeading ? (
+                    <p className="text-[11px] font-bold mb-0.5" style={{ color: "#ffd884" }}>
+                      {s.detailHeading}
+                    </p>
+                  ) : null}
                   {s.detail.map((d, di) => (
                     <div key={di} className="flex items-baseline justify-between gap-3">
                       <span className="text-[12px] leading-snug" style={{ color: "#c8d2e6" }}>
@@ -192,22 +197,59 @@ export default function EventAnnounce() {
                   {s.note}
                 </p>
               ) : null}
+              {/* 別料金・注意（お金がかかる情報を独立した琥珀の注意ボックスで強調）*/}
+              {s.warn ? (
+                <p
+                  className="mt-2 text-[12px] font-semibold leading-relaxed px-2.5 py-2 rounded-lg"
+                  style={{ background: "rgba(245,170,80,0.13)", color: "#ffd6a0", border: "1px solid rgba(245,180,90,0.40)" }}
+                >
+                  ※ {s.warn}
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── 費用のめやす ── */}
+      {/* ── 費用のめやす（お酒を飲む/飲まないで2種）── */}
       <div className="night-card px-4 py-4">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm font-black" style={{ color: "#ffd884" }}>
-            概算合計（1人あたり）
-          </span>
-          <span className="text-2xl font-black" style={{ color: "#ffd873" }}>
-            {e.estimateTotal}
-          </span>
+        <span className="text-sm font-black" style={{ color: "#ffd884" }}>
+          概算合計（1人あたり）
+        </span>
+        <div className="mt-2.5 grid grid-cols-2 gap-2">
+          <div
+            className="rounded-xl px-3 py-3 text-center"
+            style={{ background: "rgba(245,197,66,0.10)", border: "1px solid rgba(245,205,110,0.30)" }}
+          >
+            <p className="text-[11px] font-bold" style={{ color: "#c8d2e6" }}>お酒を飲む人</p>
+            <p className="mt-1 text-2xl font-black" style={{ color: "#ffd873" }}>{e.estimateDrink}</p>
+            <p className="mt-0.5 text-[11px]" style={{ color: "#c8d2e6" }}>焼肉＝飲み放題コース</p>
+          </div>
+          <div
+            className="rounded-xl px-3 py-3 text-center"
+            style={{ background: "rgba(120,180,255,0.10)", border: "1px solid rgba(140,180,240,0.30)" }}
+          >
+            <p className="text-[11px] font-bold" style={{ color: "#c8d2e6" }}>飲まない人</p>
+            <p className="mt-1 text-2xl font-black" style={{ color: "#bcd6ff" }}>{e.estimateSoft}</p>
+            <p className="mt-0.5 text-[11px]" style={{ color: "#c8d2e6" }}>焼肉＝ソフトドリンク</p>
+          </div>
         </div>
-        <p className="mt-1 text-[12px] font-semibold" style={{ color: "#cdd6ea" }}>
+
+        {/* 当日の支払い（最重要アクション：見出し付き・費用の直下で強調）*/}
+        <div
+          className="mt-3 px-3 py-2.5 rounded-lg"
+          style={{ background: "rgba(245,197,66,0.12)", border: "1px solid rgba(245,205,110,0.42)" }}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="w-1.5 h-3.5 rounded-full" style={{ background: "#F5C542" }} />
+            <span className="text-[12px] font-black" style={{ color: "#ffd884" }}>{e.paymentTitle}</span>
+          </div>
+          <p className="text-[12px] font-semibold leading-relaxed" style={{ color: "#f0e4c8" }}>
+            {e.paymentNote}
+          </p>
+        </div>
+
+        <p className="mt-2.5 text-[12px] font-semibold" style={{ color: "#cdd6ea" }}>
           {e.estimateBridge}
         </p>
         <p className="mt-2 text-[12px] leading-relaxed" style={{ color: "#b7c2da" }}>
