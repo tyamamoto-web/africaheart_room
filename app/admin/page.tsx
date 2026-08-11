@@ -7,6 +7,7 @@ import { getMembers, addMember, updateMember, deleteMember, resetToDefault } fro
 import { getEventSetup, setAttendance, setMemberRoom } from "@/lib/eventStore";
 import type { RoomKey } from "@/lib/eventStore";
 import { getRoomNumbers, saveRoomNumbers, RoomNumbersSetupError } from "@/lib/roomNumbers";
+import { getOfficerPlan, setOfficerPriority, clearOfficerPlan, seedOfficerPlan } from "@/lib/officerPlan";
 
 const roomCfg = {
   A: { gradient: "linear-gradient(135deg,#8E1252,#A8175F)", color: "#A8175F", bg: "#F6E1EB" },
@@ -208,25 +209,61 @@ export default function AdminPage() {
     getRoomNumbers()
       .then((r) => setRoomNos({ A: r.A, B: r.B, C: r.C }))
       .catch(() => {});
-    try {
-      const raw = localStorage.getItem(OFFICER_MOSCOW_KEY);
-      if (raw) setPriorities(JSON.parse(raw));
-    } catch { /* 保存が読めなくても初期状態で続行 */ }
+    // 役員プランは全員で共有（Supabase）。初回だけ、この端末に残っていた旧入力を共有へ移行する。
+    (async () => {
+      let local: Record<string, Priority> = {};
+      try {
+        const raw = localStorage.getItem(OFFICER_MOSCOW_KEY);
+        if (raw) local = JSON.parse(raw);
+      } catch { /* 読めなくても続行 */ }
+      const migratedKey = OFFICER_MOSCOW_KEY + "-migrated";
+      let migrated = false;
+      try { migrated = !!localStorage.getItem(migratedKey); } catch { /* no-op */ }
+      try {
+        let plan;
+        if (Object.keys(local).length && !migrated) {
+          plan = await seedOfficerPlan(local);              // 端末の入力を共有へ吸い上げ（既存は尊重）
+          try { localStorage.setItem(migratedKey, "1"); } catch { /* no-op */ }
+        } else {
+          plan = await getOfficerPlan();                    // 以降は共有が正
+        }
+        setPriorities(plan);
+      } catch { /* 取得失敗時は空のまま（表示優先） */ }
+    })();
   }, []);
 
-  // タスクの優先度を設定（同じものを再度押すと解除）。この端末に保存。
+  // 役員専用タブを開いている間は、他メンバーの入力を約6秒ごとに取り込む（共有・同期）。
+  useEffect(() => {
+    if (tab !== "officer") return;
+    let alive = true;
+    const iv = setInterval(async () => {
+      try {
+        const plan = await getOfficerPlan();
+        if (alive) setPriorities(plan);
+      } catch { /* 一時的な失敗は無視して次回に */ }
+    }, 6000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [tab]);
+
+  // タスクの優先度を設定（同じものを再度押すと解除）。全員に共有（Supabase）。
   function setTaskPriority(taskId: string, p: Priority) {
+    const cleared = priorities[taskId] === p;
+    // まず画面を即更新（体感を良く）。
     setPriorities((prev) => {
       const next = { ...prev };
-      if (next[taskId] === p) delete next[taskId];
+      if (cleared) delete next[taskId];
       else next[taskId] = p;
-      try { localStorage.setItem(OFFICER_MOSCOW_KEY, JSON.stringify(next)); } catch { /* 保存に失敗しても画面は更新する */ }
       return next;
     });
+    // 共有へ保存（サーバ側で最新にマージ）→ 返ってきた全マップで確定させる。
+    setOfficerPriority(taskId, cleared ? null : p)
+      .then(setPriorities)
+      .catch(() => { /* 保存失敗時は次回のポーリングで整合 */ });
   }
   function resetPriorities() {
     setPriorities({});
-    try { localStorage.removeItem(OFFICER_MOSCOW_KEY); } catch { /* 失敗しても状態はクリア済み */ }
+    clearOfficerPlan().catch(() => { /* 失敗時は次回のポーリングで整合 */ });
+    try { localStorage.removeItem(OFFICER_MOSCOW_KEY); } catch { /* no-op */ }
     setConfirmMoscowReset(false);
   }
 
@@ -396,7 +433,7 @@ export default function AdminPage() {
 
               {/* 進み具合 */}
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 16, marginBottom: 10 }}>
-                <span style={{ fontSize: 11.5, color: "#a2988a" }}>各行で1つ選ぶ</span>
+                <span style={{ fontSize: 11.5, color: "#a2988a" }}>各行で1つ選ぶ・みんなで共有</span>
                 <span style={{ fontSize: 12, color: "#8b8274" }}>
                   設定済み <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#5f5747" }}>{moscowSetCount}</b>
                   <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
@@ -507,7 +544,7 @@ export default function AdminPage() {
                 </button>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <span style={{ fontSize: 12, color: "#8b8274" }}>すべての優先度を消しますか？</span>
+                  <span style={{ fontSize: 12, color: "#8b8274" }}>全員ぶんの入力をすべて消しますか？（元に戻せません）</span>
                   <button type="button" onClick={() => setConfirmMoscowReset(false)} style={{ fontSize: 12, padding: "6px 13px", borderRadius: 9, border: "1px solid #e3dccf", background: "#fff", color: "#8b8274", cursor: "pointer" }}>
                     やめる
                   </button>
