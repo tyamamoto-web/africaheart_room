@@ -24,6 +24,161 @@ const roleOrder: MemberRole[] = ["leader", "subleader", "regular", "guest"];
 
 const rotationSlots = timeSlots.filter((s) => s.type === "rotation");
 
+// ── 役員専用ページ：オフ会運営タスクの優先度づけ（MoSCoW法）──────────
+// リストの全項目を表にして、役員が自分たちで各タスクの優先度を手動で設定する。
+// 専門用語は使わず、平易な日本語ラベルで4段階に分ける。
+// 参考：MoSCoW法（Must / Should / Could / Won't）
+type Priority = "must" | "should" | "could" | "wont";
+
+// 4段階の優先度。ラベル・説明はすべて平易な言葉づかいに統一。
+const priorityDefs: { key: Priority; label: string; hint: string; accent: string; tint: string }[] = [
+  { key: "must",   label: "必ずやる",       hint: "これが無いとオフ会が成り立たない", accent: "#1c1a17", tint: "rgba(28,26,23,0.05)"  },
+  { key: "should", label: "なるべくやる",   hint: "あると良い。無くても開催はできる", accent: "#a9823f", tint: "rgba(169,130,63,0.09)" },
+  { key: "could",  label: "できたらやる",   hint: "あればもっと良い。優先度は低め",   accent: "#9c917d", tint: "rgba(156,145,125,0.10)"},
+  { key: "wont",   label: "今回はやらない", hint: "今回は見送り（次回以降に考える）", accent: "#b4a992", tint: "rgba(180,169,146,0.10)"},
+];
+
+// リストのやることを 大分類 → 中分類 → 小分類（やること）に体系化。
+// 元リスト（先方提供）の全項目を漏れなく収録。重複しやすいものは同じグループにまとめている。
+// ※ サブリーダーMTGは第4土曜ではないと確認済みのため曜日表記を削除。定例会議に「役員会議」を上に追加。
+//   「オフ会の日程を決める」の（第4土曜）は元リストの記述を暫定で残置（要確認）。
+type OfficerTask = { id: string; label: string };
+type OfficerTaxonomy = { no: string; major: string; groups: { mid: string; tasks: OfficerTask[] }[] }[];
+
+const officerTaxonomy: OfficerTaxonomy = [
+  {
+    no: "01", major: "会の運営・体制",
+    groups: [
+      { mid: "定例会議", tasks: [
+        { id: "t36", label: "役員MTG（リーダー・サブリーダー）" },
+        { id: "t01", label: "役員MTG（サブリーダー）" },
+      ] },
+      { mid: "ルール・決め方", tasks: [
+        { id: "t02", label: "ルールづくり" },
+        { id: "t03", label: "物事の決め方（意思決定）" },
+      ] },
+      { mid: "アプリ・ツール",  tasks: [{ id: "t04", label: "アプリの運用" }] },
+    ],
+  },
+  {
+    no: "02", major: "オフ会の準備・当日",
+    groups: [
+      { mid: "日程・会場を決める", tasks: [
+        { id: "t05", label: "オフ会の日程を決める（第4土曜）" },
+        { id: "t06", label: "会場を松本駅前へ変更（JOYJOY・カラオケ館）" },
+      ] },
+      { mid: "予約", tasks: [
+        { id: "t07", label: "カラオケの予約" },
+        { id: "t08", label: "部屋の予約" },
+      ] },
+      { mid: "案内・出欠（アプリ）", tasks: [
+        { id: "t09", label: "イベントの作成（アプリ）" },
+        { id: "t10", label: "締め切りの1週間前に案内" },
+        { id: "t11", label: "出欠の管理" },
+      ] },
+      { mid: "当日の進行", tasks: [{ id: "t12", label: "タイムテーブル・部屋割り" }] },
+    ],
+  },
+  {
+    no: "03", major: "お金（会計）",
+    groups: [
+      { mid: "管理", tasks: [{ id: "t13", label: "お金の管理・出納帳" }] },
+      { mid: "報告", tasks: [{ id: "t14", label: "会計報告" }] },
+    ],
+  },
+  {
+    no: "04", major: "企画・盛り上げ",
+    groups: [
+      { mid: "誕生日のお祝い", tasks: [
+        { id: "t15", label: "誕生日プレゼントの手配" },
+        { id: "t16", label: "ケーキ・イントロクイズ" },
+      ] },
+      { mid: "当日の楽しみ",       tasks: [{ id: "t17", label: "フリー部屋" }] },
+      { mid: "季節・単発イベント", tasks: [{ id: "t18", label: "塩尻ハロウィン" }] },
+      { mid: "ゲリラ企画", tasks: [
+        { id: "t19", label: "ゲリライベント" },
+        { id: "t20", label: "ゲリラ開催のオフ会" },
+        { id: "t21", label: "中島みゆき ゲリラオフ会" },
+      ] },
+    ],
+  },
+  {
+    no: "05", major: "交流・情報発信",
+    groups: [
+      { mid: "メンバー間の交流", tasks: [
+        { id: "t22", label: "他メンバーの紹介・本人からの自己紹介" },
+        { id: "t23", label: "メンバー同士の交流を活発にする" },
+      ] },
+      { mid: "グループLINE（グルチャ）", tasks: [
+        { id: "t24", label: "グルチャを部屋分け（雑談・イベントなど）" },
+        { id: "t25", label: "グルチャ投稿の役割分担" },
+        { id: "t26", label: "LINEスタンプ" },
+      ] },
+    ],
+  },
+  {
+    no: "06", major: "記録（写真・動画）",
+    groups: [
+      { mid: "撮影・管理", tasks: [
+        { id: "t27", label: "イベントの写真・動画の撮影" },
+        { id: "t28", label: "集合写真・動画の管理" },
+      ] },
+      { mid: "共有ルール", tasks: [{ id: "t29", label: "写真・動画の共有ルールの案内" }] },
+    ],
+  },
+  {
+    no: "07", major: "新規メンバー募集（ジモティ）",
+    groups: [
+      { mid: "出稿の準備", tasks: [
+        { id: "t30", label: "ジモティのイベント作成" },
+        { id: "t31", label: "ジモティの紹介文の作成" },
+      ] },
+      { mid: "対応・ルール", tasks: [
+        { id: "t32", label: "ジモティ経由の新規希望者とのやりとり" },
+        { id: "t33", label: "ジモティの年齢制限" },
+      ] },
+    ],
+  },
+  {
+    no: "08", major: "安全・トラブル対応",
+    groups: [
+      { mid: "注意喚起",       tasks: [{ id: "t34", label: "お酒の飲みすぎ注意の案内" }] },
+      { mid: "困りごと対応",   tasks: [{ id: "t35", label: "トラブル対応" }] },
+    ],
+  },
+];
+
+// フラットなやること一覧（件数集計に使用）
+const officerTasks: OfficerTask[] = officerTaxonomy.flatMap((m) => m.groups.flatMap((g) => g.tasks));
+
+// 表の行データ（大分類・中分類のセル結合＝rowSpan 用のフラグつき）
+type OfficerRow = {
+  task: OfficerTask;
+  majorNo?: string; major?: string; majorSpan?: number;
+  mid?: string; midSpan?: number;
+};
+const officerRows: OfficerRow[] = officerTaxonomy.flatMap((m) => {
+  const majorSpan = m.groups.reduce((s, g) => s + g.tasks.length, 0);
+  let firstOfMajor = true;
+  return m.groups.flatMap((g) =>
+    g.tasks.map((task, ti) => {
+      const row: OfficerRow = {
+        task,
+        majorNo:   firstOfMajor ? m.no : undefined,
+        major:     firstOfMajor ? m.major : undefined,
+        majorSpan: firstOfMajor ? majorSpan : undefined,
+        mid:     ti === 0 ? g.mid : undefined,
+        midSpan: ti === 0 ? g.tasks.length : undefined,
+      };
+      firstOfMajor = false;
+      return row;
+    })
+  );
+});
+
+// 役員が設定した優先度の保存キー（この端末に保存）。体系化に伴い版数を v2 に更新。
+const OFFICER_MOSCOW_KEY = "africaheart-officer-moscow-v2";
+
 type FormState = { nickname: string; role: MemberRole };
 
 export default function AdminPage() {
@@ -40,6 +195,9 @@ export default function AdminPage() {
   const [roomMsg,      setRoomMsg]      = useState<{ kind: "ok" | "err" | "setup"; text: string } | null>(null);
   // 管理画面のタブ（左=部屋割り・メンバー / 右=役員専用）。ロックなし＝URLを知っていれば切替可。既定は左。
   const [tab, setTab] = useState<"officer" | "admin">("admin");
+  // 役員専用：各タスクに手動でつけた優先度（この端末に保存）
+  const [priorities, setPriorities] = useState<Record<string, Priority>>({});
+  const [confirmMoscowReset, setConfirmMoscowReset] = useState(false);
 
   useEffect(() => {
     const m = getMembers();
@@ -50,7 +208,27 @@ export default function AdminPage() {
     getRoomNumbers()
       .then((r) => setRoomNos({ A: r.A, B: r.B, C: r.C }))
       .catch(() => {});
+    try {
+      const raw = localStorage.getItem(OFFICER_MOSCOW_KEY);
+      if (raw) setPriorities(JSON.parse(raw));
+    } catch { /* 保存が読めなくても初期状態で続行 */ }
   }, []);
+
+  // タスクの優先度を設定（同じものを再度押すと解除）。この端末に保存。
+  function setTaskPriority(taskId: string, p: Priority) {
+    setPriorities((prev) => {
+      const next = { ...prev };
+      if (next[taskId] === p) delete next[taskId];
+      else next[taskId] = p;
+      try { localStorage.setItem(OFFICER_MOSCOW_KEY, JSON.stringify(next)); } catch { /* 保存に失敗しても画面は更新する */ }
+      return next;
+    });
+  }
+  function resetPriorities() {
+    setPriorities({});
+    try { localStorage.removeItem(OFFICER_MOSCOW_KEY); } catch { /* 失敗しても状態はクリア済み */ }
+    setConfirmMoscowReset(false);
+  }
 
   async function handleSaveRoomNumbers() {
     setRoomSaving(true);
@@ -128,6 +306,7 @@ export default function AdminPage() {
   const attendingList  = sorted.filter((m) => attendance.has(m.id));
   const activeAssign   = rotations[activeSlot] ?? {};
   const assignedCount  = attendingList.filter((m) => activeAssign[m.id]).length;
+  const moscowSetCount = officerTasks.filter((t) => priorities[t.id]).length;
 
   return (
     <main className="min-h-screen pb-16" style={{ background: "#ffffff" }}>
@@ -174,15 +353,175 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* ── 役員専用タブ（ロックなし・中身は準備中）── */}
+      {/* ── 役員専用タブ（ロックなし）── */}
+      {/* このタブのみ高級感のある白基調・ミニマムなUI。全スタイルをインラインで自己完結させ、
+          他画面のピンク系テーマを継承しない。優先度は役員が表で手動設定する。 */}
       {tab === "officer" && (
-        <div className="px-4 pt-4 max-w-lg mx-auto">
-          <div className="card p-5">
-            <p className="text-base font-black" style={{ color: "#2c2c2c" }}>役員専用</p>
-            <div className="mt-4 py-10 text-center rounded-xl" style={{ background: "#faf7f2", border: "1px dashed #e6ddd3" }}>
-              <p className="text-sm" style={{ color: "#aaa" }}>ここに役員向けの情報を追加していきます。</p>
-              <p className="text-xs mt-1" style={{ color: "#c4b8ab" }}>（準備中）</p>
+        <div className="px-4 pt-5 pb-8 max-w-5xl mx-auto">
+          <div
+            style={{
+              background: "linear-gradient(180deg,#ffffff,#fdfcfa)",
+              border: "1px solid #eee7db",
+              borderRadius: 22,
+              padding: "30px 26px 26px",
+              boxShadow: "0 18px 50px -30px rgba(70,58,34,0.35)",
+            }}
+          >
+            {/* ヘッダー（読みやすさのため横幅を抑える）*/}
+            <div style={{ maxWidth: 660 }}>
+              <p style={{ fontSize: 10.5, letterSpacing: "0.30em", color: "#bcb09c", fontWeight: 600, textTransform: "uppercase" }}>
+                Officers Only
+              </p>
+              <h2 style={{ marginTop: 12, fontSize: 23, fontWeight: 600, color: "#1c1a16", letterSpacing: "0.01em", lineHeight: 1.3 }}>
+                オフ会運営タスク
+              </h2>
+              <p style={{ marginTop: 7, fontSize: 12.5, color: "#a2988a", letterSpacing: "0.05em" }}>
+                やることリスト　｜　分類して、みんなで優先度を決める
+              </p>
+
+              <div style={{ height: 1, background: "#efe8dc", margin: "20px 0 16px" }} />
+
+              {/* 優先度の説明（凡例）*/}
+              <div>
+                {priorityDefs.map((d) => (
+                  <div key={d.key} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "6px 0" }}>
+                    <span style={{ flexShrink: 0, width: 11, height: 11, borderRadius: "50%", background: d.accent, transform: "translateY(1px)" }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#33302a" }}>{d.label}</span>
+                      <span style={{ fontSize: 11.5, color: "#9c927f", marginLeft: 8 }}>{d.hint}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 進み具合 */}
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 16, marginBottom: 10 }}>
+                <span style={{ fontSize: 11.5, color: "#a2988a" }}>各行で1つ選ぶ</span>
+                <span style={{ fontSize: 12, color: "#8b8274" }}>
+                  設定済み <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#5f5747" }}>{moscowSetCount}</b>
+                  <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
+                </span>
+              </div>
             </div>
+
+            {/* 大きな横長の表：スマホは横スクロール／PCは大きく表示 */}
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table style={{ width: "100%", minWidth: 840, borderCollapse: "collapse" }}>
+                <colgroup>
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "32%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ background: "#fbf8f3" }}>
+                    <th style={{ textAlign: "left", padding: "12px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #eadfce", fontSize: 12, fontWeight: 700, color: "#8b8274" }}>大分類</th>
+                    <th style={{ textAlign: "left", padding: "12px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274" }}>中分類</th>
+                    <th style={{ textAlign: "left", padding: "12px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274" }}>やること（小分類）</th>
+                    {priorityDefs.map((d) => (
+                      <th key={d.key} style={{ textAlign: "center", padding: "12px 4px", borderBottom: "2px solid #e7dfd1", fontSize: 11, fontWeight: 700, color: d.accent, whiteSpace: "nowrap" }}>
+                        {d.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {officerRows.map((row, i) => {
+                    const task = row.task;
+                    const cur = priorities[task.id];
+                    const curDef = priorityDefs.find((d) => d.key === cur);
+                    const majorEnd = i === officerRows.length - 1 || Boolean(officerRows[i + 1].major);
+                    const rowBorder = majorEnd ? "1px solid #e7dfd1" : "1px solid #f4efe6";
+                    return (
+                      <tr key={task.id} style={{ background: curDef ? curDef.tint : "transparent" }}>
+                        {row.major && (
+                          <td rowSpan={row.majorSpan} style={{ background: "#faf6ef", borderRight: "1px solid #eadfce", borderBottom: "1px solid #e7dfd1", verticalAlign: "middle", padding: "14px 12px" }}>
+                            <div style={{ fontFamily: "Georgia,serif", fontSize: 12, color: "#c3b48f", letterSpacing: "0.06em", marginBottom: 5 }}>{row.majorNo}</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#2e2a22", lineHeight: 1.45 }}>{row.major}</div>
+                          </td>
+                        )}
+                        {row.mid && (
+                          <td rowSpan={row.midSpan} style={{ background: "#fdfbf6", borderRight: "1px solid #f0ebe1", borderBottom: "1px solid #efe6d6", verticalAlign: "middle", padding: "12px 12px" }}>
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "#5c5646", lineHeight: 1.5 }}>{row.mid}</span>
+                          </td>
+                        )}
+                        <td style={{ padding: "12px 12px", borderBottom: rowBorder, verticalAlign: "middle" }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: "#241f18", lineHeight: 1.5 }}>{task.label}</span>
+                        </td>
+                        {priorityDefs.map((d) => {
+                          const on = cur === d.key;
+                          return (
+                            <td key={d.key} style={{ textAlign: "center", padding: "9px 4px", borderBottom: rowBorder, verticalAlign: "middle" }}>
+                              <button
+                                type="button"
+                                onClick={() => setTaskPriority(task.id, d.key)}
+                                aria-label={`「${task.label}」を「${d.label}」にする`}
+                                aria-pressed={on}
+                                style={{
+                                  width: 26, height: 26, borderRadius: "50%", padding: 0, cursor: "pointer",
+                                  border: on ? `1.5px solid ${d.accent}` : "1.5px solid #dad2c4",
+                                  background: on ? d.accent : "transparent",
+                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                  transition: "background .12s, border-color .12s",
+                                }}
+                              >
+                                {on && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 集計 */}
+            <div style={{ maxWidth: 660, display: "flex", flexWrap: "wrap", gap: "7px 16px", marginTop: 18, paddingTop: 14, borderTop: "1px solid #efe8dc" }}>
+              {priorityDefs.map((d) => {
+                const n = officerTasks.filter((t) => priorities[t.id] === d.key).length;
+                return (
+                  <span key={d.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#7d7568" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: d.accent }} />
+                    {d.label}
+                    <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: d.accent }}>{n}</b>
+                  </span>
+                );
+              })}
+              <span style={{ fontSize: 11.5, color: "#b3a794" }}>未設定 {officerTasks.length - moscowSetCount}</span>
+            </div>
+
+            {/* リセット */}
+            <div style={{ marginTop: 20 }}>
+              {!confirmMoscowReset ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmMoscowReset(true)}
+                  style={{ fontSize: 11.5, color: "#b0a794", background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}
+                >
+                  選択をすべてリセット
+                </button>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <span style={{ fontSize: 12, color: "#8b8274" }}>すべての優先度を消しますか？</span>
+                  <button type="button" onClick={() => setConfirmMoscowReset(false)} style={{ fontSize: 12, padding: "6px 13px", borderRadius: 9, border: "1px solid #e3dccf", background: "#fff", color: "#8b8274", cursor: "pointer" }}>
+                    やめる
+                  </button>
+                  <button type="button" onClick={resetPriorities} style={{ fontSize: 12, padding: "6px 13px", borderRadius: 9, border: "none", background: "#1c1a17", color: "#fff", cursor: "pointer" }}>
+                    リセット
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* フッター注記 */}
+            <p style={{ maxWidth: 660, marginTop: 18, fontSize: 11, lineHeight: 1.9, color: "#b3a794" }}>
+              ※ 「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方です（MoSCoW法を参考）。分類は内容から推し量った暫定です。サブリーダーMTGで話しながら見直していきましょう。
+            </p>
           </div>
         </div>
       )}
