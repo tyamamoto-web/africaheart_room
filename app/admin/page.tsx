@@ -38,6 +38,8 @@ export default function AdminPage() {
   const [roomNos,      setRoomNos]      = useState<{ A: string; B: string; C: string }>({ A: "", B: "", C: "" });
   const [roomSaving,   setRoomSaving]   = useState(false);
   const [roomMsg,      setRoomMsg]      = useState<{ kind: "ok" | "err" | "setup"; text: string } | null>(null);
+  // 管理画面のタブ（左=部屋割り・メンバー / 右=役員専用）。ロックなし＝URLを知っていれば切替可。既定は左。
+  const [tab, setTab] = useState<"officer" | "admin">("admin");
 
   useEffect(() => {
     const m = getMembers();
@@ -135,15 +137,57 @@ export default function AdminPage() {
           ← 戻る
         </Link>
         <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>管理画面</h1>
-        <button
-          onClick={openAdd}
-          className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
-          style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", boxShadow: "0 3px 10px rgba(168,23,95,0.3)" }}
-        >
-          ＋ 追加
-        </button>
+        {tab === "admin" && (
+          <button
+            onClick={openAdd}
+            className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
+            style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", boxShadow: "0 3px 10px rgba(168,23,95,0.3)" }}
+          >
+            ＋ 追加
+          </button>
+        )}
       </div>
 
+      {/* ── タブ切替（役員専用 / 部屋割り・メンバー）── */}
+      <div className="px-4 pt-3 max-w-lg mx-auto">
+        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "#f4f0ea" }}>
+          {([
+            { key: "admin", label: "部屋割り・メンバー" },
+            { key: "officer", label: "役員専用" },
+          ] as const).map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors"
+                style={
+                  active
+                    ? { background: "linear-gradient(135deg,#A8175F,#C81E77)", color: "#fff", boxShadow: "0 2px 8px rgba(168,23,95,0.25)" }
+                    : { background: "transparent", color: "#888" }
+                }
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 役員専用タブ（ロックなし・中身は準備中）── */}
+      {tab === "officer" && (
+        <div className="px-4 pt-4 max-w-lg mx-auto">
+          <div className="card p-5">
+            <p className="text-base font-black" style={{ color: "#2c2c2c" }}>役員専用</p>
+            <div className="mt-4 py-10 text-center rounded-xl" style={{ background: "#faf7f2", border: "1px dashed #e6ddd3" }}>
+              <p className="text-sm" style={{ color: "#aaa" }}>ここに役員向けの情報を追加していきます。</p>
+              <p className="text-xs mt-1" style={{ color: "#c4b8ab" }}>（準備中）</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "admin" && (
       <div className="px-4 pt-3 max-w-lg mx-auto flex flex-col gap-4">
 
         {/* ── 部屋番号（当日の実部屋番号を全員に共有）── */}
@@ -389,6 +433,7 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── Add/Edit Modal ── */}
       {modal.open && (
