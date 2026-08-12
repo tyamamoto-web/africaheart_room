@@ -14,12 +14,18 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #e8e0d8; }
+/* スクロールバーは暗めのグレー（縦・横とも同じ配色。以前は赤紫のグラデーションだった） */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #e6e3df; }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #ff6b6b, #845ef7);
+  background: #55524d;
   border-radius: 2px;
 }
+::-webkit-scrollbar-thumb:hover { background: #3d3a36; }
+::-webkit-scrollbar-corner { background: #e6e3df; }
+
+/* Firefox など（同じ配色にそろえる） */
+html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 
 /* ── Fun confetti background ── */
 .fun-bg {
