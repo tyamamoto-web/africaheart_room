@@ -110,9 +110,9 @@ const officerTaxonomy: OfficerTaxonomy = [
         { id: "t05", label: "オフ会の日程を決める（第4土曜）" },
         { id: "t06", label: "会場を松本駅前へ変更（JOYJOY・カラオケ館）" },
       ] },
-      { mid: "予約", tasks: [
+      { mid: "予約・部屋の準備", tasks: [
         { id: "t07", label: "カラオケの予約" },
-        { id: "t08", label: "部屋の予約" },
+        { id: "t08", label: "部屋の準備（張り紙）" },
       ] },
       { mid: "案内・出欠（アプリ）", tasks: [
         { id: "t09", label: "イベントの作成（アプリ）" },
