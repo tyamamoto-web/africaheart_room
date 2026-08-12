@@ -572,18 +572,19 @@ export default function AdminPage() {
             )}
             {/* 大きな横長の表：スマホは横スクロール／PCは大きく表示 */}
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-              <table style={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
+              {/* 折り返しをやめたぶん、全列が潰れない幅を確保（狭い画面では従来どおり横スクロール） */}
+              <table style={{ width: "100%", minWidth: 1340, borderCollapse: "collapse" }}>
                 <colgroup>
-                  <col style={{ width: "11%" }} />
-                  <col style={{ width: "12%" }} />
-                  <col style={{ width: "24%" }} />
-                  <col style={{ width: "7%" }} />
-                  <col style={{ width: "7%" }} />
-                  <col style={{ width: "7%" }} />
-                  <col style={{ width: "7%" }} />
-                  <col style={{ width: "8%" }} />
-                  <col style={{ width: "8%" }} />
-                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "23.5%" }} />
+                  <col style={{ width: "6.4%" }} />
+                  <col style={{ width: "6.4%" }} />
+                  <col style={{ width: "6.4%" }} />
+                  <col style={{ width: "6.4%" }} />
+                  <col style={{ width: "7.3%" }} />
+                  <col style={{ width: "7.3%" }} />
+                  <col style={{ width: "7.3%" }} />
                 </colgroup>
                 <thead>
                   {/* 1段目：セクションの見出し（優先度／担当）*/}
@@ -623,16 +624,17 @@ export default function AdminPage() {
                         {row.major && (
                           <td rowSpan={row.majorSpan} style={{ background: "#fff", borderRight: "1px solid #eadfce", borderBottom: "1px solid #e7dfd1", verticalAlign: "middle", padding: "14px 12px" }}>
                             <div style={{ fontFamily: "Georgia,serif", fontSize: 12, color: "#c3b48f", letterSpacing: "0.06em", marginBottom: 5 }}>{row.majorNo}</div>
-                            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#2e2a22", lineHeight: 1.45 }}>{row.major}</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#2e2a22", lineHeight: 1.45, whiteSpace: "nowrap" }}>{row.major}</div>
                           </td>
                         )}
                         {row.mid && (
                           <td rowSpan={row.midSpan} style={{ background: "#fff", borderRight: "1px solid #f0ebe1", borderBottom: "1px solid #efe6d6", verticalAlign: "middle", padding: "12px 12px" }}>
-                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "#5c5646", lineHeight: 1.5 }}>{row.mid}</span>
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "#5c5646", lineHeight: 1.5, whiteSpace: "nowrap" }}>{row.mid}</span>
                           </td>
                         )}
+                        {/* やること名は折り返さない（2行になると結合セルとの高さが崩れるため）。列幅は内容に合わせて伸びる（表は横スクロール可） */}
                         <td style={{ padding: "12px 12px", borderBottom: rowBorder, verticalAlign: "middle" }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: "#241f18", lineHeight: 1.5 }}>{task.label}</span>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: "#241f18", lineHeight: 1.5, whiteSpace: "nowrap" }}>{task.label}</span>
                           {aCount >= 2 && (
                             <div style={{ marginTop: 4, fontSize: 10.5, color: "#b08948", lineHeight: 1.5 }}>※「責任者」が複数います。1人にしぼるのがおすすめ</div>
                           )}
