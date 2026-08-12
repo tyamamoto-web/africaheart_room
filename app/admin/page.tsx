@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { timeSlots, defaultMembers, type Member, type MemberRole } from "@/lib/data";
 import { getMembers, addMember, updateMember, deleteMember, resetToDefault } from "@/lib/memberStore";
@@ -43,14 +43,18 @@ const priorityDefs: { key: Priority; label: string; hint: string; accent: string
   { key: "wont",   label: "今回はやらない", hint: "今回は見送り（次回以降に考える）", accent: "#b4a992", tint: "rgba(180,169,146,0.10)"},
 ];
 
-// ── 担当・役割（RACIチャート）──────────────────────────────
-// 各やることを「誰が・どの役割で」進めるかを決める。専門用語は避け、意味を平易な言葉で添える。
-// R=担当 / A=責任者 / C=相談役 / I=共有（RACI法）。プルダウンで1人ずつ選ぶ。
-const raciDefs: { key: RaciRole; letter: string; short: string; label: string; hint: string; accent: string; tint: string }[] = [
-  { key: "r", letter: "R", short: "R 担当",   label: "担当（実際にやる）",   hint: "手を動かして進める人",                accent: "#a9823f", tint: "rgba(169,130,63,0.10)" },
-  { key: "a", letter: "A", short: "A 責任者", label: "責任者（最終の決定）", hint: "最終的に決める・OKを出す人（1人が目安）", accent: "#1c1a17", tint: "rgba(28,26,23,0.06)"  },
-  { key: "c", letter: "C", short: "C 相談役", label: "相談役（意見をもらう）", hint: "進める前に相談する人",                accent: "#8a7f6a", tint: "rgba(138,127,106,0.10)"},
-  { key: "i", letter: "I", short: "I 共有",   label: "共有（報告を受ける）", hint: "結果を知らせておく人",                accent: "#b1a68f", tint: "rgba(177,166,143,0.12)"},
+// ── 担当（だれが・どう関わるか）──────────────────────────────
+// 役割分担の考え方（RACI法）を、聞き馴染みのない語や記号を出さず「平易な言葉」に翻訳して表示する。
+// 意味・ルールはそのまま：R=やる人 / A=責任者 / C=相談役 / I=共有。
+//   ・責任者(A) は1つのやることにつき1人（最後に決めて責任を持つ）。
+//   ・やる人(R) は実際に手を動かす人（何人でもよい）。責任者が自分でやってもよい。
+//   ・相談役(C) は進める前に意見を聞く相手、共有(I) は終わってから知らせる相手。
+// 「RACI」という言葉はフッターの注記で一度だけ触れ、表・凡例・プルダウンには出さない。
+const raciDefs: { key: RaciRole; short: string; label: string; hint: string; accent: string; tint: string }[] = [
+  { key: "r", short: "やる人", label: "やる人", hint: "実際に手を動かして進める人（何人でもOK）",            accent: "#a9823f", tint: "rgba(169,130,63,0.10)" },
+  { key: "a", short: "責任者", label: "責任者", hint: "最後に決めて責任を持つ人。自分で動いてもOK（1つにつき1人）", accent: "#1c1a17", tint: "rgba(28,26,23,0.06)"  },
+  { key: "c", short: "相談役", label: "相談役", hint: "進める前に意見を聞く相手",                          accent: "#8a7f6a", tint: "rgba(138,127,106,0.10)"},
+  { key: "i", short: "共有",   label: "共有",   hint: "終わったら結果を知らせておく相手",                    accent: "#b1a68f", tint: "rgba(177,166,143,0.12)"},
 ];
 
 // リストのやることを 大分類 → 中分類 → 小分類（やること）に体系化。
@@ -215,6 +219,11 @@ export default function AdminPage() {
   // 役員専用：各やることの担当・役割（RACI）。全員でSupabase共有。キーは `taskId|personId`。
   const [raci, setRaci] = useState<OfficerRaci>({});
   const [confirmMoscowReset, setConfirmMoscowReset] = useState(false);
+  // 役員専用：保存失敗などの一時メッセージ（成功や次回同期で自動的に消える）
+  const [officerMsg, setOfficerMsg] = useState<string | null>(null);
+  // 共有書き込み中／直近の編集を検知し、ポーリングが「自分の入力」を巻き戻さないためのガード
+  const pendingWrites = useRef(0);
+  const editSeq = useRef(0);
 
   useEffect(() => {
     const m = getMembers();
@@ -257,9 +266,14 @@ export default function AdminPage() {
     if (tab !== "officer") return;
     let alive = true;
     const iv = setInterval(async () => {
+      if (pendingWrites.current > 0) return; // 書き込み中はスキップ（自分の入力の巻き戻り防止）
+      const seqAtStart = editSeq.current;
       try {
         const [plan, r] = await Promise.all([getOfficerPlan(), getOfficerRaci()]);
-        if (alive) { setPriorities(plan); setRaci(r); }
+        // 取得中に自分が編集/保存していたら適用しない（巻き戻り防止・次回のポーリングで整合）
+        if (alive && pendingWrites.current === 0 && editSeq.current === seqAtStart) {
+          setPriorities(plan); setRaci(r); setOfficerMsg(null);
+        }
       } catch { /* 一時的な失敗は無視して次回に */ }
     }, 6000);
     return () => { alive = false; clearInterval(iv); };
@@ -268,6 +282,7 @@ export default function AdminPage() {
   // タスクの優先度を設定（同じものを再度押すと解除）。全員に共有（Supabase）。
   function setTaskPriority(taskId: string, p: Priority) {
     const cleared = priorities[taskId] === p;
+    editSeq.current++;
     // まず画面を即更新（体感を良く）。
     setPriorities((prev) => {
       const next = { ...prev };
@@ -276,13 +291,16 @@ export default function AdminPage() {
       return next;
     });
     // 共有へ保存（サーバ側で最新にマージ）→ 返ってきた全マップで確定させる。
+    pendingWrites.current++;
     setOfficerPriority(taskId, cleared ? null : p)
-      .then(setPriorities)
-      .catch(() => { /* 保存失敗時は次回のポーリングで整合 */ });
+      .then((plan) => { setPriorities(plan); setOfficerMsg(null); })
+      .catch(() => { setOfficerMsg("保存に失敗しました。通信状況をご確認ください（数秒後に自動でやり直します）"); })
+      .finally(() => { pendingWrites.current--; });
   }
   // やること×人 の役割（RACI）を設定（空欄を選ぶと解除）。全員に共有（Supabase）。
   function setTaskAssignee(taskId: string, personId: string, role: RaciRole | null) {
     const key = raciKey(taskId, personId);
+    editSeq.current++;
     // まず画面を即更新（体感を良く）。
     setRaci((prev) => {
       const next = { ...prev };
@@ -291,9 +309,11 @@ export default function AdminPage() {
       return next;
     });
     // 共有へ保存（サーバ側で最新にマージ）→ 返ってきた全マップで確定させる。
+    pendingWrites.current++;
     setOfficerRaci(taskId, personId, role)
-      .then(setRaci)
-      .catch(() => { /* 保存失敗時は次回のポーリングで整合 */ });
+      .then((map) => { setRaci(map); setOfficerMsg(null); })
+      .catch(() => { setOfficerMsg("保存に失敗しました。通信状況をご確認ください（数秒後に自動でやり直します）"); })
+      .finally(() => { pendingWrites.current--; });
   }
   function resetPriorities() {
     setPriorities({});
@@ -481,14 +501,14 @@ export default function AdminPage() {
 
               {/* ── 担当・役割（RACIチャート）の説明 ── */}
               <div style={{ height: 1, background: "#efe8dc", margin: "20px 0 14px" }} />
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>担当・役割（RACIチャート）</p>
+              <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>担当（だれが・どう関わるか）</p>
               <p style={{ marginTop: 6, fontSize: 11.5, color: "#a2988a", lineHeight: 1.7 }}>
-                表の右側で、やることごとに「誰が・どの役割で」進めるかを決めます。名前ごとにプルダウンから選ぶだけ・みんなで共有されます。
+                表の右側で、やることごとに「だれが担当し、どう関わるか」を、次の4つの関わり方から決めます。名前ごとにプルダウンで選ぶだけ・みんなで共有されます。
               </p>
               <div style={{ marginTop: 10 }}>
                 {raciDefs.map((d) => (
                   <div key={d.key} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "5px 0" }}>
-                    <span style={{ flexShrink: 0, width: 18, textAlign: "center", fontFamily: "Georgia,serif", fontSize: 13, fontWeight: 700, color: d.accent }}>{d.letter}</span>
+                    <span style={{ flexShrink: 0, width: 11, height: 11, borderRadius: "50%", background: d.accent, transform: "translateY(1px)" }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#33302a" }}>{d.label}</span>
                       <span style={{ fontSize: 11.5, color: "#9c927f", marginLeft: 8 }}>{d.hint}</span>
@@ -509,7 +529,7 @@ export default function AdminPage() {
 
               {/* 進み具合（担当）*/}
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 12, marginBottom: 2 }}>
-                <span style={{ fontSize: 11.5, color: "#a2988a" }}>「A 責任者」は1つにつき1人が目安・みんなで共有</span>
+                <span style={{ fontSize: 11.5, color: "#a2988a" }}>「責任者」は1つにつき1人が目安・みんなで共有</span>
                 <span style={{ fontSize: 12, color: "#8b8274" }}>
                   担当を決めた数 <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#5f5747" }}>{raciTaskCount}</b>
                   <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
@@ -517,6 +537,11 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {officerMsg && (
+              <div style={{ margin: "4px 0 12px", padding: "8px 12px", borderRadius: 10, background: "rgba(176,137,72,0.10)", border: "1px solid #e7d8bf", fontSize: 11.5, color: "#8a6b32", lineHeight: 1.6 }}>
+                {officerMsg}
+              </div>
+            )}
             {/* 大きな横長の表：スマホは横スクロール／PCは大きく表示 */}
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table style={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
@@ -539,7 +564,7 @@ export default function AdminPage() {
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>中分類</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>やること（小分類）</th>
                     <th colSpan={4} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #eee3d2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>優先度（どれか1つ）</th>
-                    <th colSpan={3} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>担当・役割（RACIチャート）</th>
+                    <th colSpan={3} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>担当（だれが・どう関わる）</th>
                   </tr>
                   {/* 2段目：各列の見出し */}
                   <tr style={{ background: "#fbf8f3" }}>
@@ -581,7 +606,7 @@ export default function AdminPage() {
                         <td style={{ padding: "12px 12px", borderBottom: rowBorder, verticalAlign: "middle" }}>
                           <span style={{ fontSize: 13, fontWeight: 500, color: "#241f18", lineHeight: 1.5 }}>{task.label}</span>
                           {aCount >= 2 && (
-                            <div style={{ marginTop: 4, fontSize: 10.5, color: "#b08948", lineHeight: 1.5 }}>※「A 責任者」が複数います。1人にしぼるのがおすすめ</div>
+                            <div style={{ marginTop: 4, fontSize: 10.5, color: "#b08948", lineHeight: 1.5 }}>※「責任者」が複数います。1人にしぼるのがおすすめ</div>
                           )}
                         </td>
                         {priorityDefs.map((d, di) => {
@@ -656,7 +681,7 @@ export default function AdminPage() {
 
             {/* 集計（担当・RACI：だれが何件の「担当(R)」か）*/}
             <div style={{ maxWidth: 660, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "7px 16px", marginTop: 10 }}>
-              <span style={{ fontSize: 11.5, color: "#a2988a" }}>担当（R）の数：</span>
+              <span style={{ fontSize: 11.5, color: "#a2988a" }}>「やる人」の数：</span>
               {RACI_PEOPLE.map((p) => {
                 const n = officerTasks.filter((t) => raci[raciKey(t.id, p.id)] === "r").length;
                 return (
@@ -680,7 +705,7 @@ export default function AdminPage() {
                 </button>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <span style={{ fontSize: 12, color: "#8b8274" }}>全員ぶんの優先度と担当（RACI）をすべて消しますか？（元に戻せません）</span>
+                  <span style={{ fontSize: 12, color: "#8b8274" }}>全員ぶんの優先度と担当をすべて消しますか？（元に戻せません）</span>
                   <button type="button" onClick={() => setConfirmMoscowReset(false)} style={{ fontSize: 12, padding: "6px 13px", borderRadius: 9, border: "1px solid #e3dccf", background: "#fff", color: "#8b8274", cursor: "pointer" }}>
                     やめる
                   </button>
@@ -693,7 +718,7 @@ export default function AdminPage() {
 
             {/* フッター注記 */}
             <p style={{ maxWidth: 660, marginTop: 18, fontSize: 11, lineHeight: 1.9, color: "#b3a794" }}>
-              ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「誰が・どの役割で」担当するかを決める表（RACIチャート）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
+              ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「やる人／責任者／相談役／共有」の4つで担当を分ける表（RACIという役割分担の考え方を参考）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
             </p>
           </div>
         </div>

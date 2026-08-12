@@ -102,6 +102,27 @@ async function fetchRaw(): Promise<string[]> {
   return arr.filter((x): x is string => typeof x === "string");
 }
 
+// 書き込みの「土台」に使う厳密版の取得。読み取りに失敗したら例外を投げる（空配列で握りつぶさない）。
+// これがないと、取得失敗（＝一時的に空に見える）を土台に全件upsertして他メンバーのセルを丸ごと消す事故が起きる。
+async function fetchRawStrict(): Promise<string[]> {
+  let res: Response;
+  try {
+    res = await fetch(`${ENDPOINT}?id=eq.${ROW_ID}&select=themes`, {
+      headers: headers(),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("最新の取得に失敗しました（保存を中止しました）");
+  }
+  if (!res.ok) throw new Error(`最新の取得に失敗しました (${res.status})（保存を中止しました）`);
+  const rows = (await res.json()) as Array<{ themes?: unknown }>;
+  const arr =
+    Array.isArray(rows) && Array.isArray(rows[0]?.themes)
+      ? (rows[0]!.themes as unknown[])
+      : [];
+  return arr.filter((x): x is string => typeof x === "string");
+}
+
 // id=5 を upsert（themes に担当マップの全件を丸ごと保存）。
 async function upsert(raw: string[]): Promise<void> {
   const body = {
@@ -151,7 +172,7 @@ export function setOfficerRaci(
   role: RaciRole | null
 ): Promise<OfficerRaci> {
   return enqueue(async () => {
-    const map = rawToRaci(await fetchRaw()); // 直前の書き込み結果を土台にする
+    const map = rawToRaci(await fetchRawStrict()); // 直前の書き込み結果を土台にする（取得失敗時は例外＝上書きしない）
     const key = raciKey(taskId, personId);
     if (role === null) delete map[key];
     else map[key] = role;
