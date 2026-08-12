@@ -43,11 +43,11 @@ const priorityDefs: { key: Priority; label: string; hint: string; accent: string
   { key: "wont",   label: "今回はやらない", hint: "今回は見送り（次回以降に考える）", accent: "#b4a992", tint: "rgba(180,169,146,0.10)"},
 ];
 
-// ── 担当（だれが・どう関わるか）──────────────────────────────
+// ── 役割（だれが・どう関わるか）──────────────────────────────
 // 役割分担の考え方（RACI法）を、聞き馴染みのない語や記号を出さず「平易な言葉」に翻訳して表示する。
-// 意味・ルールはそのまま：R=やる人 / A=責任者 / C=相談役 / I=お知らせ（Iの表示名は共有機能と紛らわしいため「お知らせ」。値は i）。
+// 意味・ルールはそのまま：R=担当者 / A=責任者 / C=相談役 / I=お知らせ（Iの表示名は共有機能と紛らわしいため「お知らせ」。値は i）。
 //   ・責任者(A) は1つのやることにつき1人（最後に決めて責任を持つ）。
-//   ・やる人(R) は実際に手を動かす人（何人でもよい）。責任者が自分でやってもよい。
+//   ・担当者(R) は実際に手を動かす人（何人でもよい）。責任者が自分でやってもよい。
 //   ・相談役(C) は決める前に意見を聞く相手、お知らせ(I) は決めた後に知らせるだけの相手。
 // 「RACI」という言葉はフッターの注記で一度だけ触れ、表・凡例・プルダウンには出さない。
 // 齟齬を避けるための工夫：
@@ -56,15 +56,15 @@ const priorityDefs: { key: Priority; label: string; hint: string; accent: string
 //  ・I の名称は、共有機能の「みんなで共有」と紛らわしいため「お知らせ」に変更（値は i のまま）。
 const raciDefs: { key: RaciRole; short: string; label: string; hint: string; example: string; accent: string; tint: string }[] = [
   {
-    key: "r", short: "やる人", label: "やる人",
+    key: "r", short: "担当者", label: "担当者",
     hint: "決まったことを実際に進める人。連絡・予約・準備など、手を動かして作業します。何人いてもOK。最終判断は「責任者」にまかせます。",
     example: "お店に予約の電話をする／会場までの地図をつくる",
     accent: "#a9823f", tint: "rgba(169,130,63,0.10)",
   },
   {
     key: "a", short: "責任者", label: "責任者",
-    hint: "最終的に決めて、結果に責任を持つ人。1つのやることにつき必ず1人だけ。自分で作業もするときも、これを選べばOK（「やる人」に重ねて選ばなくてよい）。",
-    example: "どのお店にするかを最終的に決める・その担当をとりまとめる",
+    hint: "最終的に決めて、結果に責任を持つ人。1つのやることにつき必ず1人だけ。自分で作業もするときも、これを選べばOK（「担当者」に重ねて選ばなくてよい）。",
+    example: "どのお店にするかを最終的に決める・担当者をとりまとめる",
     accent: "#1c1a17", tint: "rgba(28,26,23,0.06)",
   },
   {
@@ -525,9 +525,9 @@ export default function AdminPage() {
 
               {/* ── 担当・役割（RACIチャート）の説明 ── */}
               <div style={{ height: 1, background: "#efe8dc", margin: "20px 0 14px" }} />
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>担当（だれが・どう関わるか）</p>
+              <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>役割（だれが・どう関わるか）</p>
               <p style={{ marginTop: 6, fontSize: 11.5, color: "#a2988a", lineHeight: 1.7 }}>
-                表の右側で、やることごとに「だれが担当し、どう関わるか」を、次の4つの関わり方から決めます。名前ごとにプルダウンで選ぶだけ・みんなで共有されます。
+                表の右側で、やることごとに「だれが、どう関わるか」を、次の4つの役割から決めます。名前ごとにプルダウンで選ぶだけ・みんなで共有されます。
               </p>
               <div style={{ marginTop: 10 }}>
                 {raciDefs.map((d) => (
@@ -544,7 +544,7 @@ export default function AdminPage() {
                 ))}
               </div>
               <p style={{ marginTop: 10, fontSize: 11.5, color: "#8b8274", lineHeight: 1.7 }}>
-                担当できる人：
+                役割をつける人：
                 {RACI_PEOPLE.map((p, i) => (
                   <span key={p.id}>
                     {i > 0 && "・"}
@@ -554,11 +554,11 @@ export default function AdminPage() {
                 ))}
               </p>
 
-              {/* 進み具合（担当）*/}
+              {/* 進み具合（役割）*/}
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 12, marginBottom: 2 }}>
-                <span style={{ fontSize: 11.5, color: "#a2988a" }}>「責任者」は1つにつき1人・「やる人」は何人でも・みんなで共有</span>
+                <span style={{ fontSize: 11.5, color: "#a2988a" }}>「責任者」は1つにつき1人・「担当者」は何人でも・みんなで共有</span>
                 <span style={{ fontSize: 12, color: "#8b8274" }}>
-                  担当を決めた数 <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#5f5747" }}>{raciTaskCount}</b>
+                  役割を決めた数 <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#5f5747" }}>{raciTaskCount}</b>
                   <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
                 </span>
               </div>
@@ -592,7 +592,7 @@ export default function AdminPage() {
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>中分類</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>やること（小分類）</th>
                     <th colSpan={4} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #eee3d2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>優先度（どれか1つ）</th>
-                    <th colSpan={3} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>担当（だれが・どう関わる）</th>
+                    <th colSpan={3} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>役割（だれが・どう関わる）</th>
                   </tr>
                   {/* 2段目：各列の見出し */}
                   <tr style={{ background: "#fbf8f3" }}>
@@ -709,7 +709,7 @@ export default function AdminPage() {
 
             {/* 集計（担当・RACI：だれが何件の「担当(R)」か）*/}
             <div style={{ maxWidth: 660, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "7px 16px", marginTop: 10 }}>
-              <span style={{ fontSize: 11.5, color: "#a2988a" }}>「やる人」の数：</span>
+              <span style={{ fontSize: 11.5, color: "#a2988a" }}>「担当者」の数：</span>
               {RACI_PEOPLE.map((p) => {
                 const n = officerTasks.filter((t) => raci[raciKey(t.id, p.id)] === "r").length;
                 return (
@@ -729,11 +729,11 @@ export default function AdminPage() {
                   onClick={() => setConfirmMoscowReset(true)}
                   style={{ fontSize: 11.5, color: "#b0a794", background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}
                 >
-                  入力をすべてリセット（優先度・担当）
+                  入力をすべてリセット（優先度・役割）
                 </button>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <span style={{ fontSize: 12, color: "#8b8274" }}>全員ぶんの優先度と担当をすべて消しますか？（元に戻せません）</span>
+                  <span style={{ fontSize: 12, color: "#8b8274" }}>全員ぶんの優先度と役割をすべて消しますか？（元に戻せません）</span>
                   <button type="button" onClick={() => setConfirmMoscowReset(false)} style={{ fontSize: 12, padding: "6px 13px", borderRadius: 9, border: "1px solid #e3dccf", background: "#fff", color: "#8b8274", cursor: "pointer" }}>
                     やめる
                   </button>
@@ -746,7 +746,7 @@ export default function AdminPage() {
 
             {/* フッター注記 */}
             <p style={{ maxWidth: 660, marginTop: 18, fontSize: 11, lineHeight: 1.9, color: "#b3a794" }}>
-              ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「やる人／責任者／相談役／お知らせ」の4つで担当を分ける表（RACIという役割分担の考え方を参考）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
+              ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「担当者／責任者／相談役／お知らせ」の4つで役割を分ける表（RACIという役割分担の考え方を参考）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
             </p>
           </div>
         </div>
