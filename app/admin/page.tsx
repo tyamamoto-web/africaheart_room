@@ -563,68 +563,6 @@ export default function AdminPage() {
                 </span>
               </div>
 
-              {/* ── 役員の役割・権限・責任（リーダー・サブリーダー）──
-                  解釈が分かれないよう、対象・相手・タイミングを具体語で言い切る（「大事なこと」「早めに」等の曖昧語は使わない）。
-                  上の表の定義（責任者＝最終的に決めて結果に責任を持つ人・1つにつき1人）と矛盾させない：
-                  決めるのは表の責任者。リーダーは責任者が未定のとき・意見が分かれたままのときに決める。 */}
-              <div style={{ height: 1, background: "#efe8dc", margin: "22px 0 14px" }} />
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>
-                役員の役割・権限・責任（リーダー・サブリーダー）
-              </p>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
-                {/* リーダー */}
-                <div style={{ flex: "1 1 260px", minWidth: 240, border: "1px solid #eadfce", borderRadius: 12, background: "#fffdf9", padding: "13px 15px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1a16" }}>リーダー</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: "#a9823f", background: "rgba(169,130,63,0.10)", border: "1px solid #e7d8bf", borderRadius: 999, padding: "2px 8px" }}>
-                      {RACI_PEOPLE.filter((p) => p.role === "leader").map((p) => p.name).join("・")}
-                    </span>
-                  </div>
-                  <ul style={{ margin: "9px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#5c5646" }}>役割</b>：役員MTGを開いて進行し、表で自分が責任者になった項目を決めます。
-                    </li>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#5c5646" }}>権限</b>：表に責任者が入っていない項目と、役員MTGで意見が分かれたままの項目は、その場でリーダーが決めます。サブリーダーが責任者の項目は、そのサブリーダーが決めます。
-                    </li>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#5c5646" }}>責任</b>：自分が決めたことは、次のオフ会の案内を出すまでに、内容と理由をメンバー全員へ伝えます。その決定への質問にもリーダーが答えます。
-                    </li>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#b08948" }}>進め方</b>：決める前にサブリーダー2人へ案を伝える／反対意見は理由まで聞いてから決める／サブリーダーが責任者の項目は任せて、結果の報告を役員MTGで受ける。
-                    </li>
-                  </ul>
-                </div>
-
-                {/* サブリーダー */}
-                <div style={{ flex: "1 1 260px", minWidth: 240, border: "1px solid #eadfce", borderRadius: 12, background: "#fffdf9", padding: "13px 15px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1a16" }}>サブリーダー</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: "#8a7f6a", background: "rgba(138,127,106,0.12)", border: "1px solid #e2d8c7", borderRadius: 999, padding: "2px 8px" }}>
-                      {RACI_PEOPLE.filter((p) => p.role === "subleader").map((p) => p.name).join("・")}
-                    </span>
-                  </div>
-                  <ul style={{ margin: "9px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#5c5646" }}>役割</b>：リーダーが決める前の相談を受け、表で自分が責任者・やる人になった項目を進めます。
-                    </li>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#5c5646" }}>権限</b>：どの項目も、決まる前に意見を言えます。表で責任者（1人）になった項目は、自分が決めます。
-                    </li>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#5c5646" }}>責任</b>：反対意見や心配は、決まる前にリーダーへ伝えます。メンバーから聞いた要望は、内容を削らず伝えます。自分が責任者の項目は、進み具合と結果を役員MTGで報告します。
-                    </li>
-                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#b08948" }}>進め方</b>：反対意見や別の案は、決まる前の役員MTGで伝える／次の役員MTGまで待てないときはリーダーへ個別に伝える／決まった後に気づいた改善案は、次の役員MTGで提案する。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <p style={{ marginTop: 11, fontSize: 11, color: "#a2988a", lineHeight: 1.7 }}>
-                ※ 役職の上下はありません。この分担を変えたいときは役員MTGで話し、決まったらリーダーがこのページを直します。
-              </p>
             </div>
 
             {officerMsg && (
