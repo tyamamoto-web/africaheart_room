@@ -571,9 +571,6 @@ export default function AdminPage() {
               <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>
                 役員の役割・権限・責任（リーダー・サブリーダー）
               </p>
-              <p style={{ marginTop: 6, fontSize: 11.5, color: "#a2988a", lineHeight: 1.7 }}>
-                お金・ルール・日程・会場・役員の担当・新しいメンバーの受け入れ（以下「この6つ」）は、役員3人が役員MTGで、上の表に責任者（1人）・相談役・お知らせを記入してから動きます。決めるのは表の責任者、決める前に相談役へ相談、決めた内容と理由は責任者がメンバーへ伝えます。
-              </p>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
                 {/* リーダー */}
@@ -613,7 +610,7 @@ export default function AdminPage() {
                       <b style={{ color: "#5c5646" }}>役割</b>：リーダーが決める前の相談を受け、表で自分が責任者・やる人になった項目を進めます。
                     </li>
                     <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
-                      <b style={{ color: "#5c5646" }}>権限</b>：この6つは、決まる前に意見を言えます。表で責任者（1人）になった項目は、自分が決めます。
+                      <b style={{ color: "#5c5646" }}>権限</b>：どの項目も、決まる前に意見を言えます。表で責任者（1人）になった項目は、自分が決めます。
                     </li>
                     <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.7 }}>
                       <b style={{ color: "#5c5646" }}>責任</b>：反対意見や心配は、決まる前にリーダーへ伝えます。メンバーから聞いた要望は、内容を削らず伝えます。自分が責任者の項目は、進み具合と結果を役員MTGで報告します。
