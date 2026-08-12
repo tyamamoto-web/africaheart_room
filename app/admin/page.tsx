@@ -54,11 +54,31 @@ const priorityDefs: { key: Priority; label: string; hint: string; accent: string
 //  ・R↔A は「作業する／決める」、C↔I は「決める前に意見をもらう／決めた後に知らせるだけ」で対比。
 //  ・各役割にカラオケ予約の具体例を添える。
 //  ・I の名称は、共有機能の「みんなで共有」と紛らわしいため「お知らせ」に変更（値は i のまま）。
-const raciDefs: { key: RaciRole; short: string; label: string; hint: string; accent: string; tint: string }[] = [
-  { key: "r", short: "やる人",   label: "やる人",   hint: "実際に手を動かして作業する人。何人いてもOK。　例：お店に予約の電話をする",                       accent: "#a9823f", tint: "rgba(169,130,63,0.10)" },
-  { key: "a", short: "責任者",   label: "責任者",   hint: "最終的に決めて、結果に責任を持つ人。1つのやることにつき必ず1人だけ（自分で作業してもOK）。　例：どのお店にするかを決める", accent: "#1c1a17", tint: "rgba(28,26,23,0.06)"  },
-  { key: "c", short: "相談役",   label: "相談役",   hint: "決める前に意見を聞いておく相手。口は出すが、担当ではない。　例：日程やお店の希望を先に聞く",           accent: "#8a7f6a", tint: "rgba(138,127,106,0.10)"},
-  { key: "i", short: "お知らせ", label: "お知らせ", hint: "決めた後・終わった後に結果を知らせておく相手。意見は求めない（知っておくだけ）。　例：予約が取れたことを伝える", accent: "#b1a68f", tint: "rgba(177,166,143,0.12)"},
+const raciDefs: { key: RaciRole; short: string; label: string; hint: string; example: string; accent: string; tint: string }[] = [
+  {
+    key: "r", short: "やる人", label: "やる人",
+    hint: "決まったことを実際に進める人。連絡・予約・準備など、手を動かして作業します。何人いてもOK。最終判断は「責任者」にまかせます。",
+    example: "お店に予約の電話をする／会場までの地図をつくる",
+    accent: "#a9823f", tint: "rgba(169,130,63,0.10)",
+  },
+  {
+    key: "a", short: "責任者", label: "責任者",
+    hint: "最終的に決めて、結果に責任を持つ人。1つのやることにつき必ず1人だけ。自分で作業もするときも、これを選べばOK（「やる人」に重ねて選ばなくてよい）。",
+    example: "どのお店にするかを最終的に決める・その担当をとりまとめる",
+    accent: "#1c1a17", tint: "rgba(28,26,23,0.06)",
+  },
+  {
+    key: "c", short: "相談役", label: "相談役",
+    hint: "決める前に意見を聞いておく相手。相談は受けますが、決める人でも作業する人でもありません。反対や心配があればこの段階で伝えます。",
+    example: "日程やお店の希望を、決める前に聞いておく",
+    accent: "#8a7f6a", tint: "rgba(138,127,106,0.10)",
+  },
+  {
+    key: "i", short: "お知らせ", label: "お知らせ",
+    hint: "決めた後・終わった後に、結果を知らせておく相手。意見を求めるのではなく、知っておいてもらうだけ。",
+    example: "予約が取れたことを、後から伝える",
+    accent: "#b1a68f", tint: "rgba(177,166,143,0.12)",
+  },
 ];
 
 // リストのやることを 大分類 → 中分類 → 小分類（やること）に体系化。
@@ -516,6 +536,9 @@ export default function AdminPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#33302a" }}>{d.label}</span>
                       <div style={{ marginTop: 3, fontSize: 11.5, color: "#9c927f", lineHeight: 1.65 }}>{d.hint}</div>
+                      <div style={{ marginTop: 3, fontSize: 11, color: "#b3a794", lineHeight: 1.6 }}>
+                        <span style={{ color: "#c0a469", fontWeight: 700 }}>例</span>　{d.example}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -539,6 +562,63 @@ export default function AdminPage() {
                   <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
                 </span>
               </div>
+
+              {/* ── サークル役員のあるべき姿・役割・権限（意思決定を透明に・独断を防ぐ）── */}
+              <div style={{ height: 1, background: "#efe8dc", margin: "22px 0 14px" }} />
+              <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>
+                役員のあるべき姿（リーダー・サブリーダー）
+              </p>
+              <p style={{ marginTop: 6, fontSize: 11.5, color: "#a2988a", lineHeight: 1.7 }}>
+                担当を決める前提として、役員それぞれの役割・権限のめやすです。大事な決めごとは、独断や「いつの間にか決まっていた」を防ぐため、まず上の表で「責任者（1人）・相談役（決める前に相談）・お知らせ（決めた後に共有）」を決めてから進めましょう。
+              </p>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
+                {/* リーダー */}
+                <div style={{ flex: "1 1 260px", minWidth: 240, border: "1px solid #eadfce", borderRadius: 12, background: "#fffdf9", padding: "13px 15px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1a16" }}>リーダー</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#a9823f", background: "rgba(169,130,63,0.10)", border: "1px solid #e7d8bf", borderRadius: 999, padding: "2px 8px" }}>
+                      {RACI_PEOPLE.filter((p) => p.role === "leader").map((p) => p.name).join("・")}
+                    </span>
+                  </div>
+                  <ul style={{ margin: "9px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
+                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.65 }}>
+                      <b style={{ color: "#5c5646" }}>役割</b>：全体の方向を示し、最終決定と結果に責任を持つまとめ役。みんなが動きやすい場をつくる。
+                    </li>
+                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.65 }}>
+                      <b style={{ color: "#5c5646" }}>権限</b>：やることの「責任者」になれる（最終決定）。ただし決める前にサブリーダーへ相談するのが基本。
+                    </li>
+                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.65 }}>
+                      <b style={{ color: "#b08948" }}>心がけ</b>：ひとりで抱えず任せる／決める前にサブの意見を聞く／決めた理由と結果はオープンに共有する（独断・密室で決めない）。
+                    </li>
+                  </ul>
+                </div>
+
+                {/* サブリーダー */}
+                <div style={{ flex: "1 1 260px", minWidth: 240, border: "1px solid #eadfce", borderRadius: 12, background: "#fffdf9", padding: "13px 15px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c1a16" }}>サブリーダー</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#8a7f6a", background: "rgba(138,127,106,0.12)", border: "1px solid #e2d8c7", borderRadius: 999, padding: "2px 8px" }}>
+                      {RACI_PEOPLE.filter((p) => p.role === "subleader").map((p) => p.name).join("・")}
+                    </span>
+                  </div>
+                  <ul style={{ margin: "9px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 7 }}>
+                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.65 }}>
+                      <b style={{ color: "#5c5646" }}>役割</b>：リーダーを支えて現場を動かす。メンバーの声を吸い上げてリーダーに届ける。
+                    </li>
+                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.65 }}>
+                      <b style={{ color: "#5c5646" }}>権限</b>：担当ごとに「責任者」や「やる人」になれる。決める前に必ず意見を求められる立場（相談役）で、遠慮なく異論を言ってよい。
+                    </li>
+                    <li style={{ fontSize: 11.5, color: "#6f6757", lineHeight: 1.65 }}>
+                      <b style={{ color: "#b08948" }}>心がけ</b>：気づいたことは早めに共有／「おかしい」と思ったら止めて問い直す／決まったことは前向きに実行する。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <p style={{ marginTop: 11, fontSize: 11, color: "#a2988a", lineHeight: 1.7 }}>
+                ※ 役割や権限は上下関係ではなく、決め方を透明にするための分担です。困ったときは助け合い、役員MTGで話しながら見直していきましょう。
+              </p>
             </div>
 
             {officerMsg && (
