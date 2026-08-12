@@ -8,6 +8,10 @@ import { getEventSetup, setAttendance, setMemberRoom } from "@/lib/eventStore";
 import type { RoomKey } from "@/lib/eventStore";
 import { getRoomNumbers, saveRoomNumbers, RoomNumbersSetupError } from "@/lib/roomNumbers";
 import { getOfficerPlan, setOfficerPriority, clearOfficerPlan, seedOfficerPlan } from "@/lib/officerPlan";
+import {
+  getOfficerRaci, setOfficerRaci, clearOfficerRaci, raciKey,
+  RACI_PEOPLE, type OfficerRaci, type RaciRole,
+} from "@/lib/officerRaci";
 
 const roomCfg = {
   A: { gradient: "linear-gradient(135deg,#8E1252,#A8175F)", color: "#A8175F", bg: "#F6E1EB" },
@@ -37,6 +41,16 @@ const priorityDefs: { key: Priority; label: string; hint: string; accent: string
   { key: "should", label: "なるべくやる",   hint: "あると良い。無くても開催はできる", accent: "#a9823f", tint: "rgba(169,130,63,0.09)" },
   { key: "could",  label: "できたらやる",   hint: "あればもっと良い。優先度は低め",   accent: "#9c917d", tint: "rgba(156,145,125,0.10)"},
   { key: "wont",   label: "今回はやらない", hint: "今回は見送り（次回以降に考える）", accent: "#b4a992", tint: "rgba(180,169,146,0.10)"},
+];
+
+// ── 担当・役割（RACIチャート）──────────────────────────────
+// 各やることを「誰が・どの役割で」進めるかを決める。専門用語は避け、意味を平易な言葉で添える。
+// R=担当 / A=責任者 / C=相談役 / I=共有（RACI法）。プルダウンで1人ずつ選ぶ。
+const raciDefs: { key: RaciRole; letter: string; short: string; label: string; hint: string; accent: string; tint: string }[] = [
+  { key: "r", letter: "R", short: "R 担当",   label: "担当（実際にやる）",   hint: "手を動かして進める人",                accent: "#a9823f", tint: "rgba(169,130,63,0.10)" },
+  { key: "a", letter: "A", short: "A 責任者", label: "責任者（最終の決定）", hint: "最終的に決める・OKを出す人（1人が目安）", accent: "#1c1a17", tint: "rgba(28,26,23,0.06)"  },
+  { key: "c", letter: "C", short: "C 相談役", label: "相談役（意見をもらう）", hint: "進める前に相談する人",                accent: "#8a7f6a", tint: "rgba(138,127,106,0.10)"},
+  { key: "i", letter: "I", short: "I 共有",   label: "共有（報告を受ける）", hint: "結果を知らせておく人",                accent: "#b1a68f", tint: "rgba(177,166,143,0.12)"},
 ];
 
 // リストのやることを 大分類 → 中分類 → 小分類（やること）に体系化。
@@ -198,6 +212,8 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"officer" | "admin">("admin");
   // 役員専用：各タスクに手動でつけた優先度（この端末に保存）
   const [priorities, setPriorities] = useState<Record<string, Priority>>({});
+  // 役員専用：各やることの担当・役割（RACI）。全員でSupabase共有。キーは `taskId|personId`。
+  const [raci, setRaci] = useState<OfficerRaci>({});
   const [confirmMoscowReset, setConfirmMoscowReset] = useState(false);
 
   useEffect(() => {
@@ -208,6 +224,10 @@ export default function AdminPage() {
     setRotations(setup.rotations);
     getRoomNumbers()
       .then((r) => setRoomNos({ A: r.A, B: r.B, C: r.C }))
+      .catch(() => {});
+    // 役員RACI（担当・役割）も全員で共有（Supabase）。初期表示ぶんを取り込む。
+    getOfficerRaci()
+      .then(setRaci)
       .catch(() => {});
     // 役員プランは全員で共有（Supabase）。初回だけ、この端末に残っていた旧入力を共有へ移行する。
     (async () => {
@@ -238,8 +258,8 @@ export default function AdminPage() {
     let alive = true;
     const iv = setInterval(async () => {
       try {
-        const plan = await getOfficerPlan();
-        if (alive) setPriorities(plan);
+        const [plan, r] = await Promise.all([getOfficerPlan(), getOfficerRaci()]);
+        if (alive) { setPriorities(plan); setRaci(r); }
       } catch { /* 一時的な失敗は無視して次回に */ }
     }, 6000);
     return () => { alive = false; clearInterval(iv); };
@@ -260,9 +280,26 @@ export default function AdminPage() {
       .then(setPriorities)
       .catch(() => { /* 保存失敗時は次回のポーリングで整合 */ });
   }
+  // やること×人 の役割（RACI）を設定（空欄を選ぶと解除）。全員に共有（Supabase）。
+  function setTaskAssignee(taskId: string, personId: string, role: RaciRole | null) {
+    const key = raciKey(taskId, personId);
+    // まず画面を即更新（体感を良く）。
+    setRaci((prev) => {
+      const next = { ...prev };
+      if (role === null) delete next[key];
+      else next[key] = role;
+      return next;
+    });
+    // 共有へ保存（サーバ側で最新にマージ）→ 返ってきた全マップで確定させる。
+    setOfficerRaci(taskId, personId, role)
+      .then(setRaci)
+      .catch(() => { /* 保存失敗時は次回のポーリングで整合 */ });
+  }
   function resetPriorities() {
     setPriorities({});
+    setRaci({});
     clearOfficerPlan().catch(() => { /* 失敗時は次回のポーリングで整合 */ });
+    clearOfficerRaci().catch(() => { /* 失敗時は次回のポーリングで整合 */ });
     try { localStorage.removeItem(OFFICER_MOSCOW_KEY); } catch { /* no-op */ }
     setConfirmMoscowReset(false);
   }
@@ -344,6 +381,8 @@ export default function AdminPage() {
   const activeAssign   = rotations[activeSlot] ?? {};
   const assignedCount  = attendingList.filter((m) => activeAssign[m.id]).length;
   const moscowSetCount = officerTasks.filter((t) => priorities[t.id]).length;
+  // 担当（RACI）を1人でも決めた「やること」の数
+  const raciTaskCount  = officerTasks.filter((t) => RACI_PEOPLE.some((p) => raci[raciKey(t.id, p.id)])).length;
 
   return (
     <main className="min-h-screen pb-16" style={{ background: "#ffffff" }}>
@@ -431,7 +470,7 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              {/* 進み具合 */}
+              {/* 進み具合（優先度）*/}
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 16, marginBottom: 10 }}>
                 <span style={{ fontSize: 11.5, color: "#a2988a" }}>各行で1つ選ぶ・みんなで共有</span>
                 <span style={{ fontSize: 12, color: "#8b8274" }}>
@@ -439,28 +478,80 @@ export default function AdminPage() {
                   <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
                 </span>
               </div>
+
+              {/* ── 担当・役割（RACIチャート）の説明 ── */}
+              <div style={{ height: 1, background: "#efe8dc", margin: "20px 0 14px" }} />
+              <p style={{ fontSize: 12.5, fontWeight: 700, color: "#33302a", letterSpacing: "0.04em" }}>担当・役割（RACIチャート）</p>
+              <p style={{ marginTop: 6, fontSize: 11.5, color: "#a2988a", lineHeight: 1.7 }}>
+                表の右側で、やることごとに「誰が・どの役割で」進めるかを決めます。名前ごとにプルダウンから選ぶだけ・みんなで共有されます。
+              </p>
+              <div style={{ marginTop: 10 }}>
+                {raciDefs.map((d) => (
+                  <div key={d.key} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "5px 0" }}>
+                    <span style={{ flexShrink: 0, width: 18, textAlign: "center", fontFamily: "Georgia,serif", fontSize: 13, fontWeight: 700, color: d.accent }}>{d.letter}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#33302a" }}>{d.label}</span>
+                      <span style={{ fontSize: 11.5, color: "#9c927f", marginLeft: 8 }}>{d.hint}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p style={{ marginTop: 10, fontSize: 11.5, color: "#8b8274", lineHeight: 1.7 }}>
+                担当できる人：
+                {RACI_PEOPLE.map((p, i) => (
+                  <span key={p.id}>
+                    {i > 0 && "・"}
+                    <b style={{ color: "#5c5646" }}>{p.name}</b>
+                    <span style={{ color: "#b3a794" }}>（{p.role === "leader" ? "リーダー" : "サブ"}）</span>
+                  </span>
+                ))}
+              </p>
+
+              {/* 進み具合（担当）*/}
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 12, marginBottom: 2 }}>
+                <span style={{ fontSize: 11.5, color: "#a2988a" }}>「A 責任者」は1つにつき1人が目安・みんなで共有</span>
+                <span style={{ fontSize: 12, color: "#8b8274" }}>
+                  担当を決めた数 <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#5f5747" }}>{raciTaskCount}</b>
+                  <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
+                </span>
+              </div>
             </div>
 
             {/* 大きな横長の表：スマホは横スクロール／PCは大きく表示 */}
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-              <table style={{ width: "100%", minWidth: 840, borderCollapse: "collapse" }}>
+              <table style={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
                 <colgroup>
-                  <col style={{ width: "13%" }} />
-                  <col style={{ width: "15%" }} />
-                  <col style={{ width: "32%" }} />
-                  <col style={{ width: "10%" }} />
-                  <col style={{ width: "10%" }} />
-                  <col style={{ width: "10%" }} />
-                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "24%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "9%" }} />
                 </colgroup>
                 <thead>
+                  {/* 1段目：セクションの見出し（優先度／担当）*/}
+                  <tr style={{ background: "#faf6ef" }}>
+                    <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #eadfce", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>大分類</th>
+                    <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>中分類</th>
+                    <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>やること（小分類）</th>
+                    <th colSpan={4} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #eee3d2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>優先度（どれか1つ）</th>
+                    <th colSpan={3} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>担当・役割（RACIチャート）</th>
+                  </tr>
+                  {/* 2段目：各列の見出し */}
                   <tr style={{ background: "#fbf8f3" }}>
-                    <th style={{ textAlign: "left", padding: "12px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #eadfce", fontSize: 12, fontWeight: 700, color: "#8b8274" }}>大分類</th>
-                    <th style={{ textAlign: "left", padding: "12px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274" }}>中分類</th>
-                    <th style={{ textAlign: "left", padding: "12px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274" }}>やること（小分類）</th>
-                    {priorityDefs.map((d) => (
-                      <th key={d.key} style={{ textAlign: "center", padding: "12px 4px", borderBottom: "2px solid #e7dfd1", fontSize: 11, fontWeight: 700, color: d.accent, whiteSpace: "nowrap" }}>
+                    {priorityDefs.map((d, di) => (
+                      <th key={d.key} style={{ textAlign: "center", padding: "10px 4px", borderBottom: "2px solid #e7dfd1", borderLeft: di === 0 ? "2px solid #eee3d2" : undefined, fontSize: 11, fontWeight: 700, color: d.accent, whiteSpace: "nowrap" }}>
                         {d.label}
+                      </th>
+                    ))}
+                    {RACI_PEOPLE.map((p, pi) => (
+                      <th key={p.id} style={{ textAlign: "center", padding: "10px 6px", borderBottom: "2px solid #e7dfd1", borderLeft: pi === 0 ? "2px solid #e3d7c2" : "1px solid #f0ebe1", fontSize: 11.5, fontWeight: 700, color: "#5c5646", whiteSpace: "nowrap" }}>
+                        {p.name}
+                        <div style={{ marginTop: 2, fontSize: 9.5, fontWeight: 600, color: "#b3a794", letterSpacing: "0.04em" }}>{p.role === "leader" ? "リーダー" : "サブ"}</div>
                       </th>
                     ))}
                   </tr>
@@ -472,6 +563,8 @@ export default function AdminPage() {
                     const curDef = priorityDefs.find((d) => d.key === cur);
                     const majorEnd = i === officerRows.length - 1 || Boolean(officerRows[i + 1].major);
                     const rowBorder = majorEnd ? "1px solid #e7dfd1" : "1px solid #f4efe6";
+                    // 「A 責任者」が複数ついている行は注意表示（1人が目安）
+                    const aCount = RACI_PEOPLE.filter((p) => raci[raciKey(task.id, p.id)] === "a").length;
                     return (
                       <tr key={task.id} style={{ background: curDef ? curDef.tint : "transparent" }}>
                         {row.major && (
@@ -487,11 +580,14 @@ export default function AdminPage() {
                         )}
                         <td style={{ padding: "12px 12px", borderBottom: rowBorder, verticalAlign: "middle" }}>
                           <span style={{ fontSize: 13, fontWeight: 500, color: "#241f18", lineHeight: 1.5 }}>{task.label}</span>
+                          {aCount >= 2 && (
+                            <div style={{ marginTop: 4, fontSize: 10.5, color: "#b08948", lineHeight: 1.5 }}>※「A 責任者」が複数います。1人にしぼるのがおすすめ</div>
+                          )}
                         </td>
-                        {priorityDefs.map((d) => {
+                        {priorityDefs.map((d, di) => {
                           const on = cur === d.key;
                           return (
-                            <td key={d.key} style={{ textAlign: "center", padding: "9px 4px", borderBottom: rowBorder, verticalAlign: "middle" }}>
+                            <td key={d.key} style={{ textAlign: "center", padding: "9px 4px", borderBottom: rowBorder, borderLeft: di === 0 ? "2px solid #eee3d2" : undefined, verticalAlign: "middle" }}>
                               <button
                                 type="button"
                                 onClick={() => setTaskPriority(task.id, d.key)}
@@ -507,6 +603,32 @@ export default function AdminPage() {
                               >
                                 {on && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
                               </button>
+                            </td>
+                          );
+                        })}
+                        {/* 担当・役割（RACI）：名前ごとにプルダウンで選ぶ・全員で共有 */}
+                        {RACI_PEOPLE.map((p, pi) => {
+                          const role = raci[raciKey(task.id, p.id)];
+                          const def = raciDefs.find((d) => d.key === role);
+                          return (
+                            <td key={p.id} style={{ textAlign: "center", padding: "8px 6px", borderBottom: rowBorder, borderLeft: pi === 0 ? "2px solid #e3d7c2" : "1px solid #f4efe6", verticalAlign: "middle" }}>
+                              <select
+                                value={role ?? ""}
+                                onChange={(e) => setTaskAssignee(task.id, p.id, e.target.value ? (e.target.value as RaciRole) : null)}
+                                aria-label={`「${task.label}」の${p.name}さんの役割`}
+                                style={{
+                                  width: "100%", maxWidth: 98, fontSize: 11.5, padding: "5px 4px", borderRadius: 8, cursor: "pointer",
+                                  border: def ? `1.5px solid ${def.accent}` : "1px solid #dad2c4",
+                                  background: def ? def.tint : "#fff",
+                                  color: def ? def.accent : "#8b8274",
+                                  fontWeight: def ? 700 : 500,
+                                }}
+                              >
+                                <option value="">—</option>
+                                {raciDefs.map((d) => (
+                                  <option key={d.key} value={d.key}>{d.short}</option>
+                                ))}
+                              </select>
                             </td>
                           );
                         })}
@@ -532,6 +654,20 @@ export default function AdminPage() {
               <span style={{ fontSize: 11.5, color: "#b3a794" }}>未設定 {officerTasks.length - moscowSetCount}</span>
             </div>
 
+            {/* 集計（担当・RACI：だれが何件の「担当(R)」か）*/}
+            <div style={{ maxWidth: 660, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "7px 16px", marginTop: 10 }}>
+              <span style={{ fontSize: 11.5, color: "#a2988a" }}>担当（R）の数：</span>
+              {RACI_PEOPLE.map((p) => {
+                const n = officerTasks.filter((t) => raci[raciKey(t.id, p.id)] === "r").length;
+                return (
+                  <span key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#7d7568" }}>
+                    {p.name}
+                    <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#a9823f" }}>{n}</b>
+                  </span>
+                );
+              })}
+            </div>
+
             {/* リセット */}
             <div style={{ marginTop: 20 }}>
               {!confirmMoscowReset ? (
@@ -540,11 +676,11 @@ export default function AdminPage() {
                   onClick={() => setConfirmMoscowReset(true)}
                   style={{ fontSize: 11.5, color: "#b0a794", background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}
                 >
-                  選択をすべてリセット
+                  入力をすべてリセット（優先度・担当）
                 </button>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <span style={{ fontSize: 12, color: "#8b8274" }}>全員ぶんの入力をすべて消しますか？（元に戻せません）</span>
+                  <span style={{ fontSize: 12, color: "#8b8274" }}>全員ぶんの優先度と担当（RACI）をすべて消しますか？（元に戻せません）</span>
                   <button type="button" onClick={() => setConfirmMoscowReset(false)} style={{ fontSize: 12, padding: "6px 13px", borderRadius: 9, border: "1px solid #e3dccf", background: "#fff", color: "#8b8274", cursor: "pointer" }}>
                     やめる
                   </button>
@@ -557,7 +693,7 @@ export default function AdminPage() {
 
             {/* フッター注記 */}
             <p style={{ maxWidth: 660, marginTop: 18, fontSize: 11, lineHeight: 1.9, color: "#b3a794" }}>
-              ※ 「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方です（MoSCoW法を参考）。分類は内容から推し量った暫定です。サブリーダーMTGで話しながら見直していきましょう。
+              ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「誰が・どの役割で」担当するかを決める表（RACIチャート）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
             </p>
           </div>
         </div>
