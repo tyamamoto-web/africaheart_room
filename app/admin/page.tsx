@@ -10,7 +10,7 @@ import { getRoomNumbers, saveRoomNumbers, RoomNumbersSetupError } from "@/lib/ro
 import { getOfficerPlan, setOfficerPriority, clearOfficerPlan, seedOfficerPlan } from "@/lib/officerPlan";
 import {
   getOfficerRaci, setOfficerRaci, clearOfficerRaci, raciKey,
-  RACI_PEOPLE, type OfficerRaci, type RaciRole,
+  RACI_PEOPLE, type OfficerRaci, type RaciRole, type RaciPerson,
 } from "@/lib/officerRaci";
 
 const roomCfg = {
@@ -80,6 +80,13 @@ const raciDefs: { key: RaciRole; short: string; label: string; hint: string; exa
     accent: "#b1a68f", tint: "rgba(177,166,143,0.12)",
   },
 ];
+
+// 表の列見出しに出す肩書き（メンバー列は個人ではなく役員以外のメンバー全体を指す）。
+function raciPersonSubLabel(role: RaciPerson["role"]): string {
+  if (role === "leader") return "リーダー";
+  if (role === "subleader") return "サブ";
+  return "役員以外";
+}
 
 // リストのやることを 大分類 → 中分類 → 小分類（やること）に体系化。
 // 元リスト（先方提供）の全項目を漏れなく収録。重複しやすいものは同じグループにまとめている。
@@ -549,7 +556,7 @@ export default function AdminPage() {
                   <span key={p.id}>
                     {i > 0 && "・"}
                     <b style={{ color: "#5c5646" }}>{p.name}</b>
-                    <span style={{ color: "#b3a794" }}>（{p.role === "leader" ? "リーダー" : "サブ"}）</span>
+                    <span style={{ color: "#b3a794" }}>（{raciPersonSubLabel(p.role)}）</span>
                   </span>
                 ))}
               </p>
@@ -573,18 +580,19 @@ export default function AdminPage() {
             {/* 大きな横長の表：スマホは横スクロール／PCは大きく表示 */}
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               {/* 折り返しをやめたぶん、全列が潰れない幅を確保（狭い画面では従来どおり横スクロール） */}
-              <table style={{ width: "100%", minWidth: 1340, borderCollapse: "collapse" }}>
+              <table style={{ width: "100%", minWidth: 1440, borderCollapse: "collapse" }}>
                 <colgroup>
-                  <col style={{ width: "16%" }} />
-                  <col style={{ width: "13%" }} />
-                  <col style={{ width: "23.5%" }} />
-                  <col style={{ width: "6.4%" }} />
-                  <col style={{ width: "6.4%" }} />
-                  <col style={{ width: "6.4%" }} />
-                  <col style={{ width: "6.4%" }} />
-                  <col style={{ width: "7.3%" }} />
-                  <col style={{ width: "7.3%" }} />
-                  <col style={{ width: "7.3%" }} />
+                  <col style={{ width: "14.9%" }} />
+                  <col style={{ width: "12.2%" }} />
+                  <col style={{ width: "21.9%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "6.75%" }} />
+                  <col style={{ width: "6.75%" }} />
+                  <col style={{ width: "6.75%" }} />
+                  <col style={{ width: "6.75%" }} />
                 </colgroup>
                 <thead>
                   {/* 1段目：セクションの見出し（優先度／担当）*/}
@@ -593,7 +601,7 @@ export default function AdminPage() {
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>中分類</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>やること（小分類）</th>
                     <th colSpan={4} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #eee3d2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>優先度（どれか1つ）</th>
-                    <th colSpan={3} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>役割（だれが・どう関わる）</th>
+                    <th colSpan={RACI_PEOPLE.length} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>役割（だれが・どう関わる）</th>
                   </tr>
                   {/* 2段目：各列の見出し */}
                   <tr style={{ background: "#fff" }}>
@@ -605,7 +613,7 @@ export default function AdminPage() {
                     {RACI_PEOPLE.map((p, pi) => (
                       <th key={p.id} style={{ textAlign: "center", padding: "10px 6px", borderBottom: "2px solid #e7dfd1", borderLeft: pi === 0 ? "2px solid #e3d7c2" : "1px solid #f0ebe1", fontSize: 11.5, fontWeight: 700, color: "#5c5646", whiteSpace: "nowrap" }}>
                         {p.name}
-                        <div style={{ marginTop: 2, fontSize: 9.5, fontWeight: 600, color: "#b3a794", letterSpacing: "0.04em" }}>{p.role === "leader" ? "リーダー" : "サブ"}</div>
+                        <div style={{ marginTop: 2, fontSize: 9.5, fontWeight: 600, color: "#b3a794", letterSpacing: "0.04em" }}>{raciPersonSubLabel(p.role)}</div>
                       </th>
                     ))}
                   </tr>

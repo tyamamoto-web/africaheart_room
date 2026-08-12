@@ -25,12 +25,14 @@ const SUPA_KEY =
 const ENDPOINT = `${SUPA_URL}/rest/v1/homework_result`;
 const ROW_ID = 5; // 宿題=1 / 部屋番号=2 / リアクション=3 / MoSCoW=4 / RACI=5
 
-// 担当できる人（表の列＝この3人）。id は保存キーに使う不変値、name/role は表示用。
-export type RaciPerson = { id: string; name: string; role: "leader" | "subleader" };
+// 役割をつける相手（表の列）。id は保存キーに使う不変値、name/role は表示用。
+// 「メンバー」は個人ではなく役員以外のメンバー全体を指す1列（例：決めた結果をお知らせする相手）。
+export type RaciPerson = { id: string; name: string; role: "leader" | "subleader" | "member" };
 export const RACI_PEOPLE: RaciPerson[] = [
   { id: "yoshi",  name: "よしのすけ", role: "leader"    },
   { id: "kuru",   name: "くる",       role: "subleader" },
   { id: "shacho", name: "しゃちょー", role: "subleader" },
+  { id: "member", name: "メンバー",   role: "member"    },
 ];
 
 export type RaciRole = "r" | "a" | "c" | "i";
