@@ -45,16 +45,20 @@ const priorityDefs: { key: Priority; label: string; hint: string; accent: string
 
 // ── 担当（だれが・どう関わるか）──────────────────────────────
 // 役割分担の考え方（RACI法）を、聞き馴染みのない語や記号を出さず「平易な言葉」に翻訳して表示する。
-// 意味・ルールはそのまま：R=やる人 / A=責任者 / C=相談役 / I=共有。
+// 意味・ルールはそのまま：R=やる人 / A=責任者 / C=相談役 / I=お知らせ（Iの表示名は共有機能と紛らわしいため「お知らせ」。値は i）。
 //   ・責任者(A) は1つのやることにつき1人（最後に決めて責任を持つ）。
 //   ・やる人(R) は実際に手を動かす人（何人でもよい）。責任者が自分でやってもよい。
-//   ・相談役(C) は進める前に意見を聞く相手、共有(I) は終わってから知らせる相手。
+//   ・相談役(C) は決める前に意見を聞く相手、お知らせ(I) は決めた後に知らせるだけの相手。
 // 「RACI」という言葉はフッターの注記で一度だけ触れ、表・凡例・プルダウンには出さない。
+// 齟齬を避けるための工夫：
+//  ・R↔A は「作業する／決める」、C↔I は「決める前に意見をもらう／決めた後に知らせるだけ」で対比。
+//  ・各役割にカラオケ予約の具体例を添える。
+//  ・I の名称は、共有機能の「みんなで共有」と紛らわしいため「お知らせ」に変更（値は i のまま）。
 const raciDefs: { key: RaciRole; short: string; label: string; hint: string; accent: string; tint: string }[] = [
-  { key: "r", short: "やる人", label: "やる人", hint: "実際に手を動かして進める人（何人でもOK）",            accent: "#a9823f", tint: "rgba(169,130,63,0.10)" },
-  { key: "a", short: "責任者", label: "責任者", hint: "最後に決めて責任を持つ人。自分で動いてもOK（1つにつき1人）", accent: "#1c1a17", tint: "rgba(28,26,23,0.06)"  },
-  { key: "c", short: "相談役", label: "相談役", hint: "進める前に意見を聞く相手",                          accent: "#8a7f6a", tint: "rgba(138,127,106,0.10)"},
-  { key: "i", short: "共有",   label: "共有",   hint: "終わったら結果を知らせておく相手",                    accent: "#b1a68f", tint: "rgba(177,166,143,0.12)"},
+  { key: "r", short: "やる人",   label: "やる人",   hint: "実際に手を動かして作業する人。何人いてもOK。　例：お店に予約の電話をする",                       accent: "#a9823f", tint: "rgba(169,130,63,0.10)" },
+  { key: "a", short: "責任者",   label: "責任者",   hint: "最終的に決めて、結果に責任を持つ人。1つのやることにつき必ず1人だけ（自分で作業してもOK）。　例：どのお店にするかを決める", accent: "#1c1a17", tint: "rgba(28,26,23,0.06)"  },
+  { key: "c", short: "相談役",   label: "相談役",   hint: "決める前に意見を聞いておく相手。口は出すが、担当ではない。　例：日程やお店の希望を先に聞く",           accent: "#8a7f6a", tint: "rgba(138,127,106,0.10)"},
+  { key: "i", short: "お知らせ", label: "お知らせ", hint: "決めた後・終わった後に結果を知らせておく相手。意見は求めない（知っておくだけ）。　例：予約が取れたことを伝える", accent: "#b1a68f", tint: "rgba(177,166,143,0.12)"},
 ];
 
 // リストのやることを 大分類 → 中分類 → 小分類（やること）に体系化。
@@ -507,11 +511,11 @@ export default function AdminPage() {
               </p>
               <div style={{ marginTop: 10 }}>
                 {raciDefs.map((d) => (
-                  <div key={d.key} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "5px 0" }}>
-                    <span style={{ flexShrink: 0, width: 11, height: 11, borderRadius: "50%", background: d.accent, transform: "translateY(1px)" }} />
+                  <div key={d.key} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "7px 0" }}>
+                    <span style={{ flexShrink: 0, width: 11, height: 11, borderRadius: "50%", background: d.accent, transform: "translateY(4px)" }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#33302a" }}>{d.label}</span>
-                      <span style={{ fontSize: 11.5, color: "#9c927f", marginLeft: 8 }}>{d.hint}</span>
+                      <div style={{ marginTop: 3, fontSize: 11.5, color: "#9c927f", lineHeight: 1.65 }}>{d.hint}</div>
                     </div>
                   </div>
                 ))}
@@ -529,7 +533,7 @@ export default function AdminPage() {
 
               {/* 進み具合（担当）*/}
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 12, marginBottom: 2 }}>
-                <span style={{ fontSize: 11.5, color: "#a2988a" }}>「責任者」は1つにつき1人が目安・みんなで共有</span>
+                <span style={{ fontSize: 11.5, color: "#a2988a" }}>「責任者」は1つにつき1人・「やる人」は1人以上が基本・みんなで共有</span>
                 <span style={{ fontSize: 12, color: "#8b8274" }}>
                   担当を決めた数 <b style={{ fontFamily: "Georgia,serif", fontWeight: 400, color: "#5f5747" }}>{raciTaskCount}</b>
                   <span style={{ color: "#bcb09c" }}> / {officerTasks.length}</span>
@@ -718,7 +722,7 @@ export default function AdminPage() {
 
             {/* フッター注記 */}
             <p style={{ maxWidth: 660, marginTop: 18, fontSize: 11, lineHeight: 1.9, color: "#b3a794" }}>
-              ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「やる人／責任者／相談役／共有」の4つで担当を分ける表（RACIという役割分担の考え方を参考）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
+              ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「やる人／責任者／相談役／お知らせ」の4つで担当を分ける表（RACIという役割分担の考え方を参考）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
             </p>
           </div>
         </div>
