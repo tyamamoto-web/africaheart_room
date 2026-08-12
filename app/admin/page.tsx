@@ -587,7 +587,7 @@ export default function AdminPage() {
                 </colgroup>
                 <thead>
                   {/* 1段目：セクションの見出し（優先度／担当）*/}
-                  <tr style={{ background: "#faf6ef" }}>
+                  <tr style={{ background: "#fff" }}>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #eadfce", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>大分類</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>中分類</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>やること（小分類）</th>
@@ -595,7 +595,7 @@ export default function AdminPage() {
                     <th colSpan={3} style={{ textAlign: "center", padding: "8px 6px", borderBottom: "1px solid #eadfce", borderLeft: "2px solid #e3d7c2", fontSize: 11, fontWeight: 700, color: "#8b8274", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>役割（だれが・どう関わる）</th>
                   </tr>
                   {/* 2段目：各列の見出し */}
-                  <tr style={{ background: "#fbf8f3" }}>
+                  <tr style={{ background: "#fff" }}>
                     {priorityDefs.map((d, di) => (
                       <th key={d.key} style={{ textAlign: "center", padding: "10px 4px", borderBottom: "2px solid #e7dfd1", borderLeft: di === 0 ? "2px solid #eee3d2" : undefined, fontSize: 11, fontWeight: 700, color: d.accent, whiteSpace: "nowrap" }}>
                         {d.label}
@@ -613,21 +613,21 @@ export default function AdminPage() {
                   {officerRows.map((row, i) => {
                     const task = row.task;
                     const cur = priorities[task.id];
-                    const curDef = priorityDefs.find((d) => d.key === cur);
                     const majorEnd = i === officerRows.length - 1 || Boolean(officerRows[i + 1].major);
                     const rowBorder = majorEnd ? "1px solid #e7dfd1" : "1px solid #f4efe6";
                     // 「A 責任者」が複数ついている行は注意表示（1人が目安）
                     const aCount = RACI_PEOPLE.filter((p) => raci[raciKey(task.id, p.id)] === "a").length;
+                    // 表の背景は全行とも白で統一（優先度による色分けはしない）。区切りは罫線のみ。
                     return (
-                      <tr key={task.id} style={{ background: curDef ? curDef.tint : "transparent" }}>
+                      <tr key={task.id} style={{ background: "#fff" }}>
                         {row.major && (
-                          <td rowSpan={row.majorSpan} style={{ background: "#faf6ef", borderRight: "1px solid #eadfce", borderBottom: "1px solid #e7dfd1", verticalAlign: "middle", padding: "14px 12px" }}>
+                          <td rowSpan={row.majorSpan} style={{ background: "#fff", borderRight: "1px solid #eadfce", borderBottom: "1px solid #e7dfd1", verticalAlign: "middle", padding: "14px 12px" }}>
                             <div style={{ fontFamily: "Georgia,serif", fontSize: 12, color: "#c3b48f", letterSpacing: "0.06em", marginBottom: 5 }}>{row.majorNo}</div>
                             <div style={{ fontSize: 13.5, fontWeight: 700, color: "#2e2a22", lineHeight: 1.45 }}>{row.major}</div>
                           </td>
                         )}
                         {row.mid && (
-                          <td rowSpan={row.midSpan} style={{ background: "#fdfbf6", borderRight: "1px solid #f0ebe1", borderBottom: "1px solid #efe6d6", verticalAlign: "middle", padding: "12px 12px" }}>
+                          <td rowSpan={row.midSpan} style={{ background: "#fff", borderRight: "1px solid #f0ebe1", borderBottom: "1px solid #efe6d6", verticalAlign: "middle", padding: "12px 12px" }}>
                             <span style={{ fontSize: 12.5, fontWeight: 600, color: "#5c5646", lineHeight: 1.5 }}>{row.mid}</span>
                           </td>
                         )}
