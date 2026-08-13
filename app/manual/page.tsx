@@ -3,14 +3,14 @@
 import Link from "next/link";
 
 /* ============================================================
-   今回のみ参加メンバー向けページ（現在は空白）
+   イベント運営マニュアル（現在は空白）
    ------------------------------------------------------------
    トップの「会員メニュー」の下から入るページ。
    中身はこれから追加するため、いまは枠（戻る導線とタイトル）だけを置いている。
    内容を足すときは下の「ここに内容を追加する」の中に書き足す。
    ============================================================ */
 
-export default function GuestPage() {
+export default function ManualPage() {
   return (
     <main className="min-h-screen bg-white pb-16">
       {/* 上部バー（トップへ戻る） */}
@@ -26,7 +26,7 @@ export default function GuestPage() {
           ← 戻る
         </Link>
         <h1 className="text-base font-black" style={{ color: "#2c2c2c" }}>
-          今回のみ参加のメンバー
+          イベント運営マニュアル
         </h1>
       </div>
 
