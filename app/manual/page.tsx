@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { eventTaskPlan, eventTaskCount, type EventTask } from "@/lib/eventTasks";
+import { eventTaskPlan, eventTaskCount, lineMessageOutline, type EventTask } from "@/lib/eventTasks";
 import { nextEvent } from "@/lib/data";
 import { RACI_PEOPLE, raciKey, type RaciRole } from "@/lib/officerRaci";
 import { raciDefs, raciPersonSubLabel } from "@/lib/raciDefs";
@@ -533,6 +533,42 @@ export default function ManualPage() {
           告知に無いことは載せていないため、決まっていない事柄は運営で決めて追記してください。
           金額・時刻は告知時点のもので、変わることがあります。役割の考え方はRACIにならっています。
         </p>
+
+        {/* 2日前にLINEへ送る文面の下書き（表の「2日前」のやることと対になる） */}
+        <div
+          className="mt-6"
+          style={{ border: `1px solid ${G.line}`, borderRadius: 12, background: "#fcfcfc", padding: "16px 18px" }}
+        >
+          <p className="text-sm font-black" style={{ color: G.text }}>
+            2日前にLINEへ送る文面の下書き
+          </p>
+          <p className="text-[11px] leading-relaxed mt-1.5" style={{ color: G.faint }}>
+            開催2日前（8月20日）にグループチャットへ送る内容です。送る前に、決まっていない箇所
+            （車の一覧、停める場所、当日の連絡先、取りやめの締切と負担額）を埋めてください。
+          </p>
+          <div className="mt-3.5 flex flex-col gap-3">
+            {lineMessageOutline.map((sec, i) => (
+              <div
+                key={sec.heading}
+                style={{ paddingTop: i === 0 ? 0 : 12, borderTop: i === 0 ? undefined : `1px solid ${G.line}` }}
+              >
+                <p className="text-[12.5px] font-bold" style={{ color: G.text }}>
+                  {sec.heading}
+                </p>
+                <ul className="mt-1.5 flex flex-col gap-1">
+                  {sec.points.map((pt, pi) => (
+                    <li key={pi} className="flex gap-2">
+                      <span style={{ color: G.faint, flexShrink: 0 }}>・</span>
+                      <span className="text-[12px] leading-relaxed" style={{ color: G.sub }}>
+                        {pt}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </main>
   );
