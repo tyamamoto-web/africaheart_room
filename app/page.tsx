@@ -24,8 +24,8 @@ export default function Home() {
       <div className={night ? "relative z-10" : undefined}>
       <Header />
 
-      {/* ロゴバナー下：動作確認ページへの導線 */}
-      <div className="px-4 pt-4 max-w-lg mx-auto">
+      {/* ロゴバナー下：会員メニューと、今回のみ参加のメンバー向けページへの導線 */}
+      <div className="px-4 pt-4 max-w-lg mx-auto flex flex-col gap-2.5">
         <Link
           href="/test"
           className="flex items-center gap-3 px-4 py-3 rounded-2xl text-white active:scale-[0.99] transition-transform"
@@ -45,6 +45,31 @@ export default function Home() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black leading-tight">会員メニュー</p>
             <p className="text-[11px] opacity-85 leading-tight">デュエット曲・宿題ルーレット・プロフィールはこちら</p>
+          </div>
+          <span className="text-lg" style={night ? { color: "#ffd884" } : { opacity: 0.9 }}>
+            ›
+          </span>
+        </Link>
+
+        {/* 今回のみ参加のメンバー向け（中身はこれから追加） */}
+        <Link
+          href="/guest"
+          className="flex items-center gap-3 px-4 py-3 rounded-2xl text-white active:scale-[0.99] transition-transform"
+          style={
+            night
+              ? {
+                  background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(245,205,110,0.34)",
+                  boxShadow: "0 6px 18px rgba(3,8,22,0.42)",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                }
+              : { background: "linear-gradient(135deg,#A8175F,#C81E77)", boxShadow: "0 4px 14px rgba(168,23,95,0.34)" }
+          }
+        >
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black leading-tight">今回のみ参加のメンバー</p>
+            <p className="text-[11px] opacity-85 leading-tight">今回だけ参加される方はこちら</p>
           </div>
           <span className="text-lg" style={night ? { color: "#ffd884" } : { opacity: 0.9 }}>
             ›
