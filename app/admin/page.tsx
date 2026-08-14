@@ -327,7 +327,6 @@ function HeadInput({
     <input
       type="text"
       value={value}
-      placeholder="列の名前"
       aria-label={`${index + 1}つめの列の名前`}
       onChange={(e) => onChange(e.target.value)}
       onFocus={() => {
