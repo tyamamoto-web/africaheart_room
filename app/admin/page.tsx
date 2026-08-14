@@ -212,40 +212,105 @@ const OFFICER_UNLOCK_KEY = "africaheart-officer-unlocked";
      見出しも全員で共有されるので、1人が直せば他の人の画面にも同じ見出しが出る。
      右のRACIの4人は、表の型を保つため固定。
 
+   見た目の考え方：白い紙に活字を組んだ誌面として扱う。
+     色は足さず、わずかに暖かい白の階調と、強さの決まった3本の罫だけで作る。
+       いちばん強い罫：見出しの下の2px（表の背骨）
+       次に強い罫　　：3行ごとの区切り（12行が4つのまとまりに見える）
+       いちばん弱い罫：1行ごとの細い罫
+     書く5列のあいだに縦罫は引かず、余白と記入欄の下線で分ける。
+     赤紫（アプリの色）はこの表では使わない。60個ある記入欄のどこにでも出るため、
+     いちばん目立つ色が「たまたま今さわっている欄」に付いてしまうので。
+
    保存は lib/officerTable.ts（homework_result の id=6 を間借り）。
    文字は打ち終わってから少し待って自動保存。役割のプルダウンは押した時点で保存。
    ほかの人の変更は約6秒ごとに入ってくる。
    ------------------------------------------------------------------ */
 
-// 薄いグレーの配色（表全体で同じトーンを使う）
+// 表の色。紙（地）・罫（線）・インク（文字）の3組に分けてある。
+// 灰色はどれも赤よりも青をわずかに落とした、ごく弱い暖色寄り（無彩色だと表計算ソフトの顔になる）。
 const T = {
-  line: "#e4e4e4",
-  phase: "#f6f6f6",
-  section: "#fafafa",
-  body: "#ffffff",
-  text: "#333333",
-  sub: "#767676",
-  faint: "#a6a6a6",
-  warn: "#b06a2c",
+  // 紙。上から順に、白 → だんだん沈む
+  paper: "#ffffff", // 表の地。記入欄の地
+  rowHov: "#faf9f6", // マウスを乗せた行
+  rowOn: "#f8f6f1", // いま自分が書いている行
+  cellHov: "#f4f2ed", // 記入欄・ボタン・×にマウスを乗せたとき
+  no: "#f2f0eb", // No列の地。左端をつらぬく柱
+  noHov: "#edeae4", // No列（行にマウスを乗せたとき）
+  noOn: "#e7e4dc", // No列（いま書いている行）
+  // 罫。弱い順に3段。いちばん強いのは見出しの下の2px（ink）
+  hair: "#e6e3dc", // 1行ごとの細い罫・人と人の間・No列の右
+  rule: "#cbc7be", // 3行ごとの区切り罫・表の外枠・ボタンの枠
+  block: "#b8b3a8", // 書く5列と役割の4列を分ける仕切り
+  guide: "#dedbd3", // 記入欄の下に常時引く線（ここに書けるという合図）
+  // インク
+  ink: "#33302a", // 本文・人名・見出しの下の2px罫・責任者の地
+  sub: "#57544d", // Noの数字
+  cap: "#6b6860", // 肩書き・状態表示・×・書いている欄の枠
+  faint: "#8a867d", // 押せないときの文字
+  warn: "#7a5a2e", // 責任者が1人に決まっていない印
 };
 
+/* マウスを乗せたとき・書いているときの見た目はCSSで書く。
+   このファイルはインラインstyleが主体で :hover が書けないため、
+   この表の中（.rtbl）だけに効く短いCSSを1つ置く。色は T から差し込む。
+   ※ 行の地色はここが受け持つので、tdのインラインstyleに background を書かないこと
+     （インラインが必ず勝ってしまう）。No列だけ className="no" を付ける。 */
+const TABLE_CSS = `
+.rtbl tbody td { background:${T.paper}; border-bottom:1px solid ${T.hair}; }
+.rtbl tbody td.no { background:${T.no}; }
+.rtbl tbody tr:hover td { background:${T.rowHov}; }
+.rtbl tbody tr:hover td.no { background:${T.noHov}; }
+.rtbl tbody tr.on td { background:${T.rowOn}; }
+.rtbl tbody tr.on td.no { background:${T.noOn}; box-shadow: inset 3px 0 0 ${T.ink}; }
+.rtbl tbody tr.cut td { border-bottom-color:${T.rule}; }
+.rtbl tbody tr:last-child td { border-bottom-color:transparent; }
+.rtbl textarea, .rtbl thead input {
+  border:1px solid transparent; border-radius:3px; background:transparent;
+  transition: background .12s, border-color .12s, box-shadow .12s;
+}
+.rtbl textarea { border-bottom-color:${T.guide}; }
+.rtbl textarea:hover { background:${T.cellHov}; border-bottom-color:${T.block}; }
+.rtbl thead input:hover { background:${T.cellHov}; }
+.rtbl textarea:focus, .rtbl thead input:focus {
+  background:${T.paper}; border-color:${T.cap}; box-shadow:0 0 0 3px rgba(51,48,42,0.10);
+}
+.rtbl select:hover { border-color:${T.cap} !important; }
+.rtbl select:focus { border-color:${T.cap} !important; box-shadow:0 0 0 3px rgba(51,48,42,0.10); }
+.rtbl .addbtn:hover:not(:disabled) { background:${T.cellHov}; border-color:${T.block}; }
+.rtbl .delbtn:hover { background:${T.cellHov}; color:${T.ink}; }
+`;
+
+/* 役割4種の見た目。言葉と意味は lib/raciDefs.ts のまま使い、色だけこの表で上書きする
+   （raciDefs は役員専用タブと共用なので触らない）。
+   見分けは4つの性質を重ねてある：面の有無 / 面の明るさ / 灰色の温度 / 文字の太さ。
+   白黒に落としても 濃い面 → 中間の面 → 白抜き＋濃い枠 → 薄い面 の順に軽くなり、
+   「決める → 手を動かす → 意見を言う → 知らせるだけ」の重さの順と一致する。 */
+const ROLE_UI: Record<RaciRole, { bg: string; fg: string; bd: string; weight: number }> = {
+  a: { bg: "#33302a", fg: "#ffffff", bd: "#33302a", weight: 700 }, // 責任者：濃く塗る。1行に1人だけなので目印になる
+  r: { bg: "#dbd6ca", fg: "#322e26", bd: "#8f8670", weight: 700 }, // 担当者：暖かい薄灰で塗る
+  c: { bg: "#ffffff", fg: "#3b3833", bd: "#6f6b63", weight: 600 }, // 相談役：白く抜いて、枠をいちばん濃くする
+  i: { bg: "#e8ebef", fg: "#363c43", bd: "#80868d", weight: 500 }, // お知らせ：冷たい薄灰で塗る
+};
+const ROLE_NONE = { bg: "transparent", fg: "#66635c", bd: "#8f8a81", weight: 500 };
+
+// プルダウンの三角を自分で描く（環境ごとの見た目の差をなくす）。
+function chevron(color: string): string {
+  const c = encodeURIComponent(color);
+  return `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='5' viewBox='0 0 7 5'><path d='M0.7 0.9 L3.5 3.8 L6.3 0.9' fill='none' stroke='${c}' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/></svg>")`;
+}
+
 const tblTh: React.CSSProperties = {
-  color: T.sub,
+  background: T.paper,
+  color: T.cap,
   fontSize: 11,
   fontWeight: 700,
   letterSpacing: "0.04em",
   textAlign: "left",
-  padding: "8px 10px",
-  borderBottom: `1px solid ${T.line}`,
-  borderRight: `1px solid ${T.line}`,
+  padding: "10px 10px 8px",
+  verticalAlign: "bottom", // 見出しの文字を、下の太い罫のすぐ上にそろえる
   whiteSpace: "nowrap",
 };
-const tblTd: React.CSSProperties = {
-  padding: "4px 4px",
-  borderBottom: `1px solid ${T.line}`,
-  borderRight: `1px solid ${T.line}`,
-  verticalAlign: "top",
-};
+const tblTd: React.CSSProperties = { padding: "3px 5px", verticalAlign: "top" };
 
 /** 自由に書く欄。書いた分だけ縦に伸びるので、行の中でスクロールバーが出ない。 */
 function CellText({
@@ -253,24 +318,21 @@ function CellText({
   onChange,
   onFocus,
   onBlur,
-  placeholder,
   label,
 }: {
   value: string;
   onChange: (v: string) => void;
   onFocus: () => void;
   onBlur: () => void;
-  placeholder?: string;
   label: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.max(34, el.scrollHeight)}px`;
+    el.style.height = `${Math.max(32, el.scrollHeight)}px`;
   }, [value]);
 
   return (
@@ -279,28 +341,18 @@ function CellText({
       rows={1}
       value={value}
       aria-label={label}
-      placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      onFocus={() => {
-        setFocused(true);
-        onFocus();
-      }}
-      onBlur={() => {
-        setFocused(false);
-        onBlur();
-      }}
+      onFocus={onFocus}
+      onBlur={onBlur}
       style={{
         width: "100%",
         display: "block",
-        borderRadius: 6,
-        border: `1px solid ${focused ? "#A8175F" : "transparent"}`,
-        background: focused ? "#fff" : "transparent",
         resize: "none",
         overflow: "hidden",
-        fontSize: 11.5,
-        lineHeight: 1.55,
-        color: T.text,
-        padding: "6px 6px",
+        fontSize: 12,
+        lineHeight: 1.6,
+        color: T.ink,
+        padding: "6px 8px",
         outline: "none",
         fontFamily: "inherit",
       }}
@@ -322,31 +374,21 @@ function HeadInput({
   onBlur: () => void;
   index: number;
 }) {
-  const [focused, setFocused] = useState(false);
   return (
     <input
       type="text"
       value={value}
       aria-label={`${index + 1}つめの列の名前`}
       onChange={(e) => onChange(e.target.value)}
-      onFocus={() => {
-        setFocused(true);
-        onFocus();
-      }}
-      onBlur={() => {
-        setFocused(false);
-        onBlur();
-      }}
+      onFocus={onFocus}
+      onBlur={onBlur}
       style={{
         width: "100%",
-        borderRadius: 6,
-        border: `1px solid ${focused ? "#A8175F" : "transparent"}`,
-        background: focused ? "#fff" : "transparent",
-        color: T.sub,
+        color: T.ink,
         fontSize: 11,
         fontWeight: 700,
         letterSpacing: "0.04em",
-        padding: "3px 4px",
+        padding: "4px 6px",
         outline: "none",
         fontFamily: "inherit",
       }}
@@ -360,12 +402,15 @@ function OfficerRoleTable() {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [focusRow, setFocusRow] = useState<string | null>(null); // いま自分が書いている行
+  const [more, setMore] = useState(false); // 右にまだ表が続くか
 
   const dataRef = useRef<OfficerTableData>({ columns: emptyColumns(), rows: [] }); // 保存はいつもこの手元の値を使う
   const pending = useRef(0); // 保存中の件数。0より大きいあいだは取り込みを止める
   const editing = useRef<string | null>(null); // 入力中の行（見出しは "cols"）は上書きしない
   const dirty = useRef<Set<string>>(new Set()); // まだ保存していない行
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const COLS_KEY = "cols"; // 見出しをタイマー・入力中の目印で扱うときのキー
 
@@ -421,9 +466,15 @@ function OfficerRoleTable() {
     );
   }
 
+  function startEdit(key: string) {
+    editing.current = key;
+    setFocusRow(key === COLS_KEY ? null : key);
+  }
+
   // 欄から離れたら、待たずに保存する
   function flush(key: string) {
     editing.current = null;
+    setFocusRow(null);
     if (!dirty.current.has(key)) return;
     clearTimeout(timers.current[key]);
     if (key === COLS_KEY) {
@@ -506,203 +557,335 @@ function OfficerRoleTable() {
     };
   }, []);
 
+  // 右にまだ表が続いているかを見張る（続いているときだけ右端をぼかす）
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const check = () => setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      el.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, [loaded, rows.length]);
+
   return (
     // 左5列＋RACI4人＋Noで横に長いので、広い画面では収まるところまで枠を広げる。
-    <div className="px-4 pt-3 pb-8 mx-auto" style={{ maxWidth: 1240 }}>
-      <div className="flex items-center justify-between gap-3 mb-2">
+    <div className="rtbl px-4 pt-3 pb-8 mx-auto" style={{ maxWidth: 1240 }}>
+      <style>{TABLE_CSS}</style>
+
+      <div className="flex items-center justify-between gap-3" style={{ marginBottom: 10 }}>
         <button
           onClick={addRow}
           disabled={!loaded}
-          className="text-xs font-bold px-3 py-1.5 rounded-lg"
+          className="addbtn"
           style={{
-            border: `1px solid ${T.line}`,
-            background: "#fff",
-            color: loaded ? T.text : T.faint,
+            background: T.paper,
+            border: `1px solid ${loaded ? T.rule : T.hair}`,
+            borderRadius: 3,
+            padding: "7px 16px",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            color: loaded ? T.ink : T.faint,
             cursor: loaded ? "pointer" : "default",
           }}
         >
           行を追加
         </button>
-        <span style={{ fontSize: 11, color: err ? T.warn : T.faint }}>
-          {err ? err : !loaded ? "読み込んでいます" : saving ? "保存しています" : "みんなで共有中"}
-        </span>
+        {/* ふだんは何も出さない。保存に失敗したときだけ、その場で知らせる。 */}
+        {err && <span style={{ fontSize: 11, letterSpacing: "0.02em", color: T.warn }}>{err}</span>}
       </div>
 
-      <div
-        style={{
-          border: `1px solid ${T.line}`,
-          borderRadius: 12,
-          overflowX: "auto",
-          overflowY: "hidden",
-          background: T.body,
-        }}
-      >
-        <table style={{ minWidth: 1173, width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-          <colgroup>
-            <col style={{ width: 34 }} />
-            {columns.map((_, i) => (
-              <col key={i} style={{ width: 165 }} />
-            ))}
-            {RACI_PEOPLE.map((p) => (
-              <col key={p.id} style={{ width: 70 }} />
-            ))}
-            <col style={{ width: 34 }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th style={{ ...tblTh, textAlign: "center", padding: "8px 4px" }} rowSpan={2}>No</th>
-              {columns.map((label, i) => (
-                <th key={i} style={{ ...tblTh, padding: "5px 6px" }} rowSpan={2}>
-                  <HeadInput
-                    value={label}
-                    index={i}
-                    onChange={(v) => patchColumn(i, v)}
-                    onFocus={() => (editing.current = COLS_KEY)}
-                    onBlur={() => flush(COLS_KEY)}
-                  />
-                </th>
+      <div style={{ position: "relative" }}>
+        <div
+          ref={scrollRef}
+          style={{
+            border: `1px solid ${T.rule}`,
+            borderRadius: 4,
+            overflowX: "auto",
+            overflowY: "hidden",
+            background: T.paper,
+          }}
+        >
+          <table
+            style={{
+              minWidth: 1199,
+              width: "100%",
+              borderCollapse: "separate", // No列を左に貼り付けても罫線が消えないように
+              borderSpacing: 0,
+              tableLayout: "fixed",
+            }}
+          >
+            <colgroup>
+              <col style={{ width: 36 }} />
+              {columns.map((_, i) => (
+                <col key={i} style={{ width: 159 }} />
               ))}
-              <th
-                style={{ ...tblTh, textAlign: "center", borderRight: "none", borderLeft: "2px solid #d8d8d8" }}
-                colSpan={RACI_PEOPLE.length}
-              >
-                役割（だれが・どう関わる）
-              </th>
-              <th style={{ ...tblTh, padding: "8px 4px", borderRight: "none", borderLeft: "2px solid #d8d8d8" }} rowSpan={2} />
-            </tr>
-            <tr>
-              {RACI_PEOPLE.map((p, pi) => (
+              {RACI_PEOPLE.map((p) => (
+                <col key={p.id} style={{ width: 84 }} />
+              ))}
+              <col style={{ width: 32 }} />
+            </colgroup>
+            <thead>
+              <tr>
                 <th
-                  key={p.id}
+                  rowSpan={2}
                   style={{
                     ...tblTh,
                     textAlign: "center",
-                    padding: "6px 4px",
-                    borderRight: pi === RACI_PEOPLE.length - 1 ? "none" : `1px solid ${T.line}`,
-                    borderLeft: pi === 0 ? "2px solid #d8d8d8" : undefined,
+                    padding: "10px 0 8px",
+                    background: T.no,
+                    borderRight: `1px solid ${T.hair}`,
+                    borderBottom: `2px solid ${T.ink}`,
+                    position: "sticky",
+                    left: 0,
+                    zIndex: 3,
                   }}
                 >
-                  <div style={{ color: T.text, fontSize: 11 }}>{p.name}</div>
-                  <div style={{ marginTop: 1, fontSize: 9.5, color: T.faint, fontWeight: 600 }}>
-                    {raciPersonSubLabel(p.role)}
-                  </div>
+                  No
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => {
-              const written = row.cells.some((c) => c.trim());
-              const aCount = Object.values(row.roles).filter((v) => v === "a").length;
-              const needsOwner = written && aCount !== 1;
-              return (
-                <tr key={row.id}>
-                  <td style={{ ...tblTd, padding: "10px 2px", textAlign: "center", background: T.section }}>
-                    <div style={{ fontSize: 11, color: T.sub }}>{i + 1}</div>
-                    {needsOwner && (
-                      <div
-                        title="責任者が1人に決まっていません"
-                        style={{ marginTop: 2, fontSize: 13, lineHeight: 1, color: T.warn }}
-                      >
-                        ・
-                      </div>
-                    )}
-                  </td>
-
-                  {/* 自分たちで見出しをつけた5列 */}
-                  {row.cells.map((cell, ci) => (
-                    <td key={ci} style={tblTd}>
-                      <CellText
-                        value={cell}
-                        onChange={(v) =>
-                          patchRow(row.id, { cells: row.cells.map((c, k) => (k === ci ? v : c)) }, false)
-                        }
-                        onFocus={() => (editing.current = row.id)}
-                        onBlur={() => flush(row.id)}
-                        label={`${i + 1}行目の${columns[ci] || `${ci + 1}つめの列`}`}
-                      />
-                    </td>
-                  ))}
-
-                  {/* 役割（だれが・どう関わる） */}
-                  {RACI_PEOPLE.map((p, pi) => {
-                    const role = row.roles[p.id];
-                    const def = raciDefs.find((d) => d.key === role);
-                    return (
-                      <td
-                        key={p.id}
-                        style={{
-                          ...tblTd,
-                          padding: "8px 5px",
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                          borderRight: pi === RACI_PEOPLE.length - 1 ? "none" : `1px solid ${T.line}`,
-                          borderLeft: pi === 0 ? "2px solid #d8d8d8" : undefined,
-                        }}
-                      >
-                        <select
-                          value={role ?? ""}
-                          onChange={(e) => {
-                            const next = { ...row.roles };
-                            if (e.target.value) next[p.id] = e.target.value as RaciRole;
-                            else delete next[p.id];
-                            patchRow(row.id, { roles: next }, true);
-                          }}
-                          aria-label={`${i + 1}行目の${p.name}さんの役割`}
-                          style={{
-                            width: "100%",
-                            fontSize: 11,
-                            padding: "4px 2px",
-                            borderRadius: 6,
-                            cursor: "pointer",
-                            border: def ? `1.5px solid ${def.accent}` : "1px solid #d2d2d2",
-                            background: def ? def.tint : "#fff",
-                            color: def ? def.accent : T.faint,
-                            fontWeight: def ? 700 : 500,
-                          }}
-                        >
-                          <option value="">—</option>
-                          {raciDefs.map((d) => (
-                            <option key={d.key} value={d.key}>
-                              {d.short}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    );
-                  })}
-
-                  <td
+                {columns.map((label, i) => (
+                  <th
+                    key={i}
+                    rowSpan={2}
                     style={{
-                      ...tblTd,
-                      padding: "8px 2px",
-                      textAlign: "center",
-                      borderRight: "none",
-                      borderLeft: "2px solid #d8d8d8",
+                      ...tblTh,
+                      padding: "10px 6px 7px",
+                      paddingRight: i === columns.length - 1 ? 14 : 6,
+                      borderBottom: `2px solid ${T.ink}`,
+                      borderRight: i === columns.length - 1 ? `1px solid ${T.block}` : undefined,
                     }}
                   >
-                    <button
-                      onClick={() => removeRow(row)}
-                      aria-label={`${i + 1}行目を消す`}
-                      title="この行を消す"
+                    <HeadInput
+                      value={label}
+                      index={i}
+                      onChange={(v) => patchColumn(i, v)}
+                      onFocus={() => startEdit(COLS_KEY)}
+                      onBlur={() => flush(COLS_KEY)}
+                    />
+                  </th>
+                ))}
+                <th
+                  colSpan={RACI_PEOPLE.length}
+                  style={{
+                    ...tblTh,
+                    textAlign: "center",
+                    padding: "10px 8px 7px",
+                    fontSize: 10,
+                    borderBottom: `1px solid ${T.hair}`,
+                  }}
+                >
+                  役割（だれが・どう関わる）
+                </th>
+                <th
+                  rowSpan={2}
+                  style={{
+                    ...tblTh,
+                    padding: "10px 2px 8px",
+                    borderLeft: `1px solid ${T.hair}`,
+                    borderBottom: `2px solid ${T.ink}`,
+                  }}
+                />
+              </tr>
+              <tr>
+                {RACI_PEOPLE.map((p, pi) => (
+                  <th
+                    key={p.id}
+                    style={{
+                      ...tblTh,
+                      textAlign: "center",
+                      padding: "6px 4px 9px",
+                      borderBottom: `2px solid ${T.ink}`,
+                      borderRight: pi === RACI_PEOPLE.length - 1 ? undefined : `1px solid ${T.hair}`,
+                    }}
+                  >
+                    <div style={{ color: T.ink, fontSize: 12, fontWeight: 600, letterSpacing: "0.02em" }}>
+                      {p.name}
+                    </div>
+                    <div style={{ marginTop: 3, fontSize: 10, fontWeight: 500, letterSpacing: "0.02em", color: T.cap }}>
+                      {raciPersonSubLabel(p.role)}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const written = row.cells.some((c) => c.trim());
+                const aCount = Object.values(row.roles).filter((v) => v === "a").length;
+                const needsOwner = written && aCount !== 1;
+                const on = focusRow === row.id;
+                const cls = `${on ? "on" : ""} ${(i + 1) % 3 === 0 ? "cut" : ""}`.trim();
+                return (
+                  <tr key={row.id} className={cls}>
+                    <td
+                      className="no"
                       style={{
-                        border: "none",
-                        background: "transparent",
-                        color: T.faint,
-                        fontSize: 13,
-                        lineHeight: 1,
-                        cursor: "pointer",
-                        padding: 4,
+                        ...tblTd,
+                        padding: "12px 0 0",
+                        textAlign: "center",
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 1,
+                        borderRight: `1px solid ${T.hair}`,
                       }}
                     >
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: "0.02em",
+                          fontVariantNumeric: "tabular-nums",
+                          color: on ? T.ink : T.sub,
+                          fontWeight: on ? 700 : 400,
+                        }}
+                      >
+                        {i + 1}
+                      </div>
+                      {needsOwner && (
+                        <div
+                          title="責任者が1人に決まっていません"
+                          style={{ width: 5, height: 5, borderRadius: "50%", background: T.warn, margin: "6px auto 0" }}
+                        />
+                      )}
+                    </td>
+
+                    {/* 自分たちで見出しをつけた5列 */}
+                    {row.cells.map((cell, ci) => (
+                      <td
+                        key={ci}
+                        style={{
+                          ...tblTd,
+                          paddingRight: ci === row.cells.length - 1 ? 14 : 5,
+                          borderRight: ci === row.cells.length - 1 ? `1px solid ${T.block}` : undefined,
+                        }}
+                      >
+                        <CellText
+                          value={cell}
+                          onChange={(v) =>
+                            patchRow(row.id, { cells: row.cells.map((c, k) => (k === ci ? v : c)) }, false)
+                          }
+                          onFocus={() => startEdit(row.id)}
+                          onBlur={() => flush(row.id)}
+                          label={`${i + 1}行目の${columns[ci] || `${ci + 1}つめの列`}`}
+                        />
+                      </td>
+                    ))}
+
+                    {/* 役割（だれが・どう関わる） */}
+                    {RACI_PEOPLE.map((p, pi) => {
+                      const role = row.roles[p.id];
+                      const ui = role ? ROLE_UI[role] : ROLE_NONE;
+                      return (
+                        <td
+                          key={p.id}
+                          style={{
+                            ...tblTd,
+                            padding: "6px 5px",
+                            textAlign: "center",
+                            verticalAlign: "middle",
+                            borderRight: pi === RACI_PEOPLE.length - 1 ? undefined : `1px solid ${T.hair}`,
+                          }}
+                        >
+                          <select
+                            value={role ?? ""}
+                            onChange={(e) => {
+                              const next = { ...row.roles };
+                              if (e.target.value) next[p.id] = e.target.value as RaciRole;
+                              else delete next[p.id];
+                              patchRow(row.id, { roles: next }, true);
+                            }}
+                            aria-label={`${i + 1}行目の${p.name}さんの役割`}
+                            style={{
+                              width: "100%",
+                              // 既定の見た目を切らないと、Safariが背景と枠をまとめて無視する
+                              appearance: "none",
+                              WebkitAppearance: "none",
+                              MozAppearance: "none",
+                              fontSize: 11,
+                              fontWeight: ui.weight,
+                              letterSpacing: "0.02em",
+                              color: ui.fg,
+                              backgroundColor: ui.bg,
+                              backgroundImage: chevron(ui.fg),
+                              backgroundRepeat: "no-repeat",
+                              backgroundPosition: "right 6px center",
+                              backgroundSize: "7px 5px",
+                              border: `1px solid ${ui.bd}`,
+                              borderRadius: 3,
+                              padding: "6px 16px 6px 8px",
+                              cursor: "pointer",
+                              outline: "none",
+                              fontFamily: "inherit",
+                              transition: "border-color .12s, box-shadow .12s",
+                            }}
+                          >
+                            <option value="">—</option>
+                            {raciDefs.map((d) => (
+                              <option key={d.key} value={d.key}>
+                                {d.short}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      );
+                    })}
+
+                    <td
+                      style={{
+                        ...tblTd,
+                        padding: "7px 4px",
+                        textAlign: "center",
+                        verticalAlign: "middle",
+                        borderLeft: `1px solid ${T.hair}`,
+                      }}
+                    >
+                      <button
+                        onClick={() => removeRow(row)}
+                        className="delbtn"
+                        aria-label={`${i + 1}行目を消す`}
+                        title="この行を消す"
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 3,
+                          border: "none",
+                          background: "transparent",
+                          color: T.cap,
+                          fontSize: 13,
+                          lineHeight: 1,
+                          padding: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ×
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 右にまだ表が続くときだけ、右端をぼかして先があることを示す */}
+        {more && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: 1,
+              right: 1,
+              bottom: 1,
+              width: 28,
+              pointerEvents: "none",
+              borderRadius: "0 4px 4px 0",
+              background: "linear-gradient(90deg, rgba(255,255,255,0), #ffffff)",
+            }}
+          />
+        )}
       </div>
     </div>
   );
