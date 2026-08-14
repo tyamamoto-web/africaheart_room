@@ -166,30 +166,78 @@ const officerTaxonomy: OfficerTaxonomy = [
 // フラットなやること一覧（件数集計に使用）
 const officerTasks: OfficerTask[] = officerTaxonomy.flatMap((m) => m.groups.flatMap((g) => g.tasks));
 
-// 表の行データ（大分類・中分類のセル結合＝rowSpan 用のフラグつき）
+/* ── 係（大分類をだれの持ち場としてまとめるか）──────────────────
+   大分類が8つあると「これは誰の持ち場か」が一目で言えないので、その上に係の列をかぶせる。
+   区分はサークル運営の一般的な5つの係に合わせた
+   （主催者／イベント担当（企画・進行）／広報担当（SNS・告知）／会計担当（予算管理）／
+     コミュニケーション担当（参加者フォロー））。
+   ※ 大分類・中分類・やることの中身と並び順は一切変えていない。この列は上にかぶせる見出しだけ。
+     並びを変えていないので、同じ係が離れて2回出ることがある（イベント担当・コミュニケーション担当）。
+     並べ替えて1か所にまとめることもできるが、大分類の通し番号（01〜08）が飛ぶので今回は見送った。 */
+type OfficerDept = { key: string; label: string; note: string };
+const officerDepts: OfficerDept[] = [
+  { key: "lead",  label: "主催",                     note: "会の舵取り" },
+  { key: "event", label: "イベント担当",             note: "企画・進行" },
+  { key: "money", label: "会計担当",                 note: "お金の管理" },
+  { key: "pr",    label: "広報担当",                 note: "募集・記録" },
+  { key: "comm",  label: "コミュニケーション担当",   note: "参加者フォロー" },
+];
+// 大分類の通し番号 → 係
+const officerDeptOfMajor: Record<string, string> = {
+  "01": "lead",  // 会の運営・体制（役員MTG・ルール・意思決定・アプリ）
+  "02": "event", // オフ会の準備・当日（日程/会場・予約・案内/出欠・進行）
+  "03": "money", // お金（会計）
+  "04": "event", // 企画・盛り上げ（誕生日・フリー部屋・季節/ゲリラ）
+  "05": "comm",  // 交流・情報発信（メンバー紹介・グルチャ運用）
+  "06": "pr",    // 記録（写真・動画）
+  "07": "pr",    // 新規メンバー募集（ジモティ）
+  "08": "comm",  // 安全・トラブル対応
+};
+// 表の行データ（係・大分類・中分類のセル結合＝rowSpan 用のフラグつき）
 type OfficerRow = {
   task: OfficerTask;
+  dept?: string; deptSpan?: number;
   majorNo?: string; major?: string; majorSpan?: number;
   mid?: string; midSpan?: number;
 };
-const officerRows: OfficerRow[] = officerTaxonomy.flatMap((m) => {
-  const majorSpan = m.groups.reduce((s, g) => s + g.tasks.length, 0);
-  let firstOfMajor = true;
-  return m.groups.flatMap((g) =>
-    g.tasks.map((task, ti) => {
-      const row: OfficerRow = {
-        task,
-        majorNo:   firstOfMajor ? m.no : undefined,
-        major:     firstOfMajor ? m.major : undefined,
-        majorSpan: firstOfMajor ? majorSpan : undefined,
-        mid:     ti === 0 ? g.mid : undefined,
-        midSpan: ti === 0 ? g.tasks.length : undefined,
-      };
-      firstOfMajor = false;
-      return row;
-    })
-  );
-});
+const officerRows: OfficerRow[] = (() => {
+  // 隣り合う大分類が同じ係なら、係のセルを縦に結合する
+  const blocks: { dept: string; majors: OfficerTaxonomy }[] = [];
+  for (const m of officerTaxonomy) {
+    const dept = officerDeptOfMajor[m.no] ?? "";
+    const last = blocks[blocks.length - 1];
+    if (last && last.dept === dept) last.majors.push(m);
+    else blocks.push({ dept, majors: [m] });
+  }
+  const rows: OfficerRow[] = [];
+  for (const b of blocks) {
+    const deptSpan = b.majors.reduce(
+      (s, m) => s + m.groups.reduce((t, g) => t + g.tasks.length, 0), 0
+    );
+    let firstOfDept = true;
+    for (const m of b.majors) {
+      const majorSpan = m.groups.reduce((s, g) => s + g.tasks.length, 0);
+      let firstOfMajor = true;
+      for (const g of m.groups) {
+        g.tasks.forEach((task, ti) => {
+          rows.push({
+            task,
+            dept:      firstOfDept ? b.dept : undefined,
+            deptSpan:  firstOfDept ? deptSpan : undefined,
+            majorNo:   firstOfMajor ? m.no : undefined,
+            major:     firstOfMajor ? m.major : undefined,
+            majorSpan: firstOfMajor ? majorSpan : undefined,
+            mid:     ti === 0 ? g.mid : undefined,
+            midSpan: ti === 0 ? g.tasks.length : undefined,
+          });
+          firstOfDept = false;
+          firstOfMajor = false;
+        });
+      }
+    }
+  }
+  return rows;
+})();
 
 // 役員が設定した優先度の保存キー（この端末に保存）。体系化に伴い版数を v2 に更新。
 const OFFICER_MOSCOW_KEY = "africaheart-officer-moscow-v2";
@@ -1355,23 +1403,25 @@ export default function AdminPage() {
             {/* 大きな横長の表：スマホは横スクロール／PCは大きく表示 */}
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               {/* 折り返しをやめたぶん、全列が潰れない幅を確保（狭い画面では従来どおり横スクロール） */}
-              <table style={{ width: "100%", minWidth: 1440, borderCollapse: "collapse" }}>
+              <table style={{ width: "100%", minWidth: 1600, borderCollapse: "collapse" }}>
                 <colgroup>
-                  <col style={{ width: "14.9%" }} />
-                  <col style={{ width: "12.2%" }} />
-                  <col style={{ width: "21.9%" }} />
-                  <col style={{ width: "6%" }} />
-                  <col style={{ width: "6%" }} />
-                  <col style={{ width: "6%" }} />
-                  <col style={{ width: "6%" }} />
-                  <col style={{ width: "6.75%" }} />
-                  <col style={{ width: "6.75%" }} />
-                  <col style={{ width: "6.75%" }} />
-                  <col style={{ width: "6.75%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "12.5%" }} />
+                  <col style={{ width: "10.5%" }} />
+                  <col style={{ width: "19%" }} />
+                  <col style={{ width: "5.5%" }} />
+                  <col style={{ width: "5.5%" }} />
+                  <col style={{ width: "5.5%" }} />
+                  <col style={{ width: "5.5%" }} />
+                  <col style={{ width: "6.25%" }} />
+                  <col style={{ width: "6.25%" }} />
+                  <col style={{ width: "6.25%" }} />
+                  <col style={{ width: "6.25%" }} />
                 </colgroup>
                 <thead>
                   {/* 1段目：セクションの見出し（優先度／担当）*/}
                   <tr style={{ background: "#fff" }}>
+                    <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "2px solid #e3d7c2", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>係（持ち場）</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #eadfce", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>大分類</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", borderRight: "1px solid #f0ebe1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>中分類</th>
                     <th rowSpan={2} style={{ textAlign: "left", padding: "10px 12px", borderBottom: "2px solid #e7dfd1", fontSize: 12, fontWeight: 700, color: "#8b8274", verticalAlign: "middle" }}>やること（小分類）</th>
@@ -1397,6 +1447,7 @@ export default function AdminPage() {
                   {officerRows.map((row, i) => {
                     const task = row.task;
                     const cur = priorities[task.id];
+                    const dept = row.dept ? officerDepts.find((d) => d.key === row.dept) : undefined;
                     const majorEnd = i === officerRows.length - 1 || Boolean(officerRows[i + 1].major);
                     const rowBorder = majorEnd ? "1px solid #e7dfd1" : "1px solid #f4efe6";
                     // 「A 責任者」が複数ついている行は注意表示（1人が目安）
@@ -1404,6 +1455,16 @@ export default function AdminPage() {
                     // 表の背景は全行とも白で統一（優先度による色分けはしない）。区切りは罫線のみ。
                     return (
                       <tr key={task.id} style={{ background: "#fff" }}>
+                        {row.dept && (
+                          <td rowSpan={row.deptSpan} style={{ background: "#fdfbf7", borderRight: "2px solid #e3d7c2", borderBottom: "1px solid #e3d7c2", verticalAlign: "middle", padding: "14px 12px" }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "#5c5646", lineHeight: 1.45 }}>
+                              {dept?.label}
+                            </div>
+                            <div style={{ marginTop: 3, fontSize: 10.5, fontWeight: 600, color: "#b3a794", letterSpacing: "0.04em" }}>
+                              {dept?.note}
+                            </div>
+                          </td>
+                        )}
                         {row.major && (
                           <td rowSpan={row.majorSpan} style={{ background: "#fff", borderRight: "1px solid #eadfce", borderBottom: "1px solid #e7dfd1", verticalAlign: "middle", padding: "14px 12px" }}>
                             <div style={{ fontFamily: "Georgia,serif", fontSize: 12, color: "#c3b48f", letterSpacing: "0.06em", marginBottom: 5 }}>{row.majorNo}</div>
