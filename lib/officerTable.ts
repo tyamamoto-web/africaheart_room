@@ -160,12 +160,41 @@ async function fetchRaw(): Promise<string[]> {
     Array.isArray(body) && Array.isArray(body[0]?.themes) ? (body[0]!.themes as unknown[]) : [];
   return arr.filter((x): x is string => typeof x === "string");
 }
+/* 書き込みの決まりごと（ここが「同時に書いても消えない」の要）
+   ------------------------------------------------------------
+   これまでの書き方（最新を読む → 自分の変更を当てる → 全件を上書き）には、
+   端末をまたいだ取り合いを防ぐ仕組みが無かった。
+   Aが読んでから書くまでの隙間（実測でこの回線でも0.2〜0.3秒、スマホならもっと長い）に
+   Bの保存が入ると、Bの変更が配列ごと消える。しかも消えたことに誰も気づけない。
+
+   そこで updated_by 列を「版の札」に使う。
+     読むとき  ：中身といっしょに札も持ち帰る。
+     書くとき  ：「札が読んだときのままなら書く」という条件を付けて送る。
+                誰かが先に書いていれば0件更新で返ってくるので、
+                取り直して自分の変更を当て直し、やり直す（最大5回）。
+   updated_by はもともと「最後に更新した人の名前」だが、名前を表示に使っているのは
+   宿題(id=1)と部屋番号(id=2)だけ。この表(id=6)では未使用なので札に転用できる。
+   SQLは実行しない。列も行も増やさない。 */
+
+// 1回に送れる大きさの目安。これを超えたら書かずに知らせる。
+const MAX_BYTES = 400_000;
+
+// exists は「id=6 の行そのものが在るか」。札が空なのと、行が無いのは別ものなので分けて持つ。
+type Snapshot = { raw: string[]; token: string; exists: boolean };
+
+// 札を作る（中身に意味は無い。前回と違う値であればよい）。
+function newToken(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "");
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
 
 // 書き込みの土台に使う厳密版。読み取りに失敗したら例外を投げる（空を土台にして全消しする事故を防ぐ）。
-async function fetchRawStrict(): Promise<string[]> {
+async function readSnapshot(): Promise<Snapshot> {
   let res: Response;
   try {
-    res = await fetch(`${ENDPOINT}?id=eq.${ROW_ID}&select=themes`, {
+    res = await fetch(`${ENDPOINT}?id=eq.${ROW_ID}&select=themes,updated_by`, {
       headers: headers(),
       cache: "no-store",
     });
@@ -173,41 +202,112 @@ async function fetchRawStrict(): Promise<string[]> {
     throw new Error("最新の取得に失敗しました（保存を中止しました）");
   }
   if (!res.ok) throw new Error(`最新の取得に失敗しました (${res.status})（保存を中止しました）`);
-  const body = (await res.json()) as Array<{ themes?: unknown }>;
-  const arr =
-    Array.isArray(body) && Array.isArray(body[0]?.themes) ? (body[0]!.themes as unknown[]) : [];
-  return arr.filter((x): x is string => typeof x === "string");
+  const body = (await res.json()) as Array<{ themes?: unknown; updated_by?: unknown }>;
+  const row = Array.isArray(body) ? body[0] : undefined;
+  const arr = Array.isArray(row?.themes) ? (row!.themes as unknown[]) : [];
+  return {
+    raw: arr.filter((x): x is string => typeof x === "string"),
+    token: typeof row?.updated_by === "string" ? row.updated_by : "",
+    exists: !!row,
+  };
 }
 
-async function upsert(raw: string[]): Promise<void> {
-  const body = {
-    id: ROW_ID,
-    themes: raw,
-    updated_by: "",
-    updated_at: new Date().toISOString(),
-  };
-  const res = await fetch(`${ENDPOINT}?on_conflict=id`, {
-    method: "POST",
-    headers: headers({ Prefer: "resolution=merge-duplicates,return=minimal" }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    let txt = "";
-    try {
-      txt = await res.text();
-    } catch {
-      /* no-op */
-    }
-    throw new Error(`表の保存に失敗しました (${res.status}) ${txt.slice(0, 120)}`);
+async function bodyText(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return "";
   }
 }
 
+/* 札が読んだときのままなら書く。誰かが先に書いていたら0件更新＝false（やり直す）。
+   札が空文字のときも `updated_by=eq.` で「空のままなら書く」として効く（実機で確認済み）。
+   これが効くおかげで、古い版のアプリが札を空に戻していっても取り合いにならない。 */
+async function patchIfSame(raw: string[], prevToken: string, nextToken: string): Promise<boolean> {
+  const url =
+    `${ENDPOINT}?id=eq.${ROW_ID}&updated_by=eq.${encodeURIComponent(prevToken)}&select=id`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "PATCH",
+      headers: headers({ Prefer: "return=representation" }),
+      body: JSON.stringify({
+        themes: raw,
+        updated_by: nextToken,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch {
+    throw new Error("表の保存に失敗しました（通信を確認してください）");
+  }
+  if (!res.ok) {
+    throw new Error(`表の保存に失敗しました (${res.status}) ${(await bodyText(res)).slice(0, 120)}`);
+  }
+  const hit = (await res.json()) as unknown;
+  return Array.isArray(hit) && hit.length > 0;
+}
+
+// id=6 の行そのものがまだ無いとき（まっさらなデータベース）に作る。
+// 同じ瞬間に他の人も作っていた場合は入れ違いになるので、書いたあと札を確かめてやり直す。
+async function insertRow(raw: string[], nextToken: string): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetch(`${ENDPOINT}?on_conflict=id`, {
+      method: "POST",
+      headers: headers({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify({
+        id: ROW_ID,
+        themes: raw,
+        updated_by: nextToken,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch {
+    throw new Error("表の保存に失敗しました（通信を確認してください）");
+  }
+  if (!res.ok) {
+    throw new Error(`表の保存に失敗しました (${res.status}) ${(await bodyText(res)).slice(0, 120)}`);
+  }
+  return (await readSnapshot()).token === nextToken;
+}
+
 // 書き込みを1件ずつ順番に流すキュー（officerRaci / officerPlan と同じ考え方）。
+// 同じタブの中の連続操作が互いを上書きしないようにする（別の端末どうしは版くらべが受け持つ）。
 let writeChain: Promise<unknown> = Promise.resolve();
 function enqueue<T>(work: () => Promise<T>): Promise<T> {
   const run = writeChain.then(work, work);
   writeChain = run.then(() => undefined, () => undefined);
   return run;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/*
+ * 表を書き換える土台。「読む → change で自分の変更だけを当てる → 版くらべで書く」。
+ * 誰かが先に書いていたら、取り直して change をやり直す（最大5回、少しずつ間をずらす）。
+ * change は何度も呼ばれるので、渡された値だけで結果を作ること（外の状態を書き換えない）。
+ */
+function writeTable(change: (data: OfficerTableData) => OfficerTableData): Promise<OfficerTableData> {
+  return enqueue(async () => {
+    for (let i = 0; i < 5; i++) {
+      const snap = await readSnapshot();
+      const next = change(rawToData(snap.raw));
+      const raw = dataToRaw(next);
+      if (new TextEncoder().encode(JSON.stringify(raw)).length > MAX_BYTES) {
+        throw new Error("中身が大きくなりすぎました（保存を中止しました）。行を減らすか、文章を短くしてください");
+      }
+      const token = newToken();
+      const ok = snap.exists
+        ? await patchIfSame(raw, snap.token, token)
+        : await insertRow(raw, token);
+      if (ok) return next;
+      // 同時にやり直してまたぶつからないよう、少しずらしてから取り直す
+      await sleep(120 + Math.floor(Math.random() * 240));
+    }
+    throw new Error("ほかの人の保存と重なりました（もう一度お試しください）");
+  });
 }
 
 /** 共有中の表を取得（未設定・失敗時も例外を投げず空で返す）。 */
@@ -220,46 +320,34 @@ export async function getOfficerTable(): Promise<OfficerTableData> {
  * idを固定しているので、2人が同時に開いても行が二重にならない。
  */
 export function seedOfficerTable(): Promise<OfficerTableData> {
-  return enqueue(async () => {
-    const data = rawToData(await fetchRawStrict());
-    if (data.rows.length > 0) return data;
-    const seeded: OfficerTableData = { columns: emptyColumns(), rows: SEED_ROW_IDS.map(emptyRow) };
-    await upsert(dataToRaw(seeded));
-    return seeded;
-  });
+  return writeTable((data) =>
+    data.rows.length > 0 ? data : { columns: emptyColumns(), rows: SEED_ROW_IDS.map(emptyRow) }
+  );
 }
 
 /** 列の見出しを保存（全員に共有）。行はそのまま残す。 */
 export function saveOfficerTableColumns(columns: string[]): Promise<OfficerTableData> {
-  return enqueue(async () => {
-    const data = rawToData(await fetchRawStrict());
-    const next: OfficerTableData = { columns: fit(columns, 40), rows: data.rows };
-    await upsert(dataToRaw(next));
-    return next;
-  });
+  return writeTable((data) => ({ columns: fit(columns, 40), rows: data.rows }));
 }
 
 /**
- * 1行を保存（全員に共有）。書き込み直前に最新を取り直して、その行だけを差し替える。
- * すでにある行なら同じ位置のまま更新し、無ければ末尾に足す。
+ * 1行を保存（全員に共有）。すでにある行なら同じ位置のまま更新し、無ければ末尾に足す。
+ * 同じ行の同じ欄を2人が同時に書いたときだけ、あとから保存したほうが残る。
  */
 export function saveOfficerTableRow(row: OfficerTableRow): Promise<OfficerTableData> {
-  return enqueue(async () => {
-    const data = rawToData(await fetchRawStrict());
-    const at = data.rows.findIndex((r) => r.id === row.id);
-    if (at >= 0) data.rows[at] = row;
-    else data.rows.push(row);
-    await upsert(dataToRaw(data));
-    return data;
+  return writeTable((data) => {
+    const rows = data.rows.slice();
+    const at = rows.findIndex((r) => r.id === row.id);
+    if (at >= 0) rows[at] = row;
+    else rows.push(row);
+    return { columns: data.columns, rows };
   });
 }
 
 /** 1行を削除（全員に共有）。 */
 export function deleteOfficerTableRow(id: string): Promise<OfficerTableData> {
-  return enqueue(async () => {
-    const data = rawToData(await fetchRawStrict());
-    const next: OfficerTableData = { columns: data.columns, rows: data.rows.filter((r) => r.id !== id) };
-    await upsert(dataToRaw(next));
-    return next;
-  });
+  return writeTable((data) => ({
+    columns: data.columns,
+    rows: data.rows.filter((r) => r.id !== id),
+  }));
 }
