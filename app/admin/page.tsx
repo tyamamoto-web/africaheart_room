@@ -261,10 +261,10 @@ const OFFICER_UNLOCK_KEY = "africaheart-officer-unlocked";
      右のRACIの4人は、表の型を保つため固定。
 
    見た目の考え方：白い紙に活字を組んだ誌面として扱う。
-     色は足さず、わずかに暖かい白の階調と、強さの決まった3本の罫だけで作る。
-       いちばん強い罫：見出しの下の2px（表の背骨）
-       次に強い罫　　：3行ごとの区切り（12行が4つのまとまりに見える）
-       いちばん弱い罫：1行ごとの細い罫
+     色は足さず、わずかに暖かい白の階調と、強さの決まった2本の罫だけで作る。
+       強い罫：見出しの下の2px（表の背骨）
+       弱い罫：1行ごとの細い罫（どの行も同じ濃さでそろえる）
+     行を数える手がかりは、左端に貼り付くNo列の柱と、桁のそろった等幅の数字が受け持つ。
      書く5列のあいだに縦罫は引かず、余白と記入欄の下線で分ける。
      赤紫（アプリの色）はこの表では使わない。60個ある記入欄のどこにでも出るため、
      いちばん目立つ色が「たまたま今さわっている欄」に付いてしまうので。
@@ -287,7 +287,7 @@ const T = {
   noOn: "#e7e4dc", // No列（いま書いている行）
   // 罫。弱い順に3段。いちばん強いのは見出しの下の2px（ink）
   hair: "#e6e3dc", // 1行ごとの細い罫・人と人の間・No列の右
-  rule: "#cbc7be", // 3行ごとの区切り罫・表の外枠・ボタンの枠
+  rule: "#cbc7be", // 表の外枠・ボタンの枠
   block: "#b8b3a8", // 書く5列と役割の4列を分ける仕切り
   guide: "#dedbd3", // 記入欄の下に常時引く線（ここに書けるという合図）
   // インク
@@ -310,7 +310,6 @@ const TABLE_CSS = `
 .rtbl tbody tr:hover td.no { background:${T.noHov}; }
 .rtbl tbody tr.on td { background:${T.rowOn}; }
 .rtbl tbody tr.on td.no { background:${T.noOn}; box-shadow: inset 3px 0 0 ${T.ink}; }
-.rtbl tbody tr.cut td { border-bottom-color:${T.rule}; }
 .rtbl tbody tr:last-child td { border-bottom-color:transparent; }
 .rtbl textarea, .rtbl thead input {
   border:1px solid transparent; border-radius:3px; background:transparent;
@@ -766,9 +765,8 @@ function OfficerRoleTable() {
                 const aCount = Object.values(row.roles).filter((v) => v === "a").length;
                 const needsOwner = written && aCount !== 1;
                 const on = focusRow === row.id;
-                const cls = `${on ? "on" : ""} ${(i + 1) % 3 === 0 ? "cut" : ""}`.trim();
                 return (
-                  <tr key={row.id} className={cls}>
+                  <tr key={row.id} className={on ? "on" : undefined}>
                     <td
                       className="no"
                       style={{
