@@ -13,6 +13,11 @@ import {
   RACI_PEOPLE, type OfficerRaci, type RaciRole,
 } from "@/lib/officerRaci";
 import { raciDefs, raciPersonSubLabel } from "@/lib/raciDefs";
+import {
+  getOfficerTable, saveOfficerTableRow, saveOfficerTableColumns, deleteOfficerTableRow,
+  seedOfficerTable, emptyRow, emptyColumns, newRowId, SEED_ROW_IDS,
+  type OfficerTableRow, type OfficerTableData,
+} from "@/lib/officerTable";
 
 const roomCfg = {
   A: { gradient: "linear-gradient(135deg,#8E1252,#A8175F)", color: "#A8175F", bg: "#F6E1EB" },
@@ -189,6 +194,521 @@ const officerRows: OfficerRow[] = officerTaxonomy.flatMap((m) => {
 // 役員が設定した優先度の保存キー（この端末に保存）。体系化に伴い版数を v2 に更新。
 const OFFICER_MOSCOW_KEY = "africaheart-officer-moscow-v2";
 
+// 役員専用タブ／役員専用2タブの合言葉。2つのタブで共通で、片方を開ければもう片方も開く。
+// ※ 画面を出す前の目隠しであって、本格的な鍵ではない（このページの中身を見れば分かってしまう）。
+//   人に見られたくない内容や、お金・個人情報そのものはここに置かないこと。
+const OFFICER_PASSCODE = "810";
+// 解錠状態はタブを閉じるまで（sessionStorage）。ブラウザを閉じればまた合言葉を聞く。
+const OFFICER_UNLOCK_KEY = "africaheart-officer-unlocked";
+
+/* ── 役員専用2：オフ会運営のRACIチャート（役員全員で共同編集）───────
+   表の形はRACIの基本どおり。左が「やることの特定」、右が「人ごとの役割」。
+     左：見出しも中身も自分たちで書ける空の5列（＋通し番号のNo）
+     右：よしのすけ／くる／しゃちょー／メンバー（担当者・責任者・相談役・お知らせ）
+
+   左を空の5列にしてある理由：
+     この表が扱うのは1回のイベントの進行ではなく、毎月まわしていく運営そのもの。
+     何を軸に並べるか（分野・まとまり・いつ など）は、書きながら決めたほうが早い。
+     見出しも全員で共有されるので、1人が直せば他の人の画面にも同じ見出しが出る。
+     右のRACIの4人は、表の型を保つため固定。
+
+   保存は lib/officerTable.ts（homework_result の id=6 を間借り）。
+   文字は打ち終わってから少し待って自動保存。役割のプルダウンは押した時点で保存。
+   ほかの人の変更は約6秒ごとに入ってくる。
+   ------------------------------------------------------------------ */
+
+// 薄いグレーの配色（表全体で同じトーンを使う）
+const T = {
+  line: "#e4e4e4",
+  phase: "#f6f6f6",
+  section: "#fafafa",
+  body: "#ffffff",
+  text: "#333333",
+  sub: "#767676",
+  faint: "#a6a6a6",
+  warn: "#b06a2c",
+};
+
+const tblTh: React.CSSProperties = {
+  color: T.sub,
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textAlign: "left",
+  padding: "8px 10px",
+  borderBottom: `1px solid ${T.line}`,
+  borderRight: `1px solid ${T.line}`,
+  whiteSpace: "nowrap",
+};
+const tblTd: React.CSSProperties = {
+  padding: "4px 4px",
+  borderBottom: `1px solid ${T.line}`,
+  borderRight: `1px solid ${T.line}`,
+  verticalAlign: "top",
+};
+
+/** 自由に書く欄。書いた分だけ縦に伸びるので、行の中でスクロールバーが出ない。 */
+function CellText({
+  value,
+  onChange,
+  onFocus,
+  onBlur,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+  placeholder?: string;
+  label: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(34, el.scrollHeight)}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      aria-label={label}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={() => {
+        setFocused(true);
+        onFocus();
+      }}
+      onBlur={() => {
+        setFocused(false);
+        onBlur();
+      }}
+      style={{
+        width: "100%",
+        display: "block",
+        borderRadius: 6,
+        border: `1px solid ${focused ? "#A8175F" : "transparent"}`,
+        background: focused ? "#fff" : "transparent",
+        resize: "none",
+        overflow: "hidden",
+        fontSize: 11.5,
+        lineHeight: 1.55,
+        color: T.text,
+        padding: "6px 6px",
+        outline: "none",
+        fontFamily: "inherit",
+      }}
+    />
+  );
+}
+
+/** 列の見出し。見出しそのものを書き替えられる（全員に共有される）。 */
+function HeadInput({
+  value,
+  onChange,
+  onFocus,
+  onBlur,
+  index,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+  index: number;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <input
+      type="text"
+      value={value}
+      placeholder="列の名前"
+      aria-label={`${index + 1}つめの列の名前`}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={() => {
+        setFocused(true);
+        onFocus();
+      }}
+      onBlur={() => {
+        setFocused(false);
+        onBlur();
+      }}
+      style={{
+        width: "100%",
+        borderRadius: 6,
+        border: `1px solid ${focused ? "#A8175F" : "transparent"}`,
+        background: focused ? "#fff" : "transparent",
+        color: T.sub,
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        padding: "3px 4px",
+        outline: "none",
+        fontFamily: "inherit",
+      }}
+    />
+  );
+}
+
+function OfficerRoleTable() {
+  const [columns, setColumns] = useState<string[]>(emptyColumns());
+  const [rows, setRows] = useState<OfficerTableRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const dataRef = useRef<OfficerTableData>({ columns: emptyColumns(), rows: [] }); // 保存はいつもこの手元の値を使う
+  const pending = useRef(0); // 保存中の件数。0より大きいあいだは取り込みを止める
+  const editing = useRef<string | null>(null); // 入力中の行（見出しは "cols"）は上書きしない
+  const dirty = useRef<Set<string>>(new Set()); // まだ保存していない行
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const COLS_KEY = "cols"; // 見出しをタイマー・入力中の目印で扱うときのキー
+
+  // 画面の表示と手元の値を同時に更新する
+  function commit(next: OfficerTableData) {
+    dataRef.current = next;
+    setColumns(next.columns);
+    setRows(next.rows);
+  }
+
+  async function run(key: string, work: () => Promise<unknown>) {
+    pending.current += 1;
+    setSaving(true);
+    try {
+      await work();
+      dirty.current.delete(key);
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "保存に失敗しました");
+    } finally {
+      pending.current -= 1;
+      if (pending.current === 0) setSaving(false);
+    }
+  }
+
+  // 1行ぶんの変更。immediate は「押した時点で保存する」もの（役割のプルダウン）。
+  function patchRow(id: string, change: Partial<OfficerTableRow>, immediate: boolean) {
+    const next: OfficerTableData = {
+      columns: dataRef.current.columns,
+      rows: dataRef.current.rows.map((r) => (r.id === id ? { ...r, ...change } : r)),
+    };
+    commit(next);
+    const row = next.rows.find((r) => r.id === id);
+    if (!row) return;
+    if (immediate) {
+      void run(id, () => saveOfficerTableRow(row));
+      return;
+    }
+    dirty.current.add(id);
+    clearTimeout(timers.current[id]);
+    timers.current[id] = setTimeout(() => void run(id, () => saveOfficerTableRow(row)), 800);
+  }
+
+  // 列の見出しの変更（全員に共有される）
+  function patchColumn(index: number, value: string) {
+    const nextCols = dataRef.current.columns.map((c, i) => (i === index ? value : c));
+    commit({ columns: nextCols, rows: dataRef.current.rows });
+    dirty.current.add(COLS_KEY);
+    clearTimeout(timers.current[COLS_KEY]);
+    timers.current[COLS_KEY] = setTimeout(
+      () => void run(COLS_KEY, () => saveOfficerTableColumns(nextCols)),
+      800
+    );
+  }
+
+  // 欄から離れたら、待たずに保存する
+  function flush(key: string) {
+    editing.current = null;
+    if (!dirty.current.has(key)) return;
+    clearTimeout(timers.current[key]);
+    if (key === COLS_KEY) {
+      const cols = dataRef.current.columns;
+      void run(COLS_KEY, () => saveOfficerTableColumns(cols));
+      return;
+    }
+    const row = dataRef.current.rows.find((r) => r.id === key);
+    if (row) void run(key, () => saveOfficerTableRow(row));
+  }
+
+  function addRow() {
+    const row = emptyRow(newRowId());
+    commit({ columns: dataRef.current.columns, rows: [...dataRef.current.rows, row] });
+    void run(row.id, () => saveOfficerTableRow(row));
+  }
+
+  function removeRow(row: OfficerTableRow) {
+    const hasText = row.cells.some((s) => s.trim());
+    if (hasText && !window.confirm("この行を消します。ほかの人の画面からも消えます。よろしいですか。")) return;
+    clearTimeout(timers.current[row.id]);
+    dirty.current.delete(row.id);
+    commit({
+      columns: dataRef.current.columns,
+      rows: dataRef.current.rows.filter((r) => r.id !== row.id),
+    });
+    void run(row.id, () => deleteOfficerTableRow(row.id));
+  }
+
+  // 最初の読み込み。まだ1行も無ければ空の12行を作る（idは固定なので二重にならない）。
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let data = await getOfficerTable();
+      if (data.rows.length === 0) {
+        try {
+          data = await seedOfficerTable();
+        } catch {
+          data = { columns: emptyColumns(), rows: SEED_ROW_IDS.map(emptyRow) };
+        }
+      }
+      if (!alive) return;
+      commit(data);
+      setLoaded(true);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ほかの人の変更を取り込む（約6秒ごと）。
+  useEffect(() => {
+    const t = setInterval(async () => {
+      if (pending.current > 0) return; // 保存中は取り込まない
+      const remote = await getOfficerTable();
+      if (remote.rows.length === 0) return; // 読めなかったときは今の表を残す
+      const key = editing.current;
+      if (!key) {
+        commit(remote);
+        return;
+      }
+      // 入力中の見出し・行だけは自分の手元を残し、ほかは共有側に合わせる
+      const cols = key === COLS_KEY ? dataRef.current.columns : remote.columns;
+      const mine = key === COLS_KEY ? undefined : dataRef.current.rows.find((r) => r.id === key);
+      commit({
+        columns: cols,
+        rows: mine ? remote.rows.map((r) => (r.id === mine.id ? mine : r)) : remote.rows,
+      });
+    }, 6000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 画面を離れるときに、待機中の保存を片づける
+  useEffect(() => {
+    const t = timers.current;
+    return () => {
+      Object.values(t).forEach(clearTimeout);
+    };
+  }, []);
+
+  return (
+    // 左5列＋RACI4人＋Noで横に長いので、広い画面では収まるところまで枠を広げる。
+    <div className="px-4 pt-3 pb-8 mx-auto" style={{ maxWidth: 1240 }}>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <button
+          onClick={addRow}
+          disabled={!loaded}
+          className="text-xs font-bold px-3 py-1.5 rounded-lg"
+          style={{
+            border: `1px solid ${T.line}`,
+            background: "#fff",
+            color: loaded ? T.text : T.faint,
+            cursor: loaded ? "pointer" : "default",
+          }}
+        >
+          行を追加
+        </button>
+        <span style={{ fontSize: 11, color: err ? T.warn : T.faint }}>
+          {err ? err : !loaded ? "読み込んでいます" : saving ? "保存しています" : "みんなで共有中"}
+        </span>
+      </div>
+
+      <div
+        style={{
+          border: `1px solid ${T.line}`,
+          borderRadius: 12,
+          overflowX: "auto",
+          overflowY: "hidden",
+          background: T.body,
+        }}
+      >
+        <table style={{ minWidth: 1173, width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: 34 }} />
+            {columns.map((_, i) => (
+              <col key={i} style={{ width: 165 }} />
+            ))}
+            {RACI_PEOPLE.map((p) => (
+              <col key={p.id} style={{ width: 70 }} />
+            ))}
+            <col style={{ width: 34 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th style={{ ...tblTh, textAlign: "center", padding: "8px 4px" }} rowSpan={2}>No</th>
+              {columns.map((label, i) => (
+                <th key={i} style={{ ...tblTh, padding: "5px 6px" }} rowSpan={2}>
+                  <HeadInput
+                    value={label}
+                    index={i}
+                    onChange={(v) => patchColumn(i, v)}
+                    onFocus={() => (editing.current = COLS_KEY)}
+                    onBlur={() => flush(COLS_KEY)}
+                  />
+                </th>
+              ))}
+              <th
+                style={{ ...tblTh, textAlign: "center", borderRight: "none", borderLeft: "2px solid #d8d8d8" }}
+                colSpan={RACI_PEOPLE.length}
+              >
+                役割（だれが・どう関わる）
+              </th>
+              <th style={{ ...tblTh, padding: "8px 4px", borderRight: "none", borderLeft: "2px solid #d8d8d8" }} rowSpan={2} />
+            </tr>
+            <tr>
+              {RACI_PEOPLE.map((p, pi) => (
+                <th
+                  key={p.id}
+                  style={{
+                    ...tblTh,
+                    textAlign: "center",
+                    padding: "6px 4px",
+                    borderRight: pi === RACI_PEOPLE.length - 1 ? "none" : `1px solid ${T.line}`,
+                    borderLeft: pi === 0 ? "2px solid #d8d8d8" : undefined,
+                  }}
+                >
+                  <div style={{ color: T.text, fontSize: 11 }}>{p.name}</div>
+                  <div style={{ marginTop: 1, fontSize: 9.5, color: T.faint, fontWeight: 600 }}>
+                    {raciPersonSubLabel(p.role)}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const written = row.cells.some((c) => c.trim());
+              const aCount = Object.values(row.roles).filter((v) => v === "a").length;
+              const needsOwner = written && aCount !== 1;
+              return (
+                <tr key={row.id}>
+                  <td style={{ ...tblTd, padding: "10px 2px", textAlign: "center", background: T.section }}>
+                    <div style={{ fontSize: 11, color: T.sub }}>{i + 1}</div>
+                    {needsOwner && (
+                      <div
+                        title="責任者が1人に決まっていません"
+                        style={{ marginTop: 2, fontSize: 13, lineHeight: 1, color: T.warn }}
+                      >
+                        ・
+                      </div>
+                    )}
+                  </td>
+
+                  {/* 自分たちで見出しをつけた5列 */}
+                  {row.cells.map((cell, ci) => (
+                    <td key={ci} style={tblTd}>
+                      <CellText
+                        value={cell}
+                        onChange={(v) =>
+                          patchRow(row.id, { cells: row.cells.map((c, k) => (k === ci ? v : c)) }, false)
+                        }
+                        onFocus={() => (editing.current = row.id)}
+                        onBlur={() => flush(row.id)}
+                        label={`${i + 1}行目の${columns[ci] || `${ci + 1}つめの列`}`}
+                      />
+                    </td>
+                  ))}
+
+                  {/* 役割（だれが・どう関わる） */}
+                  {RACI_PEOPLE.map((p, pi) => {
+                    const role = row.roles[p.id];
+                    const def = raciDefs.find((d) => d.key === role);
+                    return (
+                      <td
+                        key={p.id}
+                        style={{
+                          ...tblTd,
+                          padding: "8px 5px",
+                          textAlign: "center",
+                          verticalAlign: "middle",
+                          borderRight: pi === RACI_PEOPLE.length - 1 ? "none" : `1px solid ${T.line}`,
+                          borderLeft: pi === 0 ? "2px solid #d8d8d8" : undefined,
+                        }}
+                      >
+                        <select
+                          value={role ?? ""}
+                          onChange={(e) => {
+                            const next = { ...row.roles };
+                            if (e.target.value) next[p.id] = e.target.value as RaciRole;
+                            else delete next[p.id];
+                            patchRow(row.id, { roles: next }, true);
+                          }}
+                          aria-label={`${i + 1}行目の${p.name}さんの役割`}
+                          style={{
+                            width: "100%",
+                            fontSize: 11,
+                            padding: "4px 2px",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            border: def ? `1.5px solid ${def.accent}` : "1px solid #d2d2d2",
+                            background: def ? def.tint : "#fff",
+                            color: def ? def.accent : T.faint,
+                            fontWeight: def ? 700 : 500,
+                          }}
+                        >
+                          <option value="">—</option>
+                          {raciDefs.map((d) => (
+                            <option key={d.key} value={d.key}>
+                              {d.short}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    );
+                  })}
+
+                  <td
+                    style={{
+                      ...tblTd,
+                      padding: "8px 2px",
+                      textAlign: "center",
+                      borderRight: "none",
+                      borderLeft: "2px solid #d8d8d8",
+                    }}
+                  >
+                    <button
+                      onClick={() => removeRow(row)}
+                      aria-label={`${i + 1}行目を消す`}
+                      title="この行を消す"
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: T.faint,
+                        fontSize: 13,
+                        lineHeight: 1,
+                        cursor: "pointer",
+                        padding: 4,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 type FormState = { nickname: string; role: MemberRole };
 
 export default function AdminPage() {
@@ -203,8 +723,13 @@ export default function AdminPage() {
   const [roomNos,      setRoomNos]      = useState<{ A: string; B: string; C: string }>({ A: "", B: "", C: "" });
   const [roomSaving,   setRoomSaving]   = useState(false);
   const [roomMsg,      setRoomMsg]      = useState<{ kind: "ok" | "err" | "setup"; text: string } | null>(null);
-  // 管理画面のタブ（左=部屋割り・メンバー / 右=役員専用）。ロックなし＝URLを知っていれば切替可。既定は左。
-  const [tab, setTab] = useState<"officer" | "admin">("admin");
+  // 管理画面のタブ（左=部屋割り・メンバー / 中=役員専用 / 右=役員専用2）。既定は左。
+  // 右の2つは合言葉を入れないと中身を出さない。役員専用2は中身がこれから決まる空のタブ。
+  const [tab, setTab] = useState<"officer" | "officer2" | "admin">("admin");
+  // 役員専用タブの解錠状態と、合言葉の入力欄。解錠はタブを閉じるまで保持する。
+  const [unlocked, setUnlocked] = useState(false);
+  const [passInput, setPassInput] = useState("");
+  const [passError, setPassError] = useState(false);
   // 役員専用：各タスクに手動でつけた優先度（この端末に保存）
   const [priorities, setPriorities] = useState<Record<string, Priority>>({});
   // 役員専用：各やることの担当・役割（RACI）。全員でSupabase共有。キーは `taskId|personId`。
@@ -252,9 +777,38 @@ export default function AdminPage() {
     })();
   }, []);
 
-  // 役員専用タブを開いている間は、他メンバーの入力を約6秒ごとに取り込む（共有・同期）。
+  // 前に合言葉を入れていれば、そのタブを開いているあいだは聞き直さない。
   useEffect(() => {
-    if (tab !== "officer") return;
+    try {
+      if (sessionStorage.getItem(OFFICER_UNLOCK_KEY) === "1") setUnlocked(true);
+    } catch { /* 読めなくても続行（合言葉を聞くだけ） */ }
+  }, []);
+
+  // 合言葉の判定。合っていれば解錠し、違っていれば入力欄を空にしてやり直してもらう。
+  function submitPasscode() {
+    if (passInput.trim() !== OFFICER_PASSCODE) {
+      setPassError(true);
+      setPassInput("");
+      return;
+    }
+    setUnlocked(true);
+    setPassError(false);
+    setPassInput("");
+    try { sessionStorage.setItem(OFFICER_UNLOCK_KEY, "1"); } catch { /* 保存できなくても解錠は有効 */ }
+  }
+
+  // 施錠に戻す（人に画面を渡すときなど）。次に開くときはまた合言葉を聞く。
+  function lockOfficer() {
+    setUnlocked(false);
+    setPassInput("");
+    setPassError(false);
+    try { sessionStorage.removeItem(OFFICER_UNLOCK_KEY); } catch { /* no-op */ }
+  }
+
+  // 役員専用タブを開いている間は、他メンバーの入力を約6秒ごとに取り込む（共有・同期）。
+  // 施錠中は中身を出していないので取りに行かない。
+  useEffect(() => {
+    if (tab !== "officer" || !unlocked) return;
     let alive = true;
     const iv = setInterval(async () => {
       if (pendingWrites.current > 0) return; // 書き込み中はスキップ（自分の入力の巻き戻り防止）
@@ -268,7 +822,7 @@ export default function AdminPage() {
       } catch { /* 一時的な失敗は無視して次回に */ }
     }, 6000);
     return () => { alive = false; clearInterval(iv); };
-  }, [tab]);
+  }, [tab, unlocked]);
 
   // タスクの優先度を設定（同じものを再度押すと解除）。全員に共有（Supabase）。
   function setTaskPriority(taskId: string, p: Priority) {
@@ -414,12 +968,13 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* ── タブ切替（役員専用 / 部屋割り・メンバー）── */}
+      {/* ── タブ切替（部屋割り・メンバー / 役員専用 / 役員専用2）── */}
       <div className="px-4 pt-3 max-w-lg mx-auto">
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: "#f4f0ea" }}>
           {([
             { key: "admin", label: "部屋割り・メンバー" },
             { key: "officer", label: "役員専用" },
+            { key: "officer2", label: "役員専用2" },
           ] as const).map((t) => {
             const active = tab === t.key;
             return (
@@ -443,7 +998,85 @@ export default function AdminPage() {
       {/* ── 役員専用タブ（ロックなし）── */}
       {/* このタブのみ高級感のある白基調・ミニマムなUI。全スタイルをインラインで自己完結させ、
           他画面のピンク系テーマを継承しない。優先度は役員が表で手動設定する。 */}
-      {tab === "officer" && (
+      {/* ── 合言葉の入力（役員専用・役員専用2で共通）── */}
+      {/* 合言葉を入れるまで、右2つのタブの中身は一切描かない。片方を開ければもう片方も開く。 */}
+      {(tab === "officer" || tab === "officer2") && !unlocked && (
+        <div className="px-4 pt-5 pb-8 max-w-lg mx-auto">
+          <div
+            style={{
+              background: "linear-gradient(180deg,#ffffff,#fdfcfa)",
+              border: "1px solid #eee7db",
+              borderRadius: 22,
+              padding: "30px 26px 26px",
+              boxShadow: "0 18px 50px -30px rgba(70,58,34,0.35)",
+            }}
+          >
+            <p style={{ fontSize: 10.5, letterSpacing: "0.30em", color: "#bcb09c", fontWeight: 600, textTransform: "uppercase" }}>
+              Officer
+            </p>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#1c1a17", marginTop: 8, letterSpacing: "0.01em" }}>
+              合言葉を入れてください
+            </h2>
+            <p style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.9, color: "#8b8274" }}>
+              ここから先は役員だけが使うページです。合言葉は役員のあいだで共有しています。
+            </p>
+
+            <form
+              onSubmit={(e) => { e.preventDefault(); submitPasscode(); }}
+              style={{ marginTop: 18, display: "flex", gap: 8 }}
+            >
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                value={passInput}
+                onChange={(e) => { setPassInput(e.target.value); setPassError(false); }}
+                placeholder="合言葉"
+                aria-label="合言葉"
+                style={{
+                  flex: 1,
+                  padding: "11px 14px",
+                  borderRadius: 11,
+                  border: `1px solid ${passError ? "#c96a6a" : "#e3dccf"}`,
+                  background: "#fff",
+                  color: "#1c1a17",
+                  fontSize: 15,
+                  letterSpacing: "0.18em",
+                  outline: "none",
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  padding: "11px 22px",
+                  borderRadius: 11,
+                  border: "none",
+                  background: "#1c1a17",
+                  color: "#fff",
+                  fontSize: 13.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                開く
+              </button>
+            </form>
+
+            {passError && (
+              <p style={{ marginTop: 10, fontSize: 12, color: "#b25a5a" }}>
+                合言葉が違います。もう一度入れてください。
+              </p>
+            )}
+
+            <p style={{ marginTop: 16, fontSize: 11, lineHeight: 1.9, color: "#b3a794" }}>
+              ※ 一度入れると、このタブを閉じるまで聞き直しません。ブラウザを閉じるとまた合言葉を聞きます。
+            </p>
+          </div>
+        </div>
+      )}
+
+      {tab === "officer" && unlocked && (
         <div className="px-4 pt-5 pb-8 max-w-5xl mx-auto">
           <div
             style={{
@@ -719,6 +1352,23 @@ export default function AdminPage() {
               ※ 左側は「必ず／なるべく／できたら／今回はやらない」の4段階で優先度をつける進め方（MoSCoW法を参考）、右側は「担当者／責任者／相談役／お知らせ」の4つで役割を分ける表（RACIという役割分担の考え方を参考）です。分類は内容から推し量った暫定です。役員MTGで話しながら見直していきましょう。
             </p>
           </div>
+        </div>
+      )}
+
+      {/* ── 役員専用2タブ ── */}
+      {/* マニュアルにあった表の見た目と操作感だけを置いてある。中身はこれから入れる。 */}
+      {tab === "officer2" && unlocked && <OfficerRoleTable />}
+
+      {/* 施錠に戻す（人に画面を渡すときなど）。解錠中だけ、目立たない形で出す。 */}
+      {(tab === "officer" || tab === "officer2") && unlocked && (
+        <div className="px-4 pb-10 max-w-5xl mx-auto">
+          <button
+            type="button"
+            onClick={lockOfficer}
+            style={{ fontSize: 11.5, color: "#b0a794", background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}
+          >
+            合言葉の入力に戻す
+          </button>
         </div>
       )}
 
