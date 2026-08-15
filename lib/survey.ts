@@ -52,11 +52,10 @@ const TRANSPORT_OPTIONS: SurveyOption[] = [
   { value: "neither", label: "行き・帰りとも、まだ決まっていません", short: "行き帰りとも未定" },
 ];
 
-/* お酒。頼む量の見当をつけるためのもの。飲まない方が答えにくくならないよう、
-   「飲めない／飲まない」の理由は聞かず、当日どうするかだけを聞く。 */
+/* お酒。少しでも飲めば「飲みます」なので、途中の段は作らず2つに分ける。
+   飲まない方が答えにくくならないよう、飲めない／飲まない理由は聞かない。 */
 const DRINK_OPTIONS: SurveyOption[] = [
   { value: "yes", label: "飲みます", short: "飲む" },
-  { value: "little", label: "少しだけ飲みます", short: "少し" },
   { value: "no", label: "飲みません", short: "飲まない" },
 ];
 
