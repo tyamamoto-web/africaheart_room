@@ -6,7 +6,7 @@ import { nextEvent } from "@/lib/data";
 import { OFFICER_UNLOCK_KEY, isOfficerUnlocked, unlockOfficer, lockOfficer } from "@/lib/officerGate";
 import {
   SURVEY_QUESTIONS, getSurveyAnswers, saveSurveyAnswer, deleteSurveyAnswer,
-  surveyDeviceId, emptyValues, missingRequired, answerText, AGREED, estimateFee, yenText,
+  surveyDeviceId, emptyValues, missingRequired, answerText, AGREED, estimateFee, yenText, SURVEY_DEADLINE,
   type SurveyAnswer, type SurveyValue,
 } from "@/lib/survey";
 
@@ -224,6 +224,17 @@ function AnswerView() {
 
   return (
     <div className="mt-5">
+      {/* 期限は設問より先に置く。あとで直せることも同時に伝えて、様子見で後回しにされないようにする。 */}
+      <p
+        className="text-[11px] leading-relaxed"
+        style={{ color: S.sub, background: S.band, borderRadius: 3, padding: "9px 11px", marginBottom: 18 }}
+      >
+        <span className="font-bold" style={{ color: S.ink }}>
+          {SURVEY_DEADLINE}まで
+        </span>
+        にお答えください。送ったあとも、それまでは何度でも書きかえられます。
+      </p>
+
       {SURVEY_QUESTIONS.map((q, i) => {
         const lacking = missing.includes(q.id);
         return (
@@ -450,7 +461,7 @@ function AnswerView() {
 
       {sent && !dirty && !err && (
         <p className="text-[11px] mt-2 leading-relaxed" style={{ color: S.cap }}>
-          回答を受け取りました。締め切りまでは、この画面でいつでも書き換えられます。
+          回答を受け取りました。{SURVEY_DEADLINE}までは、この画面でいつでも書きかえられます。
         </p>
       )}
 

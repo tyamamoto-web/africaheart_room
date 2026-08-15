@@ -159,7 +159,7 @@ export const nextEvent = {
 export const defaultMembers: Member[] = [
   { id: "1",  nickname: "よしのすけ", role: "leader" },
   { id: "2",  nickname: "くる",       role: "subleader" },
-  { id: "3",  nickname: "しゃちょー", role: "regular" },
+  { id: "3",  nickname: "しゃちょー", role: "subleader" }, // くると同じサブリーダー（役員RACIの lib/officerRaci.ts と合わせた）
   { id: "4",  nickname: "Take",       role: "regular" },
   { id: "5",  nickname: "シュウ",     role: "regular" },
   { id: "6",  nickname: "ヒィ",       role: "regular" },
