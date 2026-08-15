@@ -6,7 +6,8 @@ import { nextEvent } from "@/lib/data";
 import { OFFICER_UNLOCK_KEY, isOfficerUnlocked, unlockOfficer, lockOfficer } from "@/lib/officerGate";
 import {
   SURVEY_QUESTIONS, getSurveyAnswers, saveSurveyAnswer, deleteSurveyAnswer,
-  surveyDeviceId, emptyValues, missingRequired, type SurveyAnswer,
+  surveyDeviceId, emptyValues, missingRequired, answerText,
+  type SurveyAnswer, type SurveyValue,
 } from "@/lib/survey";
 
 /* ============================================================
@@ -51,6 +52,7 @@ const PAGE_CSS = `
 }
 .svy .primary:hover:not(:disabled) { background:#4a463e; }
 .svy .quiet:hover { color:${S.ink}; }
+.svy .check:hover { background:${S.soft}; }
 `;
 
 type View = "answer" | "results";
@@ -137,7 +139,7 @@ export default function SurveyPage() {
 
 /* ── 回答する（参加する方の画面）───────────────────────────── */
 function AnswerView() {
-  const [values, setValues] = useState<Record<string, string>>(emptyValues);
+  const [values, setValues] = useState<Record<string, SurveyValue>>(emptyValues);
   const [deviceId, setDeviceId] = useState("");
   const [sent, setSent] = useState(false); // すでに出したことがあるか
   const [dirty, setDirty] = useState(false); // 出したあとに書き換えたか
@@ -164,10 +166,17 @@ function AnswerView() {
     };
   }, []);
 
-  function change(qid: string, v: string) {
+  function change(qid: string, v: SurveyValue) {
     setValues((prev) => ({ ...prev, [qid]: v }));
     setDirty(true);
     setMissing((m) => m.filter((x) => x !== qid));
+  }
+
+  // チェックの入り切り。選択肢の並び順は lib/survey.ts 側でそろえるので、ここでは足し引きだけ。
+  function toggle(qid: string, value: string) {
+    const cur = values[qid];
+    const list = Array.isArray(cur) ? cur : [];
+    change(qid, list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
   }
 
   async function submit() {
@@ -222,29 +231,83 @@ function AnswerView() {
               </span>
               {q.label}
             </label>
-            <input
-              id={`sv-${q.id}`}
-              type="text"
-              value={values[q.id] ?? ""}
-              maxLength={q.max}
-              onChange={(e) => change(q.id, e.target.value)}
-              style={{
-                width: "100%",
-                marginTop: 8,
-                border: `1px solid ${lacking ? S.warn : S.rule}`,
-                borderRadius: 3,
-                background: S.paper,
-                color: S.ink,
-                fontSize: 14,
-                padding: "10px 12px",
-                outline: "none",
-                fontFamily: "inherit",
-                transition: "background .12s, border-color .12s, box-shadow .12s",
-              }}
-            />
+            {q.kind === "text" ? (
+              <input
+                id={`sv-${q.id}`}
+                type="text"
+                value={typeof values[q.id] === "string" ? (values[q.id] as string) : ""}
+                maxLength={q.max}
+                onChange={(e) => change(q.id, e.target.value)}
+                style={{
+                  width: "100%",
+                  marginTop: 8,
+                  border: `1px solid ${lacking ? S.warn : S.rule}`,
+                  borderRadius: 3,
+                  background: S.paper,
+                  color: S.ink,
+                  fontSize: 14,
+                  padding: "10px 12px",
+                  outline: "none",
+                  fontFamily: "inherit",
+                  transition: "background .12s, border-color .12s, box-shadow .12s",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  marginTop: 8,
+                  border: `1px solid ${lacking ? S.warn : S.rule}`,
+                  borderRadius: 3,
+                  overflow: "hidden",
+                }}
+              >
+                {q.options.map((o, oi) => {
+                  const cur = values[q.id];
+                  const on = Array.isArray(cur) && cur.includes(o.value);
+                  return (
+                    <label
+                      key={o.value}
+                      className="check flex items-center gap-3"
+                      style={{
+                        padding: "12px 12px",
+                        borderTop: oi === 0 ? "none" : `1px solid ${S.hair}`,
+                        background: on ? S.soft : S.paper,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggle(q.id, o.value)}
+                        style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                      />
+                      {/* 四角は自分で描く（環境ごとの見た目の差をなくす） */}
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 17,
+                          height: 17,
+                          flex: "0 0 auto",
+                          borderRadius: 3,
+                          border: `1px solid ${on ? S.ink : S.rule}`,
+                          background: on ? S.ink : S.paper,
+                          color: S.paper,
+                          fontSize: 11,
+                          lineHeight: "15px",
+                          textAlign: "center",
+                        }}
+                      >
+                        {on ? "✓" : ""}
+                      </span>
+                      <span style={{ fontSize: 13, color: S.ink, letterSpacing: "0.01em" }}>{o.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
             {lacking && (
               <p className="text-[11px] mt-1.5" style={{ color: S.warn }}>
-                こちらは必ず入れてください。
+                {q.kind === "checks" ? "1つ以上えらんでください。" : "こちらは必ず入れてください。"}
               </p>
             )}
           </div>
@@ -457,7 +520,7 @@ function ResultsView() {
                   </td>
                   {SURVEY_QUESTIONS.map((q) => (
                     <td key={q.id} style={{ ...td, color: S.ink }}>
-                      {a.values[q.id] || "—"}
+                      {answerText(q, a.values[q.id]) || "—"}
                     </td>
                   ))}
                   <td style={{ ...td, textAlign: "right", color: S.faint, fontVariantNumeric: "tabular-nums" }}>

@@ -46,6 +46,10 @@ export type NextScheduleItem = {
   place: string;
   cost: string;
   map: string;
+  /* 参加者アンケートで「どこから参加するか」を選んでもらう対象かどうか。
+     値があるものだけが選択肢に出る（集合・移動・解散は参加の単位ではないので付けない）。
+     この文字列は回答の保存キーになるので、一度決めたら変えないこと。 */
+  joinKey?: string;
   detailHeading?: string;
   detail?: { label: string; price?: string }[];
   note?: string;
@@ -75,6 +79,7 @@ export const nextEvent = {
     {
       time: "12:00〜17:40",
       title: "カラオケ",
+      joinKey: "karaoke",
       place: "JOYJOY 諏訪インター店（2部屋）",
       cost: "1,700円",
       map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2",
@@ -87,6 +92,7 @@ export const nextEvent = {
     {
       time: "18:00〜19:20",
       title: "焼肉パーティー",
+      joinKey: "yakiniku",
       place: "焼肉 じゅうじゅうカルビ 上諏訪店",
       cost: "4,900〜5,500円",
       map: "じゅうじゅうカルビ 上諏訪店 長野県諏訪市",
@@ -98,10 +104,11 @@ export const nextEvent = {
       note: "コースは「じゅうかる」（140品・食べ放題）で全員統一。上のどちらかを当日選択します。目安は端数を切り上げた金額です。",
     },
     { time: "19:20〜20:00", title: "移動・買い出し", place: "コンビニで各自、お酒・ジュース・おつまみを少量購入", cost: "", map: "" },
-    { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市" },
+    { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市", joinKey: "hanabi" },
     {
       time: "21:00〜23:00",
       title: "カラオケバー",
+      joinKey: "bar",
       place: "カラオケバー・ミルユッテ",
       cost: "3,500円",
       map: "カラオケバー ミルユッテ 長野県諏訪市大手2丁目1-4 大津屋ビル2F",
