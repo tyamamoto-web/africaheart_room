@@ -50,6 +50,12 @@ export type NextScheduleItem = {
      値があるものだけが選択肢に出る（集合・移動・解散は参加の単位ではないので付けない）。
      この文字列は回答の保存キーになるので、一度決めたら変えないこと。 */
   joinKey?: string;
+  /* 参加費の自動計算に使う金額（円）。cost は表示用の文字列なので、計算にはこちらを使う。
+     当日どちらかを選ぶ会場（焼肉）は feeDrink＝飲み放題／feeSoft＝ソフトドリンクに分けて持つ。
+     joinKey が付いている項目には必ずどちらかを入れること（無いと0円として数える）。 */
+  fee?: number;
+  feeDrink?: number;
+  feeSoft?: number;
   detailHeading?: string;
   detail?: { label: string; price?: string }[];
   note?: string;
@@ -82,6 +88,7 @@ export const nextEvent = {
       joinKey: "karaoke",
       place: "JOYJOY 諏訪インター店（2部屋）",
       cost: "1,700円",
+      fee: 1700,
       map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2",
       detail: [
         { label: "フリータイム", price: "1,200円" },
@@ -95,6 +102,8 @@ export const nextEvent = {
       joinKey: "yakiniku",
       place: "焼肉 じゅうじゅうカルビ 上諏訪店",
       cost: "4,900〜5,500円",
+      feeDrink: 5500,
+      feeSoft: 4900,
       map: "じゅうじゅうカルビ 上諏訪店 長野県諏訪市",
       detailHeading: "当日どちらかを選択",
       detail: [
@@ -104,13 +113,14 @@ export const nextEvent = {
       note: "コースは「じゅうかる」（140品・食べ放題）で全員統一。上のどちらかを当日選択します。目安は端数を切り上げた金額です。",
     },
     { time: "19:20〜20:00", title: "移動・買い出し", place: "コンビニで各自、お酒・ジュース・おつまみを少量購入", cost: "", map: "" },
-    { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市", joinKey: "hanabi" },
+    { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市", joinKey: "hanabi", fee: 0 },
     {
       time: "21:00〜23:00",
       title: "カラオケバー",
       joinKey: "bar",
       place: "カラオケバー・ミルユッテ",
       cost: "3,500円",
+      fee: 3500,
       map: "カラオケバー ミルユッテ 長野県諏訪市大手2丁目1-4 大津屋ビル2F",
       detailHeading: "3,500円に含まれるもの",
       detail: [
@@ -134,6 +144,8 @@ export const nextEvent = {
   paymentNote:
     "集合時に1日分（全額）を会計担当（くるちゃん）へまとめてお支払いください。各会場への支払いは会計がまとめて行います。",
   driverThanks: "車を出してくれた方へお礼：1人 300円（この概算に含みます）",
+  // 上のお礼の金額（参加費の自動計算に使う。参加する方は全員ぶん出し合う）
+  driverThanksFee: 300,
   // 予定・価格が変わりうる旨の注意書き（運営依頼）
   changeNote: "やむなく予定・価格の変更があることがあります。ご了承ください。",
   // 雨天・持ち物の案内

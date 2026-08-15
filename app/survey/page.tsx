@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { nextEvent } from "@/lib/data";
 import { OFFICER_UNLOCK_KEY, isOfficerUnlocked, unlockOfficer, lockOfficer } from "@/lib/officerGate";
 import {
   SURVEY_QUESTIONS, getSurveyAnswers, saveSurveyAnswer, deleteSurveyAnswer,
-  surveyDeviceId, emptyValues, missingRequired, answerText, AGREED,
+  surveyDeviceId, emptyValues, missingRequired, answerText, AGREED, estimateFee, yenText,
   type SurveyAnswer, type SurveyValue,
 } from "@/lib/survey";
 
@@ -146,6 +146,7 @@ function AnswerView() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
+  const feeRef = useRef<HTMLDivElement | null>(null);
 
   // 自分が前に出した回答があれば読み込んで、書き換えられるようにする
   useEffect(() => {
@@ -192,6 +193,8 @@ function AnswerView() {
       await saveSurveyAnswer(deviceId, values);
       setSent(true);
       setDirty(false);
+      // 送ったあとに出る参加費は、長い設問の下に隠れる。自分から見せに行く。
+      requestAnimationFrame(() => feeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "保存に失敗しました");
     } finally {
@@ -214,6 +217,10 @@ function AnswerView() {
       setBusy(false);
     }
   }
+
+  // 参加費は回答から自動で出す（計算は lib/survey.ts、金額の出どころは lib/data.ts の予定表）
+  const fee = estimateFee(values);
+  const picksCourse = fee.lines.some((l) => !!l.note); // 焼肉のように当日えらぶ会場に参加するか
 
   return (
     <div className="mt-5">
@@ -445,6 +452,76 @@ function AnswerView() {
         <p className="text-[11px] mt-2 leading-relaxed" style={{ color: S.cap }}>
           回答を受け取りました。締め切りまでは、この画面でいつでも書き換えられます。
         </p>
+      )}
+
+      {/* 回答から出した参加費。集金の場でもめないよう、内訳を出してから合計を見せる。 */}
+      {sent && (
+        <div
+          ref={feeRef}
+          className="mt-4"
+          style={{ border: `1px solid ${S.rule}`, borderRadius: 3, overflow: "hidden", background: S.paper }}
+        >
+          <div style={{ background: S.band, padding: "9px 12px", borderBottom: `1px solid ${S.hair}` }}>
+            <p className="text-[10.5px] font-bold" style={{ color: S.cap, letterSpacing: "0.1em" }}>
+              あなたの参加費（目安）
+            </p>
+          </div>
+          <div style={{ padding: "4px 12px 14px" }}>
+            {fee.lines.map((l, li) => (
+              <div
+                key={l.label}
+                className="flex items-baseline justify-between"
+                style={{ padding: "9px 0", borderTop: li === 0 ? "none" : `1px solid ${S.hair}` }}
+              >
+                <span style={{ fontSize: 12.5, color: S.ink }}>
+                  {l.label}
+                  {l.note && (
+                    <span style={{ fontSize: 11, color: S.faint, marginLeft: 7 }}>{l.note}</span>
+                  )}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12.5,
+                    color: l.yen === 0 ? S.faint : S.ink,
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    paddingLeft: 10,
+                  }}
+                >
+                  {yenText(l.yen)}
+                </span>
+              </div>
+            ))}
+            <div
+              className="flex items-baseline justify-between"
+              style={{ marginTop: 3, paddingTop: 10, borderTop: `2px solid ${S.ink}` }}
+            >
+              <span className="font-bold" style={{ fontSize: 11.5, color: S.cap, letterSpacing: "0.08em" }}>
+                合計
+              </span>
+              <span className="font-black" style={{ fontSize: 22, color: S.ink, fontVariantNumeric: "tabular-nums" }}>
+                {fee.total.toLocaleString("ja-JP")}
+                <span style={{ fontSize: 12, marginLeft: 2 }}>円</span>
+              </span>
+            </div>
+
+            <p className="text-[11px] mt-3 leading-relaxed" style={{ color: S.cap }}>
+              集合のときに、この金額を会計のくるちゃんへお渡しください。お釣りのないようにご用意いただけると助かります。
+            </p>
+            {picksCourse && (
+              <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: S.cap }}>
+                焼肉のコースは当日えらびます。上と違うほうをえらんだ場合は、その場で差額600円をやり取りします。
+              </p>
+            )}
+            <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: S.cap }}>
+              コンビニでの買い物代と、ミルユッテでの追加注文は、この金額とは別に手元にご用意ください。
+            </p>
+            <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: S.faint }}>
+              あくまで目安です。確定した金額は8月21日にお知らせします。
+              {dirty ? "いまは書きかえ中の内容で計算しています。" : ""}
+            </p>
+          </div>
+        </div>
       )}
 
       {sent && (

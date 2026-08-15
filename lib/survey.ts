@@ -159,6 +159,46 @@ export const SURVEY_QUESTIONS: SurveyQuestion[] = [
 /** 答えの形。自由記入は文字列、チェックは選んだ value の配列。 */
 export type SurveyValue = string | string[];
 
+/* ── 参加費の自動計算 ────────────────────────────────────────
+   回答（どこに参加するか・お酒を飲むか）から、その人が集合時に払う額を組み立てる。
+   金額は lib/data.ts の予定表から取る。ここに数字を書かない（二重管理にすると必ずずれる）。 */
+
+// 計算に使う設問。設問の id を変えたらここも直すこと。
+const Q_JOIN = "q2"; // 参加するスケジュール
+const Q_DRINK = "q4"; // お酒を飲むか
+
+export type FeeLine = { label: string; yen: number; note?: string };
+export type FeeEstimate = { lines: FeeLine[]; total: number };
+
+/** 回答から参加費の目安を出す。1つも参加しない場合は空（合計0円）。 */
+export function estimateFee(values: Record<string, SurveyValue>): FeeEstimate {
+  const joined = Array.isArray(values[Q_JOIN]) ? (values[Q_JOIN] as string[]) : [];
+  const drinks = values[Q_DRINK] === "yes";
+
+  const lines: FeeLine[] = [];
+  for (const s of nextEvent.schedule) {
+    if (!s.joinKey || !joined.includes(s.joinKey)) continue;
+    // 当日どちらかを選ぶ会場（焼肉）は、お酒の回答でどちらの額かが決まる
+    const split = s.feeDrink !== undefined && s.feeSoft !== undefined;
+    lines.push({
+      label: s.title,
+      yen: split ? (drinks ? (s.feeDrink as number) : (s.feeSoft as number)) : (s.fee ?? 0),
+      note: split ? (drinks ? "飲み放題" : "ソフトドリンク") : undefined,
+    });
+  }
+  // お礼は参加する方みんなで出し合うぶん。1か所でも参加するなら入れる。
+  if (lines.length > 0) {
+    lines.push({ label: "車を出してくれた方へのお礼", yen: nextEvent.driverThanksFee });
+  }
+
+  return { lines, total: lines.reduce((sum, l) => sum + l.yen, 0) };
+}
+
+/** 金額の見せ方をそろえる（0円は「無料」）。 */
+export function yenText(yen: number): string {
+  return yen === 0 ? "無料" : `${yen.toLocaleString("ja-JP")}円`;
+}
+
 /** 1人ぶんの回答。id はこの端末を見分けるための不変値。 */
 export type SurveyAnswer = {
   id: string;
