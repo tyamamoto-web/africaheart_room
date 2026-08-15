@@ -62,6 +62,78 @@ export type NextScheduleItem = {
   warn?: string;
 };
 
+// 車を出してくれた方へのお礼（1人あたり）。参加費の計算にも、下の文面にも使う。
+const DRIVER_THANKS_FEE = 300;
+
+// 当日のスケジュール（予定）。cost は「1人あたりの目安」。空文字は費用表示なし。
+// map: タップで地図アプリを開く検索クエリ（店名＋住所）。空なら地図リンクを出さない。
+// ここの金額（fee / feeDrink / feeSoft）が、TOPの概算と参加者アンケートの参加費の
+// ただ一つの出どころ。値を直せば両方が同時に変わる（片方だけ古い、が起きない）。
+const nextSchedule: NextScheduleItem[] = [
+  { time: "11:50", title: "集合", place: "JOYJOY 諏訪インター店 ロビー集合", cost: "", map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2" },
+  {
+    time: "12:00〜17:40",
+    title: "カラオケ",
+    joinKey: "karaoke",
+    place: "JOYJOY 諏訪インター店（2部屋）",
+    cost: "1,700円",
+    fee: 1700,
+    map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2",
+    detail: [
+      { label: "フリータイム", price: "1,200円" },
+      { label: "延長1時間", price: "＋490円" },
+    ],
+    note: "焼肉への移動のため17:40で終了予定。端数を切り上げ目安1,700円です。",
+  },
+  {
+    time: "18:00〜19:20",
+    title: "焼肉パーティー",
+    joinKey: "yakiniku",
+    place: "焼肉 じゅうじゅうカルビ 上諏訪店",
+    cost: "4,900〜5,500円",
+    feeDrink: 5500,
+    feeSoft: 4900,
+    map: "じゅうじゅうカルビ 上諏訪店 長野県諏訪市",
+    detailHeading: "当日どちらかを選択",
+    detail: [
+      { label: "フル焼肉＋飲み放題（サワー・ハイボール・カクテル等）", price: "5,500円" },
+      { label: "フル焼肉＋ソフトドリンク", price: "4,900円" },
+    ],
+    note: "コースは「じゅうかる」（140品・食べ放題）で全員統一。上のどちらかを当日選択します。目安は端数を切り上げた金額です。",
+  },
+  { time: "19:20〜20:00", title: "移動・買い出し", place: "コンビニで各自、お酒・ジュース・おつまみを少量購入", cost: "", map: "" },
+  { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市", joinKey: "hanabi", fee: 0 },
+  {
+    time: "21:00〜23:00",
+    title: "カラオケバー",
+    joinKey: "bar",
+    place: "カラオケバー・ミルユッテ",
+    cost: "3,500円",
+    fee: 3500,
+    map: "カラオケバー ミルユッテ 長野県諏訪市大手2丁目1-4 大津屋ビル2F",
+    detailHeading: "3,500円に含まれるもの",
+    detail: [
+      { label: "歌い放題（2時間）" },
+      { label: "ハウスウイスキー（水割り・ロック・ストレート）" },
+      { label: "烏龍茶・ジュース（アフリカへの特別サービス／通常はソフトドリンク1杯500円）" },
+    ],
+    warn: "ハイボールは＋500円、その他のウイスキー・酒類は別料金です。注文するときはマスターに価格を確認し、会計（くるちゃん）に代金を渡してから注文してください。",
+  },
+  { time: "23:05", title: "解散", place: "松本行 終電／上諏訪駅まで徒歩5分", cost: "", map: "上諏訪駅 長野県諏訪市" },
+];
+
+/** 全部に参加した場合の1日ぶんの目安（お礼こみ）。drink=true は焼肉を飲み放題で数える。 */
+function sumDayFee(drink: boolean): number {
+  const venues = nextSchedule.reduce((total, s) => {
+    if (!s.joinKey) return total; // 集合・移動・解散は費用なし
+    if (s.feeDrink !== undefined && s.feeSoft !== undefined) return total + (drink ? s.feeDrink : s.feeSoft);
+    return total + (s.fee ?? 0);
+  }, 0);
+  return venues + DRIVER_THANKS_FEE;
+}
+
+const yen = (n: number) => `${n.toLocaleString("ja-JP")}円`;
+
 // 次回イベント告知（部屋割りの無い回）。TOPの EventAnnounce で表示する。
 // 内容を差し替えるだけで告知を更新できる（チラシ「夏の歌宴 完全燃焼 in 諏訪」より）。
 export const nextEvent = {
@@ -78,74 +150,22 @@ export const nextEvent = {
     { label: "焼肉", note: "食べ放題でお腹いっぱい", tone: "pink" as const },
     { label: "サマーナイト花火", note: "毎晩約500発の打ち上げ花火", tone: "gold" as const },
   ],
-  // 当日のスケジュール（予定）。cost は「1人あたりの目安」。空文字は費用表示なし。
-  // map: タップで地図アプリを開く検索クエリ（店名＋住所）。空なら地図リンクを出さない。
-  schedule: [
-    { time: "11:50", title: "集合", place: "JOYJOY 諏訪インター店 ロビー集合", cost: "", map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2" },
-    {
-      time: "12:00〜17:40",
-      title: "カラオケ",
-      joinKey: "karaoke",
-      place: "JOYJOY 諏訪インター店（2部屋）",
-      cost: "1,700円",
-      fee: 1700,
-      map: "カラオケJOYJOY 諏訪インター店 長野県諏訪市四賀1811-2",
-      detail: [
-        { label: "フリータイム", price: "1,200円" },
-        { label: "延長1時間", price: "＋490円" },
-      ],
-      note: "焼肉への移動のため17:40で終了予定。端数を切り上げ目安1,700円です。",
-    },
-    {
-      time: "18:00〜19:20",
-      title: "焼肉パーティー",
-      joinKey: "yakiniku",
-      place: "焼肉 じゅうじゅうカルビ 上諏訪店",
-      cost: "4,900〜5,500円",
-      feeDrink: 5500,
-      feeSoft: 4900,
-      map: "じゅうじゅうカルビ 上諏訪店 長野県諏訪市",
-      detailHeading: "当日どちらかを選択",
-      detail: [
-        { label: "フル焼肉＋飲み放題（サワー・ハイボール・カクテル等）", price: "5,500円" },
-        { label: "フル焼肉＋ソフトドリンク", price: "4,900円" },
-      ],
-      note: "コースは「じゅうかる」（140品・食べ放題）で全員統一。上のどちらかを当日選択します。目安は端数を切り上げた金額です。",
-    },
-    { time: "19:20〜20:00", title: "移動・買い出し", place: "コンビニで各自、お酒・ジュース・おつまみを少量購入", cost: "", map: "" },
-    { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市", joinKey: "hanabi", fee: 0 },
-    {
-      time: "21:00〜23:00",
-      title: "カラオケバー",
-      joinKey: "bar",
-      place: "カラオケバー・ミルユッテ",
-      cost: "3,500円",
-      fee: 3500,
-      map: "カラオケバー ミルユッテ 長野県諏訪市大手2丁目1-4 大津屋ビル2F",
-      detailHeading: "3,500円に含まれるもの",
-      detail: [
-        { label: "歌い放題（2時間）" },
-        { label: "ハウスウイスキー（水割り・ロック・ストレート）" },
-        { label: "烏龍茶・ジュース（アフリカへの特別サービス／通常はソフトドリンク1杯500円）" },
-      ],
-      warn: "ハイボールは＋500円、その他のウイスキー・酒類は別料金です。注文するときはマスターに価格を確認し、会計（くるちゃん）に代金を渡してから注文してください。",
-    },
-    { time: "23:05", title: "解散", place: "松本行 終電／上諏訪駅まで徒歩5分", cost: "", map: "上諏訪駅 長野県諏訪市" },
-  ] as NextScheduleItem[],
+  schedule: nextSchedule,
   feeNote: "料金はすべて1人あたりの目安です。端数は100円単位で切り上げています。",
-  // 概算合計は焼肉のドリンク選択で2種（お酒を飲む人／飲まない人）
-  estimateDrink: "11,000円",
-  estimateSoft: "10,400円",
-  estimateBridge: "上のスケジュール料金とお礼（300円）を合わせた目安です。",
-  estimateNote:
-    "あくまで予約前の概算です。焼肉のドリンクを「飲み放題」か「ソフトドリンク」のどちらで選ぶかにより、飲む人と飲まない人で600円変わります。追加注文がなければこの範囲に収まる見込みです。",
+  // 概算合計は焼肉のドリンク選択で2種（お酒を飲む人／飲まない人）。予定表の金額から自動で出す。
+  estimateDrink: yen(sumDayFee(true)),
+  estimateSoft: yen(sumDayFee(false)),
+  estimateBridge: `上のスケジュール料金とお礼（${yen(DRIVER_THANKS_FEE)}）を合わせた目安です。`,
+  estimateNote: `あくまで予約前の概算です。焼肉のドリンクを「飲み放題」か「ソフトドリンク」のどちらで選ぶかにより、飲む人と飲まない人で${yen(sumDayFee(true) - sumDayFee(false))}変わります。追加注文がなければこの範囲に収まる見込みです。`,
   // 当日の会計方法（運営依頼）。当日の最重要アクションとして見出し付きで強調表示する。
   paymentTitle: "当日の支払い",
   paymentNote:
     "集合時に1日分（全額）を会計担当（くるちゃん）へまとめてお支払いください。各会場への支払いは会計がまとめて行います。",
-  driverThanks: "車を出してくれた方へお礼：1人 300円（この概算に含みます）",
+  driverThanks: `車を出してくれた方へお礼：1人 ${yen(DRIVER_THANKS_FEE)}（この概算に含みます）`,
   // 上のお礼の金額（参加費の自動計算に使う。参加する方は全員ぶん出し合う）
-  driverThanksFee: 300,
+  driverThanksFee: DRIVER_THANKS_FEE,
+  // 焼肉のドリンクの選び方で変わる差額（当日えらび直したときのやり取りに使う）
+  drinkDiffFee: sumDayFee(true) - sumDayFee(false),
   // 予定・価格が変わりうる旨の注意書き（運営依頼）
   changeNote: "やむなく予定・価格の変更があることがあります。ご了承ください。",
   // 雨天・持ち物の案内

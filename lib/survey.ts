@@ -176,7 +176,8 @@ const Q_JOIN = "q2"; // 参加するスケジュール
 const Q_DRINK = "q4"; // お酒を飲むか
 
 export type FeeLine = { label: string; yen: number; note?: string };
-export type FeeEstimate = { lines: FeeLine[]; total: number };
+/** incomplete＝金額の分からない会場が混じっている（合計をそのまま信じてはいけない）。 */
+export type FeeEstimate = { lines: FeeLine[]; total: number; incomplete: boolean };
 
 /** 回答から参加費の目安を出す。1つも参加しない場合は空（合計0円）。 */
 export function estimateFee(values: Record<string, SurveyValue>): FeeEstimate {
@@ -184,22 +185,34 @@ export function estimateFee(values: Record<string, SurveyValue>): FeeEstimate {
   const drinks = values[Q_DRINK] === "yes";
 
   const lines: FeeLine[] = [];
+  const known = new Set<string>();
+  let incomplete = false;
+
   for (const s of nextEvent.schedule) {
-    if (!s.joinKey || !joined.includes(s.joinKey)) continue;
+    if (!s.joinKey) continue; // 集合・移動・解散は費用なし
+    known.add(s.joinKey);
+    if (!joined.includes(s.joinKey)) continue;
+
     // 当日どちらかを選ぶ会場（焼肉）は、お酒の回答でどちらの額かが決まる
     const split = s.feeDrink !== undefined && s.feeSoft !== undefined;
+    // 予定表に金額が入っていない会場。0円として黙って足すと集金が狂うので、印を立てる。
+    if (!split && s.fee === undefined) incomplete = true;
+
     lines.push({
       label: s.title,
       yen: split ? (drinks ? (s.feeDrink as number) : (s.feeSoft as number)) : (s.fee ?? 0),
       note: split ? (drinks ? "飲み放題" : "ソフトドリンク") : undefined,
     });
   }
+  // 予定表に無いものを選んでいる＝設問と予定表がずれている
+  if (joined.some((k) => !known.has(k))) incomplete = true;
+
   // お礼は参加する方みんなで出し合うぶん。1か所でも参加するなら入れる。
   if (lines.length > 0) {
     lines.push({ label: "車を出してくれた方へのお礼", yen: nextEvent.driverThanksFee });
   }
 
-  return { lines, total: lines.reduce((sum, l) => sum + l.yen, 0) };
+  return { lines, total: lines.reduce((sum, l) => sum + l.yen, 0), incomplete };
 }
 
 /** 金額の見せ方をそろえる（0円は「無料」）。 */

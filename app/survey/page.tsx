@@ -519,9 +519,17 @@ function AnswerView() {
             <p className="text-[11px] mt-3 leading-relaxed" style={{ color: S.cap }}>
               集合のときに、この金額を会計のくるちゃんへお渡しください。お釣りのないようにご用意いただけると助かります。
             </p>
+            {fee.incomplete && (
+              <p className="text-[11px] mt-3 leading-relaxed font-bold" style={{ color: S.warn }}>
+                金額がまだ入っていない項目があります。この合計は正しくないかもしれません。運営にご確認ください。
+              </p>
+            )}
             {picksCourse && (
               <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: S.cap }}>
-                焼肉のコースは当日えらびます。上と違うほうをえらんだ場合は、その場で差額600円をやり取りします。
+                焼肉の金額は、Q4で「
+                {values.q4 === "yes" ? "飲みます" : "飲みません"}
+                」とお答えいただいたので{yenText(fee.lines.find((l) => l.note)?.yen ?? 0)}で計算しています。コースは当日えらぶので、違うほうにされる場合は、その場で差額
+                {yenText(nextEvent.drinkDiffFee)}をやり取りします。
               </p>
             )}
             <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: S.cap }}>
