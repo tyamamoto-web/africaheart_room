@@ -6,7 +6,7 @@ import { nextEvent } from "@/lib/data";
 import { OFFICER_UNLOCK_KEY, isOfficerUnlocked, unlockOfficer, lockOfficer } from "@/lib/officerGate";
 import {
   SURVEY_QUESTIONS, getSurveyAnswers, saveSurveyAnswer, deleteSurveyAnswer,
-  surveyDeviceId, emptyValues, missingRequired, answerText,
+  surveyDeviceId, emptyValues, missingRequired, answerText, AGREED,
   type SurveyAnswer, type SurveyValue,
 } from "@/lib/survey";
 
@@ -252,6 +252,94 @@ function AnswerView() {
                   transition: "background .12s, border-color .12s, box-shadow .12s",
                 }}
               />
+            ) : q.kind === "agree" ? (
+              <>
+                {/* 読んでもらう確認事項。長いので、見出しごとに細い罫で区切る。 */}
+                <div
+                  style={{
+                    marginTop: 8,
+                    border: `1px solid ${S.rule}`,
+                    borderRadius: 3,
+                    background: S.paper,
+                    overflow: "hidden",
+                  }}
+                >
+                  {q.notices.map((n, ni) => (
+                    <div
+                      key={n.title}
+                      style={{ padding: "13px 12px 14px", borderTop: ni === 0 ? "none" : `1px solid ${S.hair}` }}
+                    >
+                      <p className="text-[10.5px] font-bold" style={{ color: S.cap, letterSpacing: "0.1em" }}>
+                        {n.title}
+                      </p>
+                      <ul style={{ marginTop: 7, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {n.lines.map((line, li) => (
+                          <li
+                            key={li}
+                            style={{
+                              fontSize: 12.5,
+                              color: S.ink,
+                              lineHeight: 1.75,
+                              paddingLeft: 13,
+                              textIndent: -13,
+                            }}
+                          >
+                            <span style={{ color: S.faint }}>・</span>
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 了承のチェック。1つだけ。 */}
+                {(() => {
+                  const on = values[q.id] === AGREED;
+                  return (
+                    <label
+                      className="check flex items-center gap-3"
+                      style={{
+                        marginTop: 8,
+                        border: `1px solid ${lacking ? S.warn : S.rule}`,
+                        borderRadius: 3,
+                        padding: "13px 12px",
+                        background: on ? S.soft : S.paper,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => change(q.id, on ? "" : AGREED)}
+                        style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                      />
+                      <span
+                        aria-hidden
+                        className="flex items-center justify-center"
+                        style={{
+                          width: 17,
+                          height: 17,
+                          flex: "0 0 auto",
+                          borderRadius: 3,
+                          border: `1px solid ${on ? S.ink : S.rule}`,
+                          background: on ? S.ink : S.paper,
+                          color: S.paper,
+                          fontSize: 11,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {on ? "✓" : ""}
+                      </span>
+                      <span
+                        style={{ fontSize: 13, fontWeight: 700, color: S.ink, letterSpacing: "0.01em", lineHeight: 1.5 }}
+                      >
+                        {q.confirmLabel}
+                      </span>
+                    </label>
+                  );
+                })()}
+              </>
             ) : (
               <div
                 style={{
@@ -320,7 +408,9 @@ function AnswerView() {
                   ? "1つ以上えらんでください。"
                   : q.kind === "choice"
                     ? "どれか1つをえらんでください。"
-                    : "こちらは必ず入れてください。"}
+                    : q.kind === "agree"
+                      ? "内容をご確認のうえ、チェックを入れてください。"
+                      : "こちらは必ず入れてください。"}
               </p>
             )}
           </div>

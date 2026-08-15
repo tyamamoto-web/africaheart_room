@@ -25,16 +25,31 @@ export type SurveyOption = {
   short: string; // 運営の一覧に出す（短く）
 };
 
+/** 読んでもらう確認事項のひとかたまり（見出しと、その中の箇条書き）。 */
+export type SurveyNotice = { title: string; lines: string[] };
+
+/** 了承のチェックが入っているときに保存する値。 */
+export const AGREED = "yes";
+
 /**
  * 設問の型。
  *   text   … 自由記入（答えは文字列）
  *   checks … あてはまるものすべてにチェック（答えは選んだ value の配列）
  *   choice … どれか1つをえらぶ（答えはえらんだ value の文字列）
+ *   agree  … 確認事項を読んで了承のチェックを入れる（答えは AGREED か空）
  */
 export type SurveyQuestion =
   | { id: string; label: string; kind: "text"; required: boolean; max: number }
   | { id: string; label: string; kind: "checks"; required: boolean; options: SurveyOption[] }
-  | { id: string; label: string; kind: "choice"; required: boolean; options: SurveyOption[] };
+  | { id: string; label: string; kind: "choice"; required: boolean; options: SurveyOption[] }
+  | {
+      id: string;
+      label: string;
+      kind: "agree";
+      required: boolean;
+      notices: SurveyNotice[];
+      confirmLabel: string;
+    };
 
 /* 参加するところを選ぶ選択肢は、イベントの予定（lib/data.ts）から作る。
    joinKey が付いている項目だけが並ぶ（集合・移動・解散は参加の単位ではないので付いていない）。
@@ -59,6 +74,65 @@ const DRINK_OPTIONS: SurveyOption[] = [
   { value: "no", label: "飲みません", short: "飲まない" },
 ];
 
+/* 当日までの確認事項。
+   ・中身は運営（LINEでのやりとり）で決まったことと、トップページの告知（lib/data.ts の nextEvent）から取っている。
+     金額・集合・雨天は data.ts の数字と合わせてあるので、あちらを直したらここも見直すこと。
+   ・まだ決まっていないこと（湖岸公園でお酒を飲んでよいか、カラオケ店のゴミの扱い、駅からの送迎の割り当て）は
+     わざと載せていない。決まってから足す。 */
+const EVENT_NOTICES: SurveyNotice[] = [
+  {
+    title: "集合と当日の流れ",
+    lines: [
+      "集合は11:50、JOYJOY 諏訪インター店のロビーです。12:00に始めます。",
+      "解散は23:05ごろ。上諏訪駅まで徒歩5分、松本行の終電に間に合う時間です。",
+      "遅れそうなとき、先に帰る予定があるときは、前もって運営までご連絡ください。やむを得ず途中でお帰りになる場合も、まず運営にご相談ください。",
+      "体調が悪くなったときは、無理をせず、その場で運営にお声がけください。",
+      "やむなく予定や料金が変わることがあります。ご了承ください。",
+    ],
+  },
+  {
+    title: "会費とお支払い",
+    lines: [
+      "集合のときに、1日ぶんの全額を会計のくるへお渡しください。各会場への支払いは運営がまとめて行います。",
+      "目安は、お酒を飲む方 11,000円／飲まない方 10,400円です（車を出してくれた方へのお礼300円を含みます）。",
+      "確定した金額は、8月21日に改めてお知らせします。",
+      "カラオケバー（ミルユッテ）で料金に含まれないお酒を頼むときは、マスターに値段を確かめ、先に会計のくるへ代金をお渡しください（ハイボールは＋500円）。",
+    ],
+  },
+  {
+    title: "お休み・キャンセルのこと",
+    lines: [
+      "体調が悪いときは、無理をせずお休みしてください。",
+      "焼肉のキャンセルは、8月20日までにお伝えいただければ無料です。",
+      "8月21日から当日のキャンセルは、お店にキャンセル料がかかった場合、ご負担をお願いします。",
+      "やむを得ない事情のときは、運営で相談のうえ、オフ会の貯金からお出しすることがあります。",
+    ],
+  },
+  {
+    title: "持ち物",
+    lines: [
+      "お昼ごはんは各自でお持ちください。",
+      "みんなで分けるお菓子を、ひとつお持ちよりください。",
+      "夕立の可能性があります。折りたたみ傘かカッパをお持ちください。レジャーシートは運営で用意します。",
+    ],
+  },
+  {
+    title: "お酒と行き帰り",
+    lines: [
+      "お酒を飲まれる方は、量にお気をつけください。",
+      "車で来られる方は、お酒を飲まないでください。",
+      "行き帰りも安全にお願いします。駅からの送り迎えが必要な方は、早めに運営へご相談ください。",
+    ],
+  },
+  {
+    title: "当日の責任者",
+    lines: [
+      "リーダー よしのすけ ／ サブリーダー しゃちょー ／ 会計 くる",
+      "スケジュールも細かい段取りも、この3人が把握しています。分からないことは何なりとお声がけください。",
+    ],
+  },
+];
+
 /** 設問一覧。並んでいる順に画面へ出る。 */
 export const SURVEY_QUESTIONS: SurveyQuestion[] = [
   { id: "q1", label: "あなたの名前を教えてください", kind: "text", required: true, max: 40 },
@@ -71,6 +145,14 @@ export const SURVEY_QUESTIONS: SurveyQuestion[] = [
     options: TRANSPORT_OPTIONS,
   },
   { id: "q4", label: "当日、お酒を飲まれますか", kind: "choice", required: true, options: DRINK_OPTIONS },
+  {
+    id: "q5",
+    label: "当日までの確認事項",
+    kind: "agree",
+    required: true,
+    notices: EVENT_NOTICES,
+    confirmLabel: "上の確認事項をすべて読み、了承しました",
+  },
 ];
 
 /** 答えの形。自由記入は文字列、チェックは選んだ value の配列。 */
@@ -91,6 +173,9 @@ export function answerText(q: SurveyQuestion, v: SurveyValue | undefined): strin
   }
   if (q.kind === "choice") {
     return q.options.find((o) => o.value === v)?.short ?? "";
+  }
+  if (q.kind === "agree") {
+    return v === AGREED ? "了承" : "";
   }
   return typeof v === "string" ? v : "";
 }
@@ -124,6 +209,7 @@ export function missingRequired(values: Record<string, SurveyValue>): SurveyQues
     const v = values[q.id];
     if (q.kind === "checks") return !(Array.isArray(v) && v.length > 0);
     if (q.kind === "choice") return !(typeof v === "string" && q.options.some((o) => o.value === v));
+    if (q.kind === "agree") return v !== AGREED;
     return !(typeof v === "string" && v.trim());
   });
 }
@@ -153,6 +239,8 @@ function parseAnswer(s: unknown): SurveyAnswer | null {
       values[q.id] = arr.filter((x): x is string => typeof x === "string" && allowed.has(x));
     } else if (q.kind === "choice") {
       values[q.id] = q.options.some((o) => o.value === v) ? (v as string) : "";
+    } else if (q.kind === "agree") {
+      values[q.id] = v === AGREED ? AGREED : "";
     } else {
       values[q.id] = typeof v === "string" ? v.slice(0, q.max) : "";
     }
@@ -195,6 +283,8 @@ export async function saveSurveyAnswer(
       clean[q.id] = q.options.map((o) => o.value).filter((x) => arr.includes(x) && allowed.has(x));
     } else if (q.kind === "choice") {
       clean[q.id] = q.options.some((o) => o.value === v) ? (v as string) : "";
+    } else if (q.kind === "agree") {
+      clean[q.id] = v === AGREED ? AGREED : "";
     } else {
       clean[q.id] = (typeof v === "string" ? v : "").slice(0, q.max);
     }
