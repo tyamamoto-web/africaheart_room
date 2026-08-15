@@ -24,7 +24,7 @@ export default function Home() {
       <div className={night ? "relative z-10" : undefined}>
       <Header />
 
-      {/* ロゴバナー下：会員メニューと、イベント運営マニュアルへの導線 */}
+      {/* ロゴバナー下：会員メニューと、参加者アンケートへの導線 */}
       <div className="px-4 pt-4 max-w-lg mx-auto flex flex-col gap-2.5">
         <Link
           href="/test"
@@ -51,9 +51,9 @@ export default function Home() {
           </span>
         </Link>
 
-        {/* イベント運営マニュアル（中身はこれから追加） */}
+        {/* 参加者アンケート（設問はこれから追加） */}
         <Link
-          href="/manual"
+          href="/survey"
           className="flex items-center gap-3 px-4 py-3 rounded-2xl text-white active:scale-[0.99] transition-transform"
           style={
             night
@@ -68,8 +68,8 @@ export default function Home() {
           }
         >
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-black leading-tight">イベント運営マニュアル</p>
-            <p className="text-[11px] opacity-85 leading-tight">当日の流れ・進め方はこちら</p>
+            <p className="text-sm font-black leading-tight">参加者アンケート</p>
+            <p className="text-[11px] opacity-85 leading-tight">事前のご確認・ご回答はこちら</p>
           </div>
           <span className="text-lg" style={night ? { color: "#ffd884" } : { opacity: 0.9 }}>
             ›

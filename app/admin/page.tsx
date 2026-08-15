@@ -13,6 +13,7 @@ import {
   RACI_PEOPLE, type OfficerRaci, type RaciRole,
 } from "@/lib/officerRaci";
 import { raciDefs, raciPersonSubLabel } from "@/lib/raciDefs";
+import { OFFICER_PASSCODE, OFFICER_UNLOCK_KEY } from "@/lib/officerGate";
 import {
   getOfficerTable, saveOfficerTableRow, saveOfficerTableColumns, deleteOfficerTableRow,
   seedOfficerTable, emptyRow, emptyColumns, newRowId, SEED_ROW_IDS,
@@ -242,12 +243,7 @@ const officerRows: OfficerRow[] = (() => {
 // 役員が設定した優先度の保存キー（この端末に保存）。体系化に伴い版数を v2 に更新。
 const OFFICER_MOSCOW_KEY = "africaheart-officer-moscow-v2";
 
-// 役員専用タブ／役員専用2タブの合言葉。2つのタブで共通で、片方を開ければもう片方も開く。
-// ※ 画面を出す前の目隠しであって、本格的な鍵ではない（このページの中身を見れば分かってしまう）。
-//   人に見られたくない内容や、お金・個人情報そのものはここに置かないこと。
-const OFFICER_PASSCODE = "810";
-// 解錠状態はタブを閉じるまで（sessionStorage）。ブラウザを閉じればまた合言葉を聞く。
-const OFFICER_UNLOCK_KEY = "africaheart-officer-unlocked";
+// 合言葉は lib/officerGate.ts に集約（参加者アンケートの「みんなの回答」とも共通）。
 
 /* ── 役員専用2：オフ会運営のRACIチャート（役員全員で共同編集）───────
    表の形はRACIの基本どおり。左が「やることの特定」、右が「人ごとの役割」。
