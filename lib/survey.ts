@@ -327,9 +327,39 @@ export async function getSurveyAnswers(): Promise<SurveyAnswer[]> {
   return rawToAnswers(await readSharedLenient(ROW_ID));
 }
 
+// 保存したい人の要素だけを差し替え、ほかの人の要素は文字列のまま置いておくための道具。
+//  ・読めない要素（壊れたJSON）も、そのまま残す＝誰かの保存で消えることがない
+//  ・いまの設問に無い項目（設問を直す前の答え）も、その人の要素の中に残す
+function idOfRaw(s: string): string | null {
+  try {
+    const o = JSON.parse(s) as { id?: unknown };
+    return typeof o.id === "string" && o.id ? o.id.slice(0, 40) : null;
+  } catch {
+    return null; // 読めないものは誰のものか分からない＝触らない
+  }
+}
+
+function extraValues(rawText: string | undefined): Record<string, SurveyValue> {
+  if (!rawText) return {};
+  const known = new Set(SURVEY_QUESTIONS.map((q) => q.id));
+  const keep: Record<string, SurveyValue> = {};
+  try {
+    const o = JSON.parse(rawText) as { values?: Record<string, unknown> };
+    for (const [k, v] of Object.entries(o.values ?? {})) {
+      if (known.has(k)) continue; // いまの設問はこのあと上書きする
+      if (typeof v === "string") keep[k] = v;
+      else if (Array.isArray(v)) keep[k] = v.filter((x): x is string => typeof x === "string");
+    }
+  } catch {
+    /* 読めなければ引き継がない */
+  }
+  return keep;
+}
+
 /**
  * この端末の回答を保存（全員に共有）。すでに出していれば同じ位置のまま書き換える。
  * 書き込み直前に最新を取り直すので、同じ時間に別の人が出した回答を消してしまうことがない。
+ * 触るのは自分の要素だけ。ほかの人の要素は一字も書き換えない。
  */
 export async function saveSurveyAnswer(
   id: string,
@@ -351,24 +381,27 @@ export async function saveSurveyAnswer(
       clean[q.id] = (typeof v === "string" ? v : "").slice(0, q.max);
     }
   }
-  const mine: SurveyAnswer = { id, values: clean, at: new Date().toISOString() };
+  const savedAt = new Date().toISOString();
 
   const raw = await writeSharedRow(ROW_ID, (cur) => {
-    const list = rawToAnswers(cur);
-    const at = list.findIndex((a) => a.id === id);
-    if (at >= 0) list[at] = mine;
-    else list.push(mine);
-    return list.map((a) => JSON.stringify(a));
+    const next = cur.slice(); // ほかの人の要素はこの配列のまま持ち回る
+    const at = next.findIndex((s) => idOfRaw(s) === id);
+    const mine: SurveyAnswer = {
+      id,
+      // 設問を直す前の答えも残したうえで、いまの設問の答えを上書きする
+      values: { ...extraValues(at >= 0 ? next[at] : undefined), ...clean },
+      at: savedAt,
+    };
+    const text = JSON.stringify(mine);
+    if (at >= 0) next[at] = text;
+    else next.push(text);
+    return next;
   });
   return rawToAnswers(raw);
 }
 
-/** この端末の回答を取り下げる（全員の一覧からも消える）。 */
+/** この端末の回答を取り下げる（全員の一覧からも消える）。消すのは自分の要素だけ。 */
 export async function deleteSurveyAnswer(id: string): Promise<SurveyAnswer[]> {
-  const raw = await writeSharedRow(ROW_ID, (cur) =>
-    rawToAnswers(cur)
-      .filter((a) => a.id !== id)
-      .map((a) => JSON.stringify(a))
-  );
+  const raw = await writeSharedRow(ROW_ID, (cur) => cur.filter((s) => idOfRaw(s) !== id));
   return rawToAnswers(raw);
 }
