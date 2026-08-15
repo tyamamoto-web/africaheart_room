@@ -29,10 +29,12 @@ export type SurveyOption = {
  * 設問の型。
  *   text   … 自由記入（答えは文字列）
  *   checks … あてはまるものすべてにチェック（答えは選んだ value の配列）
+ *   choice … どれか1つをえらぶ（答えはえらんだ value の文字列）
  */
 export type SurveyQuestion =
   | { id: string; label: string; kind: "text"; required: boolean; max: number }
-  | { id: string; label: string; kind: "checks"; required: boolean; options: SurveyOption[] };
+  | { id: string; label: string; kind: "checks"; required: boolean; options: SurveyOption[] }
+  | { id: string; label: string; kind: "choice"; required: boolean; options: SurveyOption[] };
 
 /* 参加するところを選ぶ選択肢は、イベントの予定（lib/data.ts）から作る。
    joinKey が付いている項目だけが並ぶ（集合・移動・解散は参加の単位ではないので付いていない）。
@@ -41,10 +43,26 @@ const SCHEDULE_OPTIONS: SurveyOption[] = nextEvent.schedule
   .filter((s) => !!s.joinKey)
   .map((s) => ({ value: s.joinKey as string, label: `${s.time}　${s.title}`, short: s.title }));
 
+/* 行き帰りの移動。運営で送迎はできないので、当日までに手当てが要る方を先に見つけるための設問。
+   「できますか／できませんか」だけだと答えにくいので、行きと帰りを分けて言い切れる形にした。 */
+const TRANSPORT_OPTIONS: SurveyOption[] = [
+  { value: "both", label: "行き・帰りとも、自分で移動できます", short: "行き帰りとも自分で" },
+  { value: "backOnly", label: "行きは自分で来られますが、帰りがまだ決まっていません", short: "帰りが未定" },
+  { value: "goOnly", label: "帰りは自分で帰れますが、行きがまだ決まっていません", short: "行きが未定" },
+  { value: "neither", label: "行き・帰りとも、まだ決まっていません", short: "行き帰りとも未定" },
+];
+
 /** 設問一覧。並んでいる順に画面へ出る。 */
 export const SURVEY_QUESTIONS: SurveyQuestion[] = [
   { id: "q1", label: "あなたの名前を教えてください", kind: "text", required: true, max: 40 },
   { id: "q2", label: "参加されるスケジュールにチェックをしてください", kind: "checks", required: true, options: SCHEDULE_OPTIONS },
+  {
+    id: "q3",
+    label: "集合場所までの行きと、解散後の帰りは、ご自分で移動手段を用意できますか",
+    kind: "choice",
+    required: true,
+    options: TRANSPORT_OPTIONS,
+  },
 ];
 
 /** 答えの形。自由記入は文字列、チェックは選んだ value の配列。 */
@@ -62,6 +80,9 @@ export function answerText(q: SurveyQuestion, v: SurveyValue | undefined): strin
   if (q.kind === "checks") {
     const chosen = Array.isArray(v) ? v : [];
     return q.options.filter((o) => chosen.includes(o.value)).map((o) => o.short).join("・");
+  }
+  if (q.kind === "choice") {
+    return q.options.find((o) => o.value === v)?.short ?? "";
   }
   return typeof v === "string" ? v : "";
 }
@@ -94,6 +115,7 @@ export function missingRequired(values: Record<string, SurveyValue>): SurveyQues
     if (!q.required) return false;
     const v = values[q.id];
     if (q.kind === "checks") return !(Array.isArray(v) && v.length > 0);
+    if (q.kind === "choice") return !(typeof v === "string" && q.options.some((o) => o.value === v));
     return !(typeof v === "string" && v.trim());
   });
 }
@@ -121,6 +143,8 @@ function parseAnswer(s: unknown): SurveyAnswer | null {
       const arr = Array.isArray(v) ? v : [];
       // 選択肢に無い値は捨てる（設問を直したあとの古い答えが混ざらないように）
       values[q.id] = arr.filter((x): x is string => typeof x === "string" && allowed.has(x));
+    } else if (q.kind === "choice") {
+      values[q.id] = q.options.some((o) => o.value === v) ? (v as string) : "";
     } else {
       values[q.id] = typeof v === "string" ? v.slice(0, q.max) : "";
     }
@@ -161,6 +185,8 @@ export async function saveSurveyAnswer(
       const allowed = new Set(q.options.map((o) => o.value));
       const arr = Array.isArray(v) ? v : [];
       clean[q.id] = q.options.map((o) => o.value).filter((x) => arr.includes(x) && allowed.has(x));
+    } else if (q.kind === "choice") {
+      clean[q.id] = q.options.some((o) => o.value === v) ? (v as string) : "";
     } else {
       clean[q.id] = (typeof v === "string" ? v : "").slice(0, q.max);
     }

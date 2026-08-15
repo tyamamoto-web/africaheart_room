@@ -262,8 +262,10 @@ function AnswerView() {
                 }}
               >
                 {q.options.map((o, oi) => {
+                  // checks は「あてはまるものすべて」、choice は「どれか1つ」。印の形も四角と丸で変える。
+                  const many = q.kind === "checks";
                   const cur = values[q.id];
-                  const on = Array.isArray(cur) && cur.includes(o.value);
+                  const on = many ? Array.isArray(cur) && cur.includes(o.value) : cur === o.value;
                   return (
                     <label
                       key={o.value}
@@ -276,30 +278,37 @@ function AnswerView() {
                       }}
                     >
                       <input
-                        type="checkbox"
+                        type={many ? "checkbox" : "radio"}
+                        name={`sv-${q.id}`}
                         checked={on}
-                        onChange={() => toggle(q.id, o.value)}
+                        onChange={() => (many ? toggle(q.id, o.value) : change(q.id, o.value))}
                         style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
                       />
-                      {/* 四角は自分で描く（環境ごとの見た目の差をなくす） */}
+                      {/* 印は自分で描く（環境ごとの見た目の差をなくす） */}
                       <span
                         aria-hidden
+                        className="flex items-center justify-center"
                         style={{
                           width: 17,
                           height: 17,
                           flex: "0 0 auto",
-                          borderRadius: 3,
+                          borderRadius: many ? 3 : 999,
                           border: `1px solid ${on ? S.ink : S.rule}`,
-                          background: on ? S.ink : S.paper,
+                          background: many && on ? S.ink : S.paper,
                           color: S.paper,
                           fontSize: 11,
-                          lineHeight: "15px",
-                          textAlign: "center",
+                          lineHeight: 1,
                         }}
                       >
-                        {on ? "✓" : ""}
+                        {many ? (
+                          on ? "✓" : ""
+                        ) : on ? (
+                          <span style={{ width: 9, height: 9, borderRadius: 999, background: S.ink }} />
+                        ) : null}
                       </span>
-                      <span style={{ fontSize: 13, color: S.ink, letterSpacing: "0.01em" }}>{o.label}</span>
+                      <span style={{ fontSize: 13, color: S.ink, letterSpacing: "0.01em", lineHeight: 1.5 }}>
+                        {o.label}
+                      </span>
                     </label>
                   );
                 })}
@@ -307,7 +316,11 @@ function AnswerView() {
             )}
             {lacking && (
               <p className="text-[11px] mt-1.5" style={{ color: S.warn }}>
-                {q.kind === "checks" ? "1つ以上えらんでください。" : "こちらは必ず入れてください。"}
+                {q.kind === "checks"
+                  ? "1つ以上えらんでください。"
+                  : q.kind === "choice"
+                    ? "どれか1つをえらんでください。"
+                    : "こちらは必ず入れてください。"}
               </p>
             )}
           </div>
