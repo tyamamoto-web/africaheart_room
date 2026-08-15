@@ -52,6 +52,14 @@ const TRANSPORT_OPTIONS: SurveyOption[] = [
   { value: "neither", label: "行き・帰りとも、まだ決まっていません", short: "行き帰りとも未定" },
 ];
 
+/* お酒。頼む量の見当をつけるためのもの。飲まない方が答えにくくならないよう、
+   「飲めない／飲まない」の理由は聞かず、当日どうするかだけを聞く。 */
+const DRINK_OPTIONS: SurveyOption[] = [
+  { value: "yes", label: "飲みます", short: "飲む" },
+  { value: "little", label: "少しだけ飲みます", short: "少し" },
+  { value: "no", label: "飲みません", short: "飲まない" },
+];
+
 /** 設問一覧。並んでいる順に画面へ出る。 */
 export const SURVEY_QUESTIONS: SurveyQuestion[] = [
   { id: "q1", label: "あなたの名前を教えてください", kind: "text", required: true, max: 40 },
@@ -63,6 +71,7 @@ export const SURVEY_QUESTIONS: SurveyQuestion[] = [
     required: true,
     options: TRANSPORT_OPTIONS,
   },
+  { id: "q4", label: "当日、お酒を飲まれますか", kind: "choice", required: true, options: DRINK_OPTIONS },
 ];
 
 /** 答えの形。自由記入は文字列、チェックは選んだ value の配列。 */
