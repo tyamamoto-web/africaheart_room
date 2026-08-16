@@ -16,6 +16,7 @@ import { raciDefs, raciPersonSubLabel } from "@/lib/raciDefs";
 import { OFFICER_PASSCODE, OFFICER_UNLOCK_KEY } from "@/lib/officerGate";
 import {
   getOfficerTable, saveOfficerTableRow, saveOfficerTableColumns, deleteOfficerTableRow,
+  insertOfficerTableRowBefore,
   seedOfficerTable, emptyRow, emptyColumns, newRowId, SEED_ROW_IDS,
   type OfficerTableRow, type OfficerTableData,
 } from "@/lib/officerTable";
@@ -355,6 +356,19 @@ const tblTh: React.CSSProperties = {
 };
 const tblTd: React.CSSProperties = { padding: "3px 5px", verticalAlign: "top" };
 
+/** 行の右端に並べる小さなボタン（＋で足す・×で消す）の共通の見た目。 */
+const rowIconBtn: React.CSSProperties = {
+  width: 22,
+  height: 22,
+  borderRadius: 3,
+  border: "none",
+  background: "transparent",
+  color: T.cap,
+  lineHeight: 1,
+  padding: 0,
+  cursor: "pointer",
+};
+
 /** 自由に書く欄。書いた分だけ縦に伸びるので、行の中でスクロールバーが出ない。 */
 function CellText({
   value,
@@ -535,6 +549,17 @@ function OfficerRoleTable() {
     void run(row.id, () => saveOfficerTableRow(row));
   }
 
+  // 行と行のあいだに足す。どの行の「上」に入れるかで位置を決める。
+  // どの行の＋を押しても上に入るので、いちばん上の行の前にも足せる（末尾は「行を追加」）。
+  function insertRowBefore(beforeId: string) {
+    const row = emptyRow(newRowId());
+    const rows = dataRef.current.rows.slice();
+    const at = rows.findIndex((r) => r.id === beforeId);
+    rows.splice(at >= 0 ? at : rows.length, 0, row);
+    commit({ columns: dataRef.current.columns, rows });
+    void run(row.id, () => insertOfficerTableRowBefore(row, beforeId));
+  }
+
   function removeRow(row: OfficerTableRow) {
     const hasText = row.cells.some((s) => s.trim());
     if (hasText && !window.confirm("この行を消します。ほかの人の画面からも消えます。よろしいですか。")) return;
@@ -655,7 +680,7 @@ function OfficerRoleTable() {
         >
           <table
             style={{
-              minWidth: 1199,
+              minWidth: 1221, // No36＋自由5列795＋役割4人336＋右の操作54
               width: "100%",
               borderCollapse: "separate", // No列を左に貼り付けても罫線が消えないように
               borderSpacing: 0,
@@ -670,7 +695,8 @@ function OfficerRoleTable() {
               {RACI_PEOPLE.map((p) => (
                 <col key={p.id} style={{ width: 84 }} />
               ))}
-              <col style={{ width: 32 }} />
+              {/* 右端の操作（＋で足す・×で消す） */}
+              <col style={{ width: 54 }} />
             </colgroup>
             <thead>
               <tr>
@@ -878,32 +904,34 @@ function OfficerRoleTable() {
                     <td
                       style={{
                         ...tblTd,
-                        padding: "7px 4px",
+                        padding: "7px 3px",
                         textAlign: "center",
                         verticalAlign: "middle",
                         borderLeft: `1px solid ${T.hair}`,
                       }}
                     >
-                      <button
-                        onClick={() => removeRow(row)}
-                        className="delbtn"
-                        aria-label={`${i + 1}行目を消す`}
-                        title="この行を消す"
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: 3,
-                          border: "none",
-                          background: "transparent",
-                          color: T.cap,
-                          fontSize: 13,
-                          lineHeight: 1,
-                          padding: 0,
-                          cursor: "pointer",
-                        }}
-                      >
-                        ×
-                      </button>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                        {/* 行と行のあいだに足す。押した行の上に入る（末尾に足すのは上の「行を追加」）。 */}
+                        <button
+                          onClick={() => insertRowBefore(row.id)}
+                          disabled={!loaded}
+                          className="delbtn"
+                          aria-label={`${i + 1}行目の上に行を足す`}
+                          title="この行の上に行を足す"
+                          style={{ ...rowIconBtn, fontSize: 12, cursor: loaded ? "pointer" : "default" }}
+                        >
+                          ＋
+                        </button>
+                        <button
+                          onClick={() => removeRow(row)}
+                          className="delbtn"
+                          aria-label={`${i + 1}行目を消す`}
+                          title="この行を消す"
+                          style={{ ...rowIconBtn, fontSize: 13 }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

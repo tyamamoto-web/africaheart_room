@@ -170,6 +170,22 @@ export function saveOfficerTableRow(row: OfficerTableRow): Promise<OfficerTableD
   });
 }
 
+/**
+ * 1行を、指定した行のすぐ上に差し込んで保存（全員に共有）。
+ * 位置を「何番目」ではなく「どの行の上か」で決めているので、
+ * 差し込むまでのあいだに別の人が行を足していても、狙った場所に入る。
+ * 目印の行が消えていたときだけ、末尾に足す。
+ */
+export function insertOfficerTableRowBefore(row: OfficerTableRow, beforeId: string): Promise<OfficerTableData> {
+  return writeTable((data) => {
+    const rows = data.rows.filter((r) => r.id !== row.id); // やり直しのとき二重に入らないように
+    const at = rows.findIndex((r) => r.id === beforeId);
+    if (at >= 0) rows.splice(at, 0, row);
+    else rows.push(row);
+    return { columns: data.columns, rows };
+  });
+}
+
 /** 1行を削除（全員に共有）。 */
 export function deleteOfficerTableRow(id: string): Promise<OfficerTableData> {
   return writeTable((data) => ({
