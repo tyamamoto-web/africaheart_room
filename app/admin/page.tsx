@@ -1021,14 +1021,6 @@ export default function AdminPage() {
     try { sessionStorage.setItem(OFFICER_UNLOCK_KEY, "1"); } catch { /* 保存できなくても解錠は有効 */ }
   }
 
-  // 施錠に戻す（人に画面を渡すときなど）。次に開くときはまた合言葉を聞く。
-  function lockOfficer() {
-    setUnlocked(false);
-    setPassInput("");
-    setPassError(false);
-    try { sessionStorage.removeItem(OFFICER_UNLOCK_KEY); } catch { /* no-op */ }
-  }
-
   // 役員専用タブを開いている間は、他メンバーの入力を約6秒ごとに取り込む（共有・同期）。
   // 施錠中は中身を出していないので取りに行かない。
   useEffect(() => {
@@ -1595,19 +1587,6 @@ export default function AdminPage() {
       {/* ── 役員専用2タブ ── */}
       {/* マニュアルにあった表の見た目と操作感だけを置いてある。中身はこれから入れる。 */}
       {tab === "officer2" && unlocked && <OfficerRoleTable />}
-
-      {/* 施錠に戻す（人に画面を渡すときなど）。解錠中だけ、目立たない形で出す。 */}
-      {(tab === "officer" || tab === "officer2") && unlocked && (
-        <div className="px-4 pb-10 max-w-5xl mx-auto">
-          <button
-            type="button"
-            onClick={lockOfficer}
-            style={{ fontSize: 11.5, color: "#b0a794", background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}
-          >
-            合言葉の入力に戻す
-          </button>
-        </div>
-      )}
 
       {tab === "admin" && (
       <div className="px-4 pt-3 max-w-lg mx-auto flex flex-col gap-4">
