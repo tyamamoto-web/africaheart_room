@@ -67,6 +67,15 @@ const TRANSPORT_OPTIONS: SurveyOption[] = [
   { value: "neither", label: "行き・帰りとも、まだ決まっていません", short: "行き帰りとも未定" },
 ];
 
+/* 当日の足。車で来る方が分かると、乗り合いの席数と停める場所、そしてお酒の可否が見える。
+   電車の方が分かると、駅の送り迎えと終電の心配を先に拾える。 */
+const TRAVEL_OPTIONS: SurveyOption[] = [
+  { value: "carSelf", label: "自家用車で行きます（自分で運転します）", short: "車・自分で運転" },
+  { value: "carRide", label: "自家用車で行きます（ほかの方に乗せてもらいます）", short: "車・乗せてもらう" },
+  { value: "transit", label: "電車やバスなど、公共交通機関で行きます", short: "電車・バス" },
+  { value: "undecided", label: "まだ決めていません", short: "未定" },
+];
+
 /* お酒。少しでも飲めば「飲みます」なので、途中の段は作らず2つに分ける。
    飲まない方が答えにくくならないよう、飲めない／飲まない理由は聞かない。 */
 const DRINK_OPTIONS: SurveyOption[] = [
@@ -144,7 +153,11 @@ const EVENT_NOTICES: SurveyNotice[] = [
 /** アンケートの回答期限。表示にだけ使う（この日を過ぎても画面は閉じない）。 */
 export const SURVEY_DEADLINE = "8月20日（木）";
 
-/** 設問一覧。並んでいる順に画面へ出る。 */
+/**
+ * 設問一覧。並んでいる順に画面へ出る。
+ * ※ id は答えの保存キー。画面に出る「Q番号」は並び順から作るだけなので、
+ *   途中に設問を差しこんでも id は変えないこと（変えると前の答えが読めなくなる）。
+ */
 export const SURVEY_QUESTIONS: SurveyQuestion[] = [
   { id: "q1", label: "あなたの名前を教えてください", kind: "text", required: true, max: 40 },
   { id: "q2", label: "参加されるスケジュールにチェックをしてください", kind: "checks", required: true, options: SCHEDULE_OPTIONS },
@@ -154,6 +167,14 @@ export const SURVEY_QUESTIONS: SurveyQuestion[] = [
     kind: "choice",
     required: true,
     options: TRANSPORT_OPTIONS,
+  },
+  // 並びは3番目と4番目のあいだだが、id は空いている q6 を使う（上の注意書きのとおり）
+  {
+    id: "q6",
+    label: "当日は、どちらでお越しになりますか",
+    kind: "choice",
+    required: true,
+    options: TRAVEL_OPTIONS,
   },
   { id: "q4", label: "当日、お酒を飲まれますか", kind: "choice", required: true, options: DRINK_OPTIONS },
   {
@@ -175,7 +196,13 @@ export type SurveyValue = string | string[];
 
 // 計算に使う設問。設問の id を変えたらここも直すこと。
 const Q_JOIN = "q2"; // 参加するスケジュール
-const Q_DRINK = "q4"; // お酒を飲むか
+export const Q_DRINK = "q4"; // お酒を飲むか（画面のQ番号は並び順で変わるので id で指す）
+
+/** 画面に出る設問の番号（Q1…）。並び順から作るので、途中に設問を差しこんでもついてくる。 */
+export function questionNo(id: string): string {
+  const i = SURVEY_QUESTIONS.findIndex((q) => q.id === id);
+  return i >= 0 ? `Q${i + 1}` : "";
+}
 
 export type FeeLine = { label: string; yen: number; note?: string };
 /** incomplete＝金額の分からない会場が混じっている（合計をそのまま信じてはいけない）。 */

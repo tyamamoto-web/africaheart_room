@@ -7,6 +7,7 @@ import { OFFICER_UNLOCK_KEY, isOfficerUnlocked, unlockOfficer, lockOfficer } fro
 import {
   SURVEY_QUESTIONS, getSurveyAnswers, saveSurveyAnswer, deleteSurveyAnswer,
   surveyDeviceId, emptyValues, missingRequired, answerText, AGREED, estimateFee, yenText, SURVEY_DEADLINE,
+  questionNo, Q_DRINK,
   type SurveyAnswer, type SurveyValue,
 } from "@/lib/survey";
 
@@ -526,8 +527,8 @@ function AnswerView() {
             )}
             {picksCourse && (
               <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: S.cap }}>
-                焼肉の金額は、Q4で「
-                {values.q4 === "yes" ? "飲みます" : "飲みません"}
+                焼肉の金額は、{questionNo(Q_DRINK)}で「
+                {values[Q_DRINK] === "yes" ? "飲みます" : "飲みません"}
                 」とお答えいただいたので{yenText(fee.lines.find((l) => l.note)?.yen ?? 0)}で計算しています。コースは当日えらぶので、違うほうにされる場合は、その場で差額
                 {yenText(nextEvent.drinkDiffFee)}をやり取りします。
               </p>
