@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { nextEvent } from "@/lib/data";
-import { OFFICER_UNLOCK_KEY, isOfficerUnlocked, unlockOfficer, lockOfficer } from "@/lib/officerGate";
+import { OFFICER_UNLOCK_KEY, isOfficerUnlocked, unlockOfficer } from "@/lib/officerGate";
 import {
   SURVEY_QUESTIONS, getSurveyAnswers, saveSurveyAnswer, deleteSurveyAnswer,
   surveyDeviceId, emptyValues, missingRequired, answerText, AGREED, estimateFee, yenText, SURVEY_DEADLINE,
@@ -749,17 +749,6 @@ function ResultsView() {
           </table>
         </div>
       )}
-
-      <button
-        onClick={() => {
-          lockOfficer();
-          setUnlocked(false);
-        }}
-        className="quiet mt-4 text-[11px] underline"
-        style={{ color: S.faint, background: "none", border: "none", cursor: "pointer", padding: 0 }}
-      >
-        合言葉の入力に戻す
-      </button>
     </div>
   );
 }
