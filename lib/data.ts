@@ -104,7 +104,7 @@ const nextSchedule: NextScheduleItem[] = [
   { time: "19:20〜20:00", title: "移動・買い出し", place: "コンビニで各自、お酒・ジュース・おつまみを少量購入", cost: "", map: "" },
   { time: "20:00〜20:40", title: "サマーナイト花火", place: "諏訪湖岸公園（芝生で花火が間近）／20:30 打ち上げ", cost: "", map: "諏訪湖岸公園 長野県諏訪市", joinKey: "hanabi", fee: 0 },
   {
-    time: "21:00〜23:00",
+    time: "21:00〜22:50",
     title: "カラオケバー",
     joinKey: "bar",
     place: "カラオケバー・ミルユッテ",
@@ -142,7 +142,7 @@ export const nextEvent = {
   lead: "真夏の一日、歌って、笑って、遊び尽くそう。",
   badge: "年間で一番盛大で楽しいイベント",
   date: "2026年8月22日（土）",
-  timeRange: "12:00〜23:00",
+  timeRange: "12:00〜22:50",
   place: "諏訪（諏訪湖周辺）",
   // その日の3つの楽しみ（チラシの3本柱）
   highlights: [
