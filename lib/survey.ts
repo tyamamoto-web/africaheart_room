@@ -160,7 +160,14 @@ export const SURVEY_DEADLINE = "8月20日（木）";
  */
 export const SURVEY_QUESTIONS: SurveyQuestion[] = [
   { id: "q1", label: "あなたの名前を教えてください", kind: "text", required: true, max: 40 },
-  { id: "q2", label: "参加されるスケジュールにチェックをしてください", kind: "checks", required: true, options: SCHEDULE_OPTIONS },
+  // 1つだけ選んで終わりにされないよう、「あてはまるものすべて」を設問文に添える。
+  {
+    id: "q2",
+    label: "参加されるスケジュールにチェックをしてください（あてはまるものすべて）",
+    kind: "checks",
+    required: true,
+    options: SCHEDULE_OPTIONS,
+  },
   {
     id: "q3",
     label: "集合場所までの行きと、解散後の帰りは、ご自分で移動手段を用意できますか",
