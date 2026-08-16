@@ -413,6 +413,23 @@ function AnswerView() {
                           <span style={{ width: 9, height: 9, borderRadius: 999, background: S.ink }} />
                         ) : null}
                       </span>
+                      {/* 時刻は幅を決めた欄に、数字の幅もそろえて出す。どの行も内容の頭が同じ位置に来る。 */}
+                      {o.lead && (
+                        <span
+                          style={{
+                            fontSize: 13,
+                            color: S.cap,
+                            lineHeight: 1.5,
+                            flex: "0 0 auto",
+                            minWidth: 96, // 「12:00〜17:40」が折り返さない幅
+                            whiteSpace: "nowrap",
+                            fontVariantNumeric: "tabular-nums",
+                            letterSpacing: "0.01em",
+                          }}
+                        >
+                          {o.lead}
+                        </span>
+                      )}
                       <span style={{ fontSize: 13, color: S.ink, letterSpacing: "0.01em", lineHeight: 1.5 }}>
                         {o.label}
                       </span>

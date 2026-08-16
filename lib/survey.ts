@@ -23,6 +23,9 @@ export type SurveyOption = {
   value: string;
   label: string; // 回答する画面に出す（長くてよい）
   short: string; // 運営の一覧に出す（短く）
+  /* ラベルの前に置く文字（時刻など）。桁をそろえた別の欄に出すので、行をまたいで縦にそろう。
+     無ければラベルだけを出す（時刻を持たない設問はこちら）。 */
+  lead?: string;
 };
 
 /** 読んでもらう確認事項のひとかたまり（見出しと、その中の箇条書き）。 */
@@ -56,7 +59,7 @@ export type SurveyQuestion =
    予定の時刻や名前を data.ts で直せば、この選択肢もそのまま追いかける。 */
 const SCHEDULE_OPTIONS: SurveyOption[] = nextEvent.schedule
   .filter((s) => !!s.joinKey)
-  .map((s) => ({ value: s.joinKey as string, label: `${s.time}　${s.title}`, short: s.title }));
+  .map((s) => ({ value: s.joinKey as string, lead: s.time, label: s.title, short: s.title }));
 
 /* 行き帰りの移動。運営で送迎はできないので、当日までに手当てが要る方を先に見つけるための設問。
    「できますか／できませんか」だけだと答えにくいので、行きと帰りを分けて言い切れる形にした。 */
