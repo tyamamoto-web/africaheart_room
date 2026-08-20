@@ -1,7 +1,13 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { karaokeRooms, type KaraokeRoomKey, type KaraokeSlot } from "@/lib/data";
+import {
+  EMPTY_ROOM_NUMBERS,
+  getRoomNumbers,
+  saveRoomNumbers,
+  type RoomNumbers,
+} from "@/lib/roomNumbers";
 
 /* ============================================================
    カラオケの部屋割り（告知の回）：TOPに掲載する表
@@ -15,9 +21,10 @@ import { karaokeRooms, type KaraokeRoomKey, type KaraokeSlot } from "@/lib/data"
    中身は lib/data.ts の karaokeRooms を差し替えるだけで更新できる
    （時刻も顔ぶれもあちらに置いてある）。
 
-   ※ 当日の実際の部屋番号（管理画面の「部屋番号（当日）」）は、ここには出していない。
-     共有テーブルに入っているのは先月（7/26・ジャパレン松本店）の番号なので、
-     そのまま出すと諏訪の部屋番号として読まれてしまう。番号は当日ご案内する。
+   当日の実際の部屋番号は、表のすぐ下から手入力して全員に共有できる（lib/roomNumbers.ts）。
+   入れた番号は A室・B室 の見出しの下に出て、ほかの人の画面にも5秒ほどで反映される。
+   まだ入っていないあいだは見出しは「A室」「B室」だけになる（先月の番号は出さない。
+   保存時に「どの回の番号か」も一緒に記録していて、回が違えば表示しないようにしてある）。
    ※ 絵文字は使わない（アプリ全体の方針）。
    ============================================================ */
 
@@ -47,8 +54,65 @@ const td: React.CSSProperties = {
   verticalAlign: "top",
 };
 
+/** 部屋番号を入れる欄。狭い枠に収まるよう小さめにしてある。 */
+const inputStyle: React.CSSProperties = {
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,0.16)",
+  color: "#eef2fb",
+};
+
 export default function KaraokeRooms() {
   const k = karaokeRooms;
+
+  // 当日の部屋番号（全員で共有）。ほかの人が入れた番号も拾えるよう5秒ごとに読み直す。
+  const [nos, setNos] = useState<RoomNumbers>(EMPTY_ROOM_NUMBERS);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ A: "", B: "" });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      getRoomNumbers()
+        .then((r) => {
+          if (alive) setNos(r);
+        })
+        .catch(() => {
+          /* 表示優先：取得できなくても番号なしのまま表を出す */
+        });
+    };
+    load();
+    const t = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  const hasNo = !!(nos.A || nos.B);
+
+  const openEditor = () => {
+    setDraft({ A: nos.A, B: nos.B });
+    setMsg(null);
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      // この回は2部屋なので C は触らずにそのまま戻す
+      await saveRoomNumbers({ A: draft.A, B: draft.B, C: nos.C }, "TOP");
+      setNos((prev) => ({ ...prev, A: draft.A.trim(), B: draft.B.trim() }));
+      setMsg({ ok: true, text: "保存しました。全員の画面に出ます。" });
+      setEditing(false);
+    } catch {
+      setMsg({ ok: false, text: "保存できませんでした。通信状況をご確認ください。" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div
@@ -93,8 +157,31 @@ export default function KaraokeRooms() {
           <thead>
             <tr style={{ background: "rgba(255,255,255,0.06)" }}>
               <th style={{ ...th, color: "#ffd884" }}>時間</th>
-              <th style={{ ...th, color: ROOM.A.fg }}>A室</th>
-              <th style={{ ...th, color: ROOM.B.fg }}>B室</th>
+              {(["A", "B"] as KaraokeRoomKey[]).map((key) => (
+                <th key={key} style={{ ...th, color: ROOM[key].fg }}>
+                  <span style={{ display: "block" }}>{key}室</span>
+                  {/* 当日入れた実際の部屋番号。まだ無いあいだは何も出さない。 */}
+                  {nos[key] ? (
+                    <span
+                      style={{
+                        display: "block",
+                        margin: "3px auto 0",
+                        maxWidth: "100%",
+                        padding: "1px 5px",
+                        borderRadius: 6,
+                        background: "rgba(255,255,255,0.16)",
+                        color: "#ffffff",
+                        fontSize: 10,
+                        fontWeight: 900,
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {nos[key]}
+                    </span>
+                  ) : null}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -162,6 +249,67 @@ export default function KaraokeRooms() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* 当日の部屋番号。お店で部屋が決まったらここに入れると、全員の表の見出しに出る。 */}
+      <div
+        className="mt-2.5 rounded-lg px-2.5 py-2"
+        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)" }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <p className="min-w-0 text-[11px] leading-snug" style={{ color: "#b7c2da" }}>
+            <span className="font-bold">当日の部屋番号</span>
+            <span className="ml-1.5" style={{ color: hasNo ? "#e4ebf8" : "#98a4c0" }}>
+              {hasNo ? `A：${nos.A || "—"} ／ B：${nos.B || "—"}` : "お店で決まったら入力してください"}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => (editing ? setEditing(false) : openEditor())}
+            className="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-black"
+            style={{ background: "rgba(245,197,66,0.16)", border: "1px solid rgba(245,205,110,0.40)", color: "#ffd884" }}
+          >
+            {editing ? "閉じる" : hasNo ? "変更" : "入力"}
+          </button>
+        </div>
+
+        {editing ? (
+          <div className="mt-2 flex flex-col gap-1.5">
+            {(["A", "B"] as KaraokeRoomKey[]).map((key) => (
+              <label key={key} className="flex items-center gap-2">
+                <span
+                  className="w-7 shrink-0 rounded-md text-center text-[11px] font-black leading-6"
+                  style={{ background: ROOM[key].bg, color: ROOM[key].fg }}
+                >
+                  {key}
+                </span>
+                <input
+                  value={draft[key]}
+                  onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                  maxLength={20}
+                  placeholder="例：305号室 / 大部屋 など"
+                  className="min-w-0 flex-1 rounded-md px-2 py-1 text-[12px]"
+                  style={inputStyle}
+                />
+              </label>
+            ))}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="mt-0.5 rounded-md px-3 py-1.5 text-[11px] font-black"
+              style={{ background: "#F5C542", color: "#2a2000", opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? "保存中…" : "保存して全員に共有"}
+            </button>
+          </div>
+        ) : null}
+
+        {msg ? (
+          <p className="mt-1.5 text-[11px]" style={{ color: msg.ok ? "#7ee0a8" : "#ff8f8f" }}>
+            {msg.text}
+          </p>
+        ) : null}
       </div>
     </div>
   );

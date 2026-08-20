@@ -11,8 +11,18 @@
      既存の共有テーブル `homework_result` を間借りする。宿題機能は id=1 の
      1行しか読み書きしないため、本機能は別の行 id=2 を使う（衝突しない）。
      A/B/C の番号は既存の themes(text[]) 列に [A, B, C] の3要素で保存する。
+
+   ★ 前回の番号が次回に出てしまわないように、4要素目へ「どの回の番号か」を書く:
+     themes = [A, B, C, その回の日付]。読むときに今回の日付と違えば番号は空で返す。
+     （行は1つしか無いので、書き換えないかぎり先月の番号が残り続けるため。
+       4要素目が無い古いデータは「どの回か不明」＝空扱いになる。列は増やしていない）
    ※ 表示専用。部屋割り(誰がどの部屋か=rotations)や同席計算には影響しない。
    ============================================================ */
+
+import { nextEvent } from "./data";
+
+/** いま募集している回の識別子。日付の文字列をそのまま使う（回が変われば自動で変わる）。 */
+const EVENT_KEY = nextEvent.date;
 
 const SUPA_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://klwfhpyftnirkxxcmjff.supabase.co";
@@ -39,6 +49,8 @@ export type RoomNumbers = {
   C: string;
   updatedBy: string;
   updatedAt: string;
+  /** 保存されていた番号がどの回のものか。今回のものでなければ A/B/C は空で返す。 */
+  eventKey: string;
 };
 
 export const EMPTY_ROOM_NUMBERS: RoomNumbers = {
@@ -47,6 +59,7 @@ export const EMPTY_ROOM_NUMBERS: RoomNumbers = {
   C: "",
   updatedBy: "",
   updatedAt: "",
+  eventKey: "",
 };
 
 /**
@@ -68,17 +81,19 @@ async function readText(res: Response): Promise<string> {
   }
 }
 
-// themes(text[]) の [A,B,C] を {A,B,C} へ復号（欠けている要素は空文字）
-function decode(themes: unknown): { A: string; B: string; C: string } {
+// themes(text[]) の [A,B,C,回] を復号（欠けている要素は空文字）
+function decode(themes: unknown): { A: string; B: string; C: string; eventKey: string } {
   const arr = Array.isArray(themes) ? themes : [];
   const at = (i: number) => (typeof arr[i] === "string" ? (arr[i] as string).trim() : "");
-  return { A: at(0), B: at(1), C: at(2) };
+  return { A: at(0), B: at(1), C: at(2), eventKey: at(3) };
 }
 
 /**
  * 共有中の部屋番号を取得。
  * 表示側（全メンバー）で使うため、未設定・失敗時も例外を投げず空で返す
  * （＝ヘッダーには A/B/C だけ表示される）。
+ * 保存されているのが前回の回の番号だった場合も、A/B/C は空で返す
+ * （前回の部屋番号を今回のものとして読まれないようにするため）。
  */
 export async function getRoomNumbers(): Promise<RoomNumbers> {
   let res: Response;
@@ -97,13 +112,22 @@ export async function getRoomNumbers(): Promise<RoomNumbers> {
     updated_at?: string;
   }>;
   const row = Array.isArray(rows) ? rows[0] : undefined;
-  const { A, B, C } = decode(row?.themes);
-  return { A, B, C, updatedBy: row?.updated_by ?? "", updatedAt: row?.updated_at ?? "" };
+  const { A, B, C, eventKey } = decode(row?.themes);
+  // 今回の回として保存されたものだけを番号として返す（前回の番号は空にする）
+  const mine = eventKey === EVENT_KEY;
+  return {
+    A: mine ? A : "",
+    B: mine ? B : "",
+    C: mine ? C : "",
+    updatedBy: row?.updated_by ?? "",
+    updatedAt: row?.updated_at ?? "",
+    eventKey,
+  };
 }
 
 /**
- * 部屋番号を保存（id=2 を upsert。全員に共有される）。管理画面から呼ぶ。
- * A/B/C を themes=[A,B,C] として保存する。
+ * 部屋番号を保存（id=2 を upsert。全員に共有される）。管理画面とTOPの部屋割り表から呼ぶ。
+ * A/B/C に加えて「どの回の番号か」を themes=[A,B,C,回] の4要素目として保存する。
  */
 export async function saveRoomNumbers(
   next: { A: string; B: string; C: string },
@@ -111,7 +135,7 @@ export async function saveRoomNumbers(
 ): Promise<void> {
   const body = {
     id: ROW_ID,
-    themes: [next.A.trim(), next.B.trim(), next.C.trim()],
+    themes: [next.A.trim(), next.B.trim(), next.C.trim(), EVENT_KEY],
     updated_by: by,
     updated_at: new Date().toISOString(),
   };
