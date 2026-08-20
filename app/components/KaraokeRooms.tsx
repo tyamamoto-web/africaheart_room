@@ -1,10 +1,13 @@
 "use client";
 
+import { Fragment } from "react";
 import { karaokeRooms, type KaraokeRoomKey, type KaraokeSlot } from "@/lib/data";
 
 /* ============================================================
-   カラオケの部屋割り（告知の回）：TOPに掲載するタイムテーブル
+   カラオケの部屋割り（告知の回）：TOPに掲載する表
    ------------------------------------------------------------
+   並びは、このアプリが前から使っている「部屋割り表」と同じ形にそろえてある。
+     左が時間、右が部屋（A室・B室）。全員で集まる枠は部屋の列をつないで1つにする。
    花火大会テーマ（夜背景）に合わせた配色。中身は lib/data.ts の karaokeRooms を
    差し替えるだけで更新できる（時刻も顔ぶれもあちらに置いてある）。
 
@@ -15,25 +18,30 @@ import { karaokeRooms, type KaraokeRoomKey, type KaraokeSlot } from "@/lib/data"
    ============================================================ */
 
 // 部屋ごとの色味（A=青／B=桃。3本柱のカードと同じ系統でそろえる）
-const ROOM: Record<KaraokeRoomKey, { bg: string; br: string; fg: string; chip: string }> = {
-  A: { bg: "rgba(90,150,230,0.13)", br: "rgba(120,170,240,0.30)", fg: "#a9cdff", chip: "rgba(90,150,230,0.28)" },
-  B: { bg: "rgba(255,120,180,0.12)", br: "rgba(255,140,190,0.30)", fg: "#ffb3d6", chip: "rgba(255,120,180,0.26)" },
+const ROOM: Record<KaraokeRoomKey, { bg: string; fg: string }> = {
+  A: { bg: "rgba(90,150,230,0.10)", fg: "#a9cdff" },
+  B: { bg: "rgba(255,120,180,0.09)", fg: "#ffb3d6" },
 };
 
 // 全員で1部屋に集まる枠の色味（琥珀）
-const ALL = { bg: "rgba(245,197,66,0.11)", br: "rgba(245,205,110,0.30)", fg: "#ffd884", chip: "rgba(245,197,66,0.26)" };
+const ALL = { bg: "rgba(245,197,66,0.10)", fg: "#ffd884" };
 
-/** 部屋の名札（A室／B室）。 */
-function RoomBadge({ room, tone }: { room: KaraokeRoomKey; tone: { fg: string; chip: string } }) {
-  return (
-    <span
-      className="flex-shrink-0 inline-block px-2 py-0.5 rounded-md text-[11px] font-black whitespace-nowrap"
-      style={{ background: tone.chip, color: tone.fg }}
-    >
-      {room}室
-    </span>
-  );
-}
+const HAIR = "1px solid rgba(255,255,255,0.13)";
+
+const th: React.CSSProperties = {
+  padding: "6px 6px",
+  borderBottom: "1px solid rgba(255,255,255,0.22)",
+  fontSize: 11,
+  fontWeight: 900,
+  textAlign: "center",
+  whiteSpace: "nowrap",
+};
+
+const td: React.CSSProperties = {
+  padding: "8px 6px",
+  borderTop: HAIR,
+  verticalAlign: "top",
+};
 
 export default function KaraokeRooms() {
   const k = karaokeRooms;
@@ -57,81 +65,97 @@ export default function KaraokeRooms() {
         {k.lead}
       </p>
 
-      <div className="mt-3 flex flex-col gap-2">
-        {k.slots.map((s: KaraokeSlot) => {
-          const split = !!s.rooms;
-          return (
-            <div
-              key={s.id}
-              className="rounded-xl px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className="text-[11px] font-black px-2 py-0.5 rounded-md whitespace-nowrap"
-                  style={{ background: "rgba(245,197,66,0.16)", color: "#ffd884" }}
-                >
-                  {s.time}
-                </span>
-                <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
-                  style={{
-                    background: "rgba(255,255,255,0.06)",
-                    color: split ? "#c8d2e6" : "#ffd884",
-                    border: `1px solid ${split ? "rgba(255,255,255,0.14)" : "rgba(245,205,110,0.34)"}`,
-                  }}
-                >
-                  {split ? "2部屋に分かれる" : "全員で1部屋"}
-                </span>
-              </div>
-
-              <p className="mt-1 text-[13px] font-black" style={{ color: "#eef2fb" }}>
-                {s.label}
-              </p>
-              {s.detail ? (
-                <p className="mt-0.5 text-[12px] leading-snug" style={{ color: "#b7c2da" }}>
-                  {s.detail}
-                </p>
-              ) : null}
-
-              {/* 2部屋に分かれる枠は部屋ごとの顔ぶれ、分かれない枠は集まる部屋だけを出す */}
-              <div className="mt-2 flex flex-col gap-1.5">
-                {split ? (
-                  s.rooms!.map((r) => (
-                    <div
-                      key={r.key}
-                      className="flex items-start gap-2 px-2.5 py-2 rounded-lg"
-                      style={{ background: ROOM[r.key].bg, border: `1px solid ${ROOM[r.key].br}` }}
-                    >
-                      <RoomBadge room={r.key} tone={ROOM[r.key]} />
-                      <p className="flex-1 text-[12px] font-semibold leading-relaxed" style={{ color: "#e4ebf8" }}>
-                        {r.members.flatMap((m, i) => [
-                          i > 0 ? <span key={`sep${i}`}>・</span> : null,
-                          <span key={m} className="whitespace-nowrap">
-                            {m}
-                          </span>,
-                        ])}
+      {/* 表そのもの。狭い画面でも本文を横に押し出さないよう、この中だけで横に流す。 */}
+      <div className="mt-3 overflow-x-auto">
+        <table
+          style={{
+            width: "100%",
+            minWidth: 300,
+            borderCollapse: "collapse",
+            tableLayout: "fixed",
+            background: "rgba(255,255,255,0.03)",
+            borderRadius: 10,
+            overflow: "hidden",
+          }}
+        >
+          <colgroup>
+            {/* 時間の列は「片付け・移動の準備」が1行で収まる幅にしてある */}
+            <col style={{ width: "34%" }} />
+            <col style={{ width: "33%" }} />
+            <col style={{ width: "33%" }} />
+          </colgroup>
+          <thead>
+            <tr style={{ background: "rgba(255,255,255,0.06)" }}>
+              <th style={{ ...th, color: "#ffd884" }}>時間</th>
+              <th style={{ ...th, color: ROOM.A.fg }}>A室</th>
+              <th style={{ ...th, color: ROOM.B.fg }}>B室</th>
+            </tr>
+          </thead>
+          <tbody>
+            {k.slots.map((s: KaraokeSlot) => {
+              const [start, end] = s.time.split("〜");
+              const split = !!s.rooms;
+              // 補足がある枠は、その1行下に横いっぱいで添える（表の列を狭くしないため）
+              const hasNote = !!s.detail;
+              return (
+                <Fragment key={s.id}>
+                  <tr style={split ? undefined : { background: ALL.bg }}>
+                    <td style={{ ...td, borderBottom: hasNote ? "none" : undefined, textAlign: "center" }}>
+                      <p className="text-[12px] font-black leading-tight" style={{ color: "#eef2fb" }}>
+                        {start}
                       </p>
-                      <span className="flex-shrink-0 text-[11px] font-bold" style={{ color: ROOM[r.key].fg }}>
-                        {r.members.length}名
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg"
-                    style={{ background: ALL.bg, border: `1px solid ${ALL.br}` }}
-                  >
-                    <RoomBadge room={k.allRoom} tone={ALL} />
-                    <p className="flex-1 text-[12px] font-semibold leading-relaxed" style={{ color: "#e4ebf8" }}>
-                      全員（{k.attendees.length}名）
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                      <p className="text-[11px] leading-tight" style={{ color: "#98a4c0" }}>
+                        〜{end}
+                      </p>
+                      <p className="mt-1 text-[10px] font-bold leading-snug" style={{ color: split ? "#c8d2e6" : ALL.fg }}>
+                        {s.label}
+                      </p>
+                    </td>
+
+                    {split ? (
+                      s.rooms!.map((r) => (
+                        <td key={r.key} style={{ ...td, borderLeft: HAIR, background: ROOM[r.key].bg }}>
+                          {r.members.map((m) => (
+                            <p
+                              key={m}
+                              className="text-[12px] font-semibold leading-snug text-center"
+                              style={{ color: "#e4ebf8" }}
+                            >
+                              {m}
+                            </p>
+                          ))}
+                          <p className="mt-1 text-[10px] font-bold text-center" style={{ color: ROOM[r.key].fg }}>
+                            {r.members.length}名
+                          </p>
+                        </td>
+                      ))
+                    ) : (
+                      /* 全員で1部屋に集まる枠は、部屋の列をつないで1つにする */
+                      <td
+                        colSpan={2}
+                        style={{ ...td, borderLeft: HAIR, textAlign: "center", verticalAlign: "middle" }}
+                      >
+                        <p className="text-[12px] font-black" style={{ color: "#e4ebf8" }}>
+                          全員（{k.attendees.length}名）で{k.allRoom}室
+                        </p>
+                      </td>
+                    )}
+                  </tr>
+
+                  {hasNote ? (
+                    <tr style={split ? undefined : { background: ALL.bg }}>
+                      <td colSpan={3} style={{ padding: "0 8px 8px", borderTop: "none" }}>
+                        <p className="text-[11px] leading-relaxed" style={{ color: "#98a4c0" }}>
+                          {s.detail}
+                        </p>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       <div className="mt-3 flex flex-col gap-1">

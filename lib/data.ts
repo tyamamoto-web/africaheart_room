@@ -247,7 +247,6 @@ export const karaokeRooms = {
       id: "koma2",
       time: "14:10〜15:10",
       label: "コマ②",
-      detail: "入れ替えです。荷物を持って移動してください。",
       rooms: [
         { key: "A" as KaraokeRoomKey, members: ["くる", "Take", "シュウ", "ヒィ", "きい"] },
         { key: "B" as KaraokeRoomKey, members: ["よっちゃん", "しゃちょー", "ハッシー", "すー"] },
