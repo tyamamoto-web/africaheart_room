@@ -8,6 +8,7 @@ import {
   saveRoomNumbers,
   type RoomNumbers,
 } from "@/lib/roomNumbers";
+import DownloadKaraokeTableButton from "./DownloadKaraokeTableButton";
 
 /* ============================================================
    カラオケの部屋割り（告知の回）：TOPに掲載する表
@@ -311,6 +312,9 @@ export default function KaraokeRooms() {
           </p>
         ) : null}
       </div>
+
+      {/* 画像で保存（先月と同じ作り）。部屋番号が入っていれば画像の見出しにも入る。 */}
+      <DownloadKaraokeTableButton roomNos={{ A: nos.A, B: nos.B }} />
     </div>
   );
 }
