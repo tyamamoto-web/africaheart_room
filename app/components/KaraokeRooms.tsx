@@ -163,14 +163,6 @@ export default function KaraokeRooms() {
           </tbody>
         </table>
       </div>
-
-      <div className="mt-3 flex flex-col gap-1">
-        {k.notes.map((n, i) => (
-          <p key={i} className="text-[11px] leading-relaxed" style={{ color: "#98a4c0" }}>
-            ※ {n}
-          </p>
-        ))}
-      </div>
     </div>
   );
 }
