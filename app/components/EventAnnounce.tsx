@@ -282,16 +282,31 @@ export default function EventAnnounce() {
         </p>
       </div>
 
-      {/* ── 参加受付の案内（受付中）── */}
-      <div className="night-card px-4 py-4 text-center" style={{ borderColor: "rgba(245,205,110,0.45)" }}>
+      {/* ── 参加受付の案内 ──
+          募っているあいだは琥珀色で目を引かせる。締め切ったあとは、もう申し込めないことが
+          ひと目で分かるように落ち着いた青灰にする（色は lib/data.ts の recruitOpen で切り替わる）。 */}
+      <div
+        className="night-card px-4 py-4 text-center"
+        style={e.recruitOpen ? { borderColor: "rgba(245,205,110,0.45)" } : undefined}
+      >
         <span
           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black"
-          style={{ background: "rgba(245,197,66,0.18)", color: "#ffd884", border: "1px solid rgba(245,205,110,0.45)" }}
+          style={
+            e.recruitOpen
+              ? { background: "rgba(245,197,66,0.18)", color: "#ffd884", border: "1px solid rgba(245,205,110,0.45)" }
+              : { background: "rgba(150,180,240,0.14)", color: "#b7c2da", border: "1px solid rgba(150,180,240,0.32)" }
+          }
         >
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#ffd884" }} />
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ background: e.recruitOpen ? "#ffd884" : "#8fa0c4" }}
+          />
           {e.recruitStatus}
         </span>
-        <p className="mt-2.5 text-sm font-black leading-relaxed" style={{ color: "#ffe0a3" }}>
+        <p
+          className="mt-2.5 text-sm font-black leading-relaxed"
+          style={{ color: e.recruitOpen ? "#ffe0a3" : "#cdd6ea" }}
+        >
           {e.recruit}
         </p>
       </div>
