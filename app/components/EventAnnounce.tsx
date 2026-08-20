@@ -1,6 +1,7 @@
 "use client";
 
 import { nextEvent } from "@/lib/data";
+import KaraokeRooms from "./KaraokeRooms";
 
 /* ============================================================
    次回イベント告知（部屋割りの無い回）：TOPに掲載する案内カード
@@ -210,6 +211,9 @@ export default function EventAnnounce() {
           ))}
         </div>
       </div>
+
+      {/* ── カラオケの部屋割り（12:00〜17:40 の進行と、どの部屋に入るか）── */}
+      <KaraokeRooms />
 
       {/* ── 費用のめやす（お酒を飲む/飲まないで2種）── */}
       <div className="night-card px-4 py-4">
