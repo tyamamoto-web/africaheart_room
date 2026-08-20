@@ -233,6 +233,7 @@ export type KaraokeSlot = {
   id: string;
   time: string;
   label: string;
+  /** 枠の下に添える補足。今回は表をすっきりさせるため全枠で無し。入れれば自動で1行下に出る。 */
   detail?: string;
   rooms?: { key: KaraokeRoomKey; members: string[] }[];
 };
@@ -251,15 +252,11 @@ export const karaokeRooms = {
       id: "open",
       time: "12:00〜12:20",
       label: "オープニング・お誕生日会",
-      detail:
-        "全員でA室に集合。今月お誕生日のよっちゃん・Takeにプレゼントを渡して、みんなでハッピーバースデーを歌います。",
     },
     {
       id: "intro",
       time: "12:20〜13:20",
       label: "自己紹介＋宿題の曲",
-      detail:
-        "1人ずつ自己紹介をして、そのまま宿題ルーレットのお題から1曲歌い、次の人へ回します。9人で60分（1人6分ほど）。全員で集まるのはここまでで、次は合唱タイムです。",
     },
     {
       id: "koma1",
@@ -301,14 +298,11 @@ export const karaokeRooms = {
       id: "chorus",
       time: "17:20〜17:30",
       label: "合唱タイム",
-      detail: "B室の人もA室に戻って、全員で「世界で一つだけの花」を歌います。",
     },
     {
       id: "end",
       time: "17:30〜17:40",
       label: "片付け・移動の準備",
-      detail:
-        "合唱のあと、そのままA室で人数と忘れ物を確かめて退室します。B室に置いた荷物もお忘れなく。このあと18:00から焼肉です（じゅうじゅうカルビ 上諏訪店）。",
     },
   ] as KaraokeSlot[],
 };
