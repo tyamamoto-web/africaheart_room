@@ -282,7 +282,6 @@ export const karaokeRooms = {
       id: "koma4",
       time: "16:30〜17:20",
       label: "コマ④（ラスト）",
-      detail: "最後のコマです。歌い残しのある方はここで。",
       rooms: [
         { key: "A" as KaraokeRoomKey, members: ["くる", "しゃちょー", "Take", "シュウ", "ハッシー"] },
         { key: "B" as KaraokeRoomKey, members: ["よっちゃん", "ヒィ", "すー", "きい"] },
