@@ -209,8 +209,12 @@ export const nextEvent = {
    コマの分け方（9名を5人・4人の2部屋へ。顔ぶれは4コマ用の最良解のまま）：
      ①同席の回数をできるだけそろえる…36通りある2人の組み合わせのうち24組がちょうど2回。
        くるがハブ役で、4人と3回・4人と1回。残る4組は
-       よっちゃん×しゃちょー／Take×きい／シュウ×すー／ヒィ×ハッシー で、コマでは同席しない。
+       よっちゃん×ハッシー／しゃちょー×ヒィ／Take×きい／シュウ×すー で、コマでは同席しない。
        （この4組も、冒頭の1時間20分と合唱・片付けでは顔を合わせる）
+       0回の4組は、なるべく気になりにくい相手になるように選んである。
+         ・よっちゃんとしゃちょーは必ず同席する（2回）
+         ・女性どうし（くる・すー・きい）が0回になる組は無い
+         ・役員どうし（よっちゃん・くる・しゃちょー）が0回になる組も無い
        ※2部屋のままでは、コマを何個にしても「全員が最大2回」にはできないことを
          総当たりで確認した。数の上でも成立しない（下記）。
          2人が偶数回会うか奇数回会うかは、その2人が5人部屋に入った回数の偶奇が
@@ -271,8 +275,8 @@ export const karaokeRooms = {
       time: "14:20〜15:20",
       label: "コマ②",
       rooms: [
-        { key: "A" as KaraokeRoomKey, members: ["よっちゃん", "くる", "Take", "ハッシー", "すー"] },
-        { key: "B" as KaraokeRoomKey, members: ["しゃちょー", "シュウ", "ヒィ", "きい"] },
+        { key: "A" as KaraokeRoomKey, members: ["くる", "しゃちょー", "Take", "シュウ", "ハッシー"] },
+        { key: "B" as KaraokeRoomKey, members: ["よっちゃん", "ヒィ", "すー", "きい"] },
       ],
     },
     {
@@ -280,8 +284,8 @@ export const karaokeRooms = {
       time: "15:20〜16:20",
       label: "コマ③",
       rooms: [
-        { key: "A" as KaraokeRoomKey, members: ["よっちゃん", "くる", "シュウ", "ハッシー", "きい"] },
-        { key: "B" as KaraokeRoomKey, members: ["しゃちょー", "Take", "ヒィ", "すー"] },
+        { key: "A" as KaraokeRoomKey, members: ["くる", "Take", "ヒィ", "ハッシー", "すー"] },
+        { key: "B" as KaraokeRoomKey, members: ["よっちゃん", "しゃちょー", "シュウ", "きい"] },
       ],
     },
     {
@@ -289,8 +293,8 @@ export const karaokeRooms = {
       time: "16:20〜17:20",
       label: "コマ④（ラスト）",
       rooms: [
-        { key: "A" as KaraokeRoomKey, members: ["くる", "しゃちょー", "Take", "シュウ", "ハッシー"] },
-        { key: "B" as KaraokeRoomKey, members: ["よっちゃん", "ヒィ", "すー", "きい"] },
+        { key: "A" as KaraokeRoomKey, members: ["くる", "シュウ", "ヒィ", "ハッシー", "きい"] },
+        { key: "B" as KaraokeRoomKey, members: ["よっちゃん", "しゃちょー", "Take", "すー"] },
       ],
     },
     {
