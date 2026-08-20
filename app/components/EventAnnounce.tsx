@@ -125,7 +125,7 @@ export default function EventAnnounce() {
         <p className="text-[11px] mb-3" style={{ color: "#b7c2da" }}>{e.feeNote}</p>
 
         <div className="flex flex-col gap-2">
-          {e.schedule.map((s, i) => (
+          {e.schedule.flatMap((s, i) => [
             <div
               key={i}
               className="rounded-xl px-3 py-2.5"
@@ -207,13 +207,12 @@ export default function EventAnnounce() {
                   ※ {s.warn}
                 </p>
               ) : null}
-            </div>
-          ))}
+            </div>,
+            /* カラオケの部屋割り：どの部屋で歌うかはカラオケの予定と一続きなので、その真下に出す */
+            s.joinKey === "karaoke" ? <KaraokeRooms key="rooms" /> : null,
+          ])}
         </div>
       </div>
-
-      {/* ── カラオケの部屋割り（12:00〜17:40 の進行と、どの部屋に入るか）── */}
-      <KaraokeRooms />
 
       {/* ── 費用のめやす（お酒を飲む/飲まないで2種）── */}
       <div className="night-card px-4 py-4">

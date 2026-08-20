@@ -6,10 +6,14 @@ import { karaokeRooms, type KaraokeRoomKey, type KaraokeSlot } from "@/lib/data"
 /* ============================================================
    カラオケの部屋割り（告知の回）：TOPに掲載する表
    ------------------------------------------------------------
+   置き場所は「当日のスケジュール」のカラオケの行のすぐ下（EventAnnounce が差し込む）。
+   どの部屋で歌うかはカラオケの予定と一続きなので、外枠もその列の1枠と同じ形にして、
+   琥珀の縁取りだけで「これは部屋割り」と分かるようにしてある。
+
    並びは、このアプリが前から使っている「部屋割り表」と同じ形にそろえてある。
      左が時間、右が部屋（A室・B室）。全員で集まる枠は部屋の列をつないで1つにする。
-   花火大会テーマ（夜背景）に合わせた配色。中身は lib/data.ts の karaokeRooms を
-   差し替えるだけで更新できる（時刻も顔ぶれもあちらに置いてある）。
+   中身は lib/data.ts の karaokeRooms を差し替えるだけで更新できる
+   （時刻も顔ぶれもあちらに置いてある）。
 
    ※ 当日の実際の部屋番号（管理画面の「部屋番号（当日）」）は、ここには出していない。
      共有テーブルに入っているのは先月（7/26・ジャパレン松本店）の番号なので、
@@ -29,7 +33,7 @@ const ALL = { bg: "rgba(245,197,66,0.10)", fg: "#ffd884" };
 const HAIR = "1px solid rgba(255,255,255,0.13)";
 
 const th: React.CSSProperties = {
-  padding: "6px 6px",
+  padding: "6px 4px",
   borderBottom: "1px solid rgba(255,255,255,0.22)",
   fontSize: 11,
   fontWeight: 900,
@@ -38,7 +42,7 @@ const th: React.CSSProperties = {
 };
 
 const td: React.CSSProperties = {
-  padding: "8px 6px",
+  padding: "8px 4px",
   borderTop: HAIR,
   verticalAlign: "top",
 };
@@ -47,30 +51,32 @@ export default function KaraokeRooms() {
   const k = karaokeRooms;
 
   return (
-    <div className="night-card px-4 py-4">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="w-1.5 h-4 rounded-full" style={{ background: "#F5C542" }} />
-        <h3 className="text-sm font-black" style={{ color: "#ffd884" }}>
+    <div
+      className="rounded-xl px-3 py-2.5"
+      style={{ background: "rgba(245,197,66,0.07)", border: "1px solid rgba(245,205,110,0.30)" }}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="w-1.5 h-3.5 rounded-full" style={{ background: "#F5C542" }} />
+        <h4 className="text-[13px] font-black" style={{ color: "#ffd884" }}>
           {k.title}
-        </h3>
+        </h4>
       </div>
-      <p className="text-[11px]" style={{ color: "#b7c2da" }}>
-        <span className="whitespace-nowrap">{k.time}</span>
-        {" ／ "}
-        <span className="whitespace-nowrap">{k.place}</span>
+      {/* 時間と店名はすぐ上のカラオケの枠に出ているので、ここでは部屋数と人数だけ添える */}
+      <p className="mt-0.5 text-[11px]" style={{ color: "#b7c2da" }}>
+        <span className="whitespace-nowrap">A室・B室の2部屋</span>
         {" ／ "}
         <span className="whitespace-nowrap">参加{k.attendees.length}名</span>
       </p>
-      <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "#b7c2da" }}>
+      <p className="mt-1 text-[12px] leading-relaxed" style={{ color: "#b7c2da" }}>
         {k.lead}
       </p>
 
       {/* 表そのもの。狭い画面でも本文を横に押し出さないよう、この中だけで横に流す。 */}
-      <div className="mt-3 overflow-x-auto">
+      <div className="mt-2.5 overflow-x-auto">
         <table
           style={{
             width: "100%",
-            minWidth: 300,
+            minWidth: 280,
             borderCollapse: "collapse",
             tableLayout: "fixed",
             background: "rgba(255,255,255,0.03)",
@@ -80,9 +86,9 @@ export default function KaraokeRooms() {
         >
           <colgroup>
             {/* 時間の列は「片付け・移動の準備」が1行で収まる幅にしてある */}
-            <col style={{ width: "34%" }} />
-            <col style={{ width: "33%" }} />
-            <col style={{ width: "33%" }} />
+            <col style={{ width: "36%" }} />
+            <col style={{ width: "32%" }} />
+            <col style={{ width: "32%" }} />
           </colgroup>
           <thead>
             <tr style={{ background: "rgba(255,255,255,0.06)" }}>
