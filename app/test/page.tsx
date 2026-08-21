@@ -44,7 +44,7 @@ import {
   REACTION_MAX_LEN,
   type Reaction,
 } from "@/lib/reactions";
-import { defaultMembers, defaultRotations } from "@/lib/data";
+import { karaokeRooms } from "@/lib/data";
 
 /* ============================================================
    動作確認ページ（タブ切り替え式）
@@ -1042,17 +1042,13 @@ function HomeworkRoulette() {
 }
 
 /* ── 歌唱順ルーレット：参加者からスタート者をスロットで抽選＋進行方向 ── */
-const SING_KEY = "africaheart_singers_v7"; // 参加者（席順・この端末）
+const SING_KEY = "africaheart_singers_v8"; // 参加者（席順・この端末）
 const SING_DIR_KEY = "africaheart_sing_dir_v1"; // 進行方向（right/left）
 const CELL_H = 52; // スロット1行の高さ(px)
-// 初期の参加者は 7/26 の「実際の出席者」（部屋割りに登場するメンバー）を登録。
-// 欠席者(例:きい)は自動的に外れる。この端末で追加/削除して調整可（並び順は抽選に無関係）。
-const ATTENDING_IDS = new Set(
-  Object.values(defaultRotations).flatMap((koma) => Object.keys(koma))
-);
-const DEFAULT_SINGERS = defaultMembers
-  .filter((m) => ATTENDING_IDS.has(m.id))
-  .map((m) => m.nickname);
+// 初期の参加者は今回のオフ会の参加者（lib/data.ts の karaokeRooms.attendees＝部屋割りの顔ぶれ）。
+// 当日の増減はこの端末で追加/削除して調整できる（並びは席順のつもりで。抽選自体は順番に無関係）。
+// ここを変えたら SING_KEY の版数を上げる（各端末に残った前回の名簿を新しい既定へ入れ替えるため）。
+const DEFAULT_SINGERS = [...karaokeRooms.attendees];
 
 // 縦スクロールのスロット。key(=spin回数)で張り替え、マウント時に一度だけ回す。
 function SlotReel({
@@ -1347,7 +1343,7 @@ function SingingOrderRoulette() {
               </button>
             </div>
             <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-              抽選で出た人が「最初に歌う人」です。並び順は関係ありません。実名が決まったら「参加者◯」を消して名前を追加してください。この内容はこの端末に保存されます。
+              抽選で出た人が「最初に歌う人」です。並び順は関係ありません。はじめは今回のオフ会の参加9名が入っています。当日の増減はここで消したり足したりしてください。この内容はこの端末に保存されます。
             </p>
           </div>
         )}
