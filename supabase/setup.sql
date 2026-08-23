@@ -127,3 +127,28 @@ create policy "mp anon delete" on public.member_profiles for delete using (true)
 --    全リアクションを id=3 の themes[] に「1件＝JSON文字列」で格納する
 --    （宿題=id=1 / 部屋番号=id=2 とは別行なので衝突しない）。
 --    実装は lib/reactions.ts を参照。
+
+
+-- ============================================================
+-- ギャラリー（当日の写真・動画）：Supabase Storage の置き場所
+-- ------------------------------------------------------------
+-- 新しいテーブルは作らない。撮影シーンは Storage のフォルダで表す。
+--   gallery/<回の日付>/<シーンid>/<撮影時刻ms>-<乱数>.<拡張子>
+--   一覧用の小さい画像は、そのとなりの thumbs/ に置く。
+-- 実装は lib/gallery.ts を参照。
+--
+-- 公開バケットにするのは、参加者が公開URLでそのまま写真を見られるようにするため。
+-- 一覧を読むには、公開バケットであっても storage.objects の select ポリシーが要る。
+-- 何度実行しても同じ結果になるように書いてある（作り直しても壊れない）。
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('gallery', 'gallery', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "gallery read"   on storage.objects;
+drop policy if exists "gallery insert" on storage.objects;
+drop policy if exists "gallery delete" on storage.objects;
+
+create policy "gallery read"   on storage.objects for select to anon using (bucket_id = 'gallery');
+create policy "gallery insert" on storage.objects for insert to anon with check (bucket_id = 'gallery');
+create policy "gallery delete" on storage.objects for delete to anon using (bucket_id = 'gallery');
