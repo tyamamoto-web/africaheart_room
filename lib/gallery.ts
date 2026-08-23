@@ -254,6 +254,128 @@ export type UploadInput = {
  * 1件アップロードする。進み具合を出したいので fetch ではなく XHR を使う
  * （fetch はアップロードの進捗を取れない）。
  */
+/** アップロードが失敗したときの言い分けを1か所にまとめる。 */
+function uploadErrorFor(status: number, text: string): Error {
+  if (looksMissingBucket(text)) return new GallerySetupError();
+  if (status === 413 || /maximum allowed size|Payload too large|exceeded/i.test(text)) {
+    return new Error("いまの上限を超えています。運営でSupabaseの上限を上げてください。");
+  }
+  return new Error(`アップロードに失敗しました (${status})`);
+}
+
+/* ── 大きなファイル用：途中から続けられるアップロード（TUS）──────────
+   数百MB〜数GBを1回の送信でまとめて送ると、途中で切れたときに
+   最初からやり直しになる。6MBずつに分けて送り、切れても続きから
+   送り直せるようにする。1回分の大きさはSupabaseが6MBちょうどと
+   決めているので変えないこと（最後の1回だけ端数になる）。 */
+const RESUMABLE_CHUNK = 6 * 1024 * 1024;
+const RESUMABLE_MIN = RESUMABLE_CHUNK; // これを超えたら分けて送る
+const CHUNK_RETRY = 3;                 // 1回分あたりの送り直しの上限
+
+/** TUSの見出しに載せる値。日本語が入っても壊れないようUTF-8にしてから変換する。 */
+function b64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function tusHeaders(): Record<string, string> {
+  return {
+    apikey: SUPA_KEY ?? "",
+    Authorization: `Bearer ${SUPA_KEY ?? ""}`,
+    "Tus-Resumable": "1.0.0",
+  };
+}
+
+/** 置き場所を予約して、送り先のURLをもらう。 */
+async function createResumable(path: string, blob: Blob, contentType: string): Promise<string> {
+  const res = await fetch(`${SUPA_URL}/storage/v1/upload/resumable`, {
+    method: "POST",
+    headers: {
+      ...tusHeaders(),
+      "Upload-Length": String(blob.size),
+      "Upload-Metadata": [
+        `bucketName ${b64(GALLERY_BUCKET)}`,
+        `objectName ${b64(path)}`,
+        `contentType ${b64(contentType)}`,
+        `cacheControl ${b64("31536000")}`,
+      ].join(","),
+      "x-upsert": "false",
+    },
+  });
+  if (!res.ok) throw uploadErrorFor(res.status, await readText(res));
+  const loc = res.headers.get("Location") || res.headers.get("location");
+  if (!loc) throw new Error("アップロードの受け口が返ってきませんでした");
+  return new URL(loc, SUPA_URL).toString();
+}
+
+/** いまサーバーがどこまで受け取ったかを聞く（切れたあとに位置を合わせる）。 */
+async function headOffset(url: string): Promise<number> {
+  const res = await fetch(url, { method: "HEAD", headers: tusHeaders() });
+  if (!res.ok) return -1;
+  const n = Number(res.headers.get("Upload-Offset"));
+  return Number.isFinite(n) ? n : -1;
+}
+
+/** 1回分を送る。送っている途中の量も知らせる（進み具合の表示に使う）。 */
+function patchChunk(
+  url: string,
+  chunk: Blob,
+  offset: number,
+  onByte: (loaded: number) => void
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PATCH", url);
+    const h = tusHeaders();
+    for (const k of Object.keys(h)) xhr.setRequestHeader(k, h[k]);
+    xhr.setRequestHeader("Upload-Offset", String(offset));
+    xhr.setRequestHeader("Content-Type", "application/offset+octet-stream");
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onByte(e.loaded); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const next = Number(xhr.getResponseHeader("Upload-Offset"));
+        resolve(Number.isFinite(next) && next > offset ? next : offset + chunk.size);
+        return;
+      }
+      reject(uploadErrorFor(xhr.status, xhr.responseText || ""));
+    };
+    xhr.onerror = () => reject(new Error("アップロードに失敗しました（通信を確認してください）"));
+    xhr.send(chunk);
+  });
+}
+
+/** 大きなファイルを6MBずつに分けて送る。切れたら続きから送り直す。 */
+async function putObjectResumable(
+  path: string,
+  blob: Blob,
+  contentType: string,
+  onProgress?: (ratio: number) => void
+): Promise<void> {
+  const url = await createResumable(path, blob, contentType);
+  let offset = 0;
+  let fails = 0;
+  // 送る回数の上限。数え違いで永久に回り続けるのを防ぐための保険。
+  const maxRounds = Math.ceil(blob.size / RESUMABLE_CHUNK) + CHUNK_RETRY * 4 + 8;
+  for (let round = 0; offset < blob.size; round++) {
+    if (round > maxRounds) throw new Error("アップロードが進みませんでした");
+    const base = offset;
+    const chunk = blob.slice(base, Math.min(base + RESUMABLE_CHUNK, blob.size));
+    try {
+      offset = await patchChunk(url, chunk, base, (loaded) => onProgress?.((base + loaded) / blob.size));
+      fails = 0;
+    } catch (e) {
+      if (e instanceof GallerySetupError) throw e;
+      fails += 1;
+      if (fails > CHUNK_RETRY) throw e;
+      const at = await headOffset(url).catch(() => -1);
+      if (at >= 0) offset = at; // サーバーが受け取っている位置に合わせ直す
+    }
+  }
+  onProgress?.(1);
+}
+
 function putObject(
   path: string,
   blob: Blob,
@@ -279,11 +401,7 @@ function putObject(
         resolve();
         return;
       }
-      if (looksMissingBucket(xhr.responseText || "")) {
-        reject(new GallerySetupError());
-        return;
-      }
-      reject(new Error(`アップロードに失敗しました (${xhr.status})`));
+      reject(uploadErrorFor(xhr.status, xhr.responseText || ""));
     };
     xhr.onerror = () => reject(new Error("アップロードに失敗しました（通信を確認してください）"));
     xhr.send(blob);
@@ -302,7 +420,12 @@ export async function uploadToGallery(
 ): Promise<GalleryItem> {
   const name = `${input.takenAt}-${randomTag()}.${input.ext}`;
   const path = `${GALLERY_EVENT}/${input.sceneId}/${name}`;
-  await putObject(path, input.blob, input.contentType, onProgress);
+  // 小さいものは1回で、大きいものは分けて送る（途中で切れても続きから送れる）
+  if (input.blob.size > RESUMABLE_MIN) {
+    await putObjectResumable(path, input.blob, input.contentType, onProgress);
+  } else {
+    await putObject(path, input.blob, input.contentType, onProgress);
+  }
   if (input.thumb) {
     try {
       await putObject(thumbPathFor(input.sceneId, name), input.thumb, "image/jpeg");

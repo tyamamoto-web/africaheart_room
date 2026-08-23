@@ -37,11 +37,16 @@ const THUMB_EDGE = 480;
 const THUMB_QUALITY = 0.72;
 
 /**
- * 1ファイルの上限（Supabaseの無料プランの既定が50MB）。
- * 超えるものは入らないので、選んだ時点で知らせる。
- * プランを上げるかバケットの上限を変えたら、ここも合わせて変える。
+ * 1ファイルの上限。
+ * 30分ほどの動画を入れられるようにするため、4GBまでにしてある
+ * （iPhoneの1080p/30fpsで約65MB/分＝30分で約2GB。60fpsでも収まる大きさ）。
+ *
+ * ※ この数字だけ変えても入らない。Supabase側の上限も同じだけ必要：
+ *    ・プランがPro以上であること（無料プランは1ファイル50MBが上限）
+ *    ・ダッシュボード → Storage → Settings の
+ *      「Upload file size limit」を5GBなどに上げておくこと
  */
-export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024;
 
 export type VideoCodec = "h264" | "hevc" | "unknown";
 
@@ -308,6 +313,7 @@ export async function downloadFile(url: string, filename: string): Promise<void>
 
 /** 見やすい容量表示（「12.4MB」など）。 */
 export function humanSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`;
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
   return `${bytes}B`;
