@@ -9,7 +9,7 @@
    ・色はグレーだけにして、写真そのものが主役になるようにしている。
    ============================================================ */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent } from "react";
 import {
   listGallery,
   uploadToGallery,
@@ -361,11 +361,80 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [allowHevc, setAllowHevc] = useState(false);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState("");
+  // 「選ぶ」を押してから、端末がファイルを渡してくるまでのあいだ
+  const [picking, setPicking] = useState(false);
+  // 待っても渡ってこなかった（＝端末側で止まっている）
+  const [stuck, setStuck] = useState(false);
+  // マウスのある画面か（＝パソコン）。ドラッグの案内を出すかどうかに使う。
+  const [canDrop, setCanDrop] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const waitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setUnlocked(isOfficerUnlocked());
+    setCanDrop(
+      typeof window !== "undefined" &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    );
   }, []);
+
+  /* ── 端末が動画を渡せずに止まるのを、画面に出す ──────────────
+     スマホは、写真アプリの動画をブラウザに渡すとき、いったん丸ごと
+     書き出す。30分の動画は1〜2GBあるので、ここで数分かかるか、
+     本体の空きが足りずに無言で失敗する。どちらも見た目は
+     「押しても何も起きない」で区別がつかないので、
+     ・待っているあいだは「書き出し中」と言う
+     ・0件で戻ってきた／待っても来ないときは、直し方を出す
+     の2つを出す。合言葉やアップロードの処理には触らない。 */
+  const stopWaiting = useCallback(() => {
+    if (waitTimer.current) {
+      clearTimeout(waitTimer.current);
+      waitTimer.current = null;
+    }
+    setPicking(false);
+  }, []);
+
+  const openPicker = useCallback(() => {
+    setStuck(false);
+    setPicking(true);
+    if (waitTimer.current) clearTimeout(waitTimer.current);
+    // 2分半。大きい動画の書き出しは本当に数分かかるので、短くしすぎない。
+    waitTimer.current = setTimeout(() => {
+      waitTimer.current = null;
+      setPicking(false);
+      setStuck(true);
+    }, 150_000);
+    fileRef.current?.click();
+  }, []);
+
+  // 自分で「キャンセル」して閉じたときは、失敗ではないので何も出さない。
+  useEffect(() => {
+    const el = fileRef.current;
+    if (!el) return;
+    const onCancel = () => stopWaiting();
+    el.addEventListener("cancel", onCancel);
+    return () => el.removeEventListener("cancel", onCancel);
+  }, [stopWaiting, unlocked]);
+
+  useEffect(
+    () => () => {
+      if (waitTimer.current) clearTimeout(waitTimer.current);
+    },
+    []
+  );
+
+  // パソコンから落とされたぶん。写真アプリの書き出しを通っているので、
+  // ここに来る動画は「渡せずに止まる」ことがない。
+  function onDrop(e: RDragEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    stopWaiting();
+    setStuck(false);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) void onPick(files);
+  }
 
   const patch = useCallback((key: string, next: Partial<Pending>) => {
     setPend((prev) => prev.map((p) => (p.key === key ? { ...p, ...next } : p)));
@@ -411,6 +480,8 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   const hasHevc = pend.some((p) => p.codec === "hevc");
   const queued = pend.filter((p) => p.status === "ready" || (allowHevc && p.status === "blocked"));
+  // 大きいものが混ざっているときは、待ち時間を先に言っておく（途中で閉じられると消える）
+  const hasBig = queued.some((p) => p.file.size > 200 * 1024 * 1024);
 
   async function run() {
     if (queued.length === 0) return;
@@ -498,6 +569,9 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <p className="text-xs mt-2 leading-relaxed" style={{ color: DIM }}>
         撮る前に、iPhoneは 設定 → カメラ → フォーマット → 「互換性優先」にしてください。写真も動画も、アンドロイドで開ける形で撮れます。
       </p>
+      <p className="text-xs mt-1.5 leading-relaxed" style={{ color: DIM }}>
+        長い動画（10分以上）は、パソコンから入れてください。スマホからだと、動画をブラウザに渡す途中で止まり、選んでも何も起きないことがあります。iPhoneはパソコンにつないで写真アプリから書き出し、その動画をこの画面に入れてください。
+      </p>
 
       <label className="block text-xs mt-4 mb-1" style={{ color: SUB }}>撮影シーン</label>
       <select
@@ -511,14 +585,34 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
         ))}
       </select>
 
+      {/* パソコンからはドラッグでも入る。長い動画はこちらが確実なので、
+          選ぶボタンそのものを落とし場所にしてある（別のボタンを増やさない）。 */}
       <button
         type="button"
-        onClick={() => fileRef.current?.click()}
+        onClick={openPicker}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!dragOver) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
         className="w-full mt-3 py-6 text-sm"
-        style={{ border: `1px dashed #b4b2a9`, borderRadius: 10, color: SUB, background: "#fff" }}
+        style={{
+          border: `1px dashed ${dragOver ? INK : "#b4b2a9"}`,
+          borderRadius: 10,
+          color: SUB,
+          background: dragOver ? FACE : "#fff",
+        }}
       >
-        スマホ・PCから選ぶ
-        <span className="block text-xs mt-1" style={{ color: DIM }}>まとめて選べます</span>
+        {dragOver ? "ここに落とす" : canDrop ? "パソコンから選ぶ" : "スマホから選ぶ"}
+        {/* 中の文字の上を通るたびに dragleave が飛んで枠がちらつくので、拾わせない */}
+        <span className="block text-xs mt-1" style={{ color: DIM, pointerEvents: "none" }}>
+          {canDrop ? "ここにドラッグしても入ります。まとめて選べます" : "まとめて選べます"}
+        </span>
       </button>
       <input
         ref={fileRef}
@@ -527,10 +621,43 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
         multiple
         className="hidden"
         onChange={(e) => {
-          void onPick(e.target.files);
+          const files = e.target.files;
+          stopWaiting();
+          // 選んだはずなのに0件で戻ってくる＝端末が渡せていない
+          if (!files || files.length === 0) setStuck(true);
+          else void onPick(files);
           e.target.value = "";
         }}
       />
+
+      {picking && (
+        <p className="text-xs mt-2 leading-relaxed" style={{ color: DIM }}>
+          選んだものを、いま端末が書き出しています。長い動画だと数分かかります。この画面のままお待ちください。
+        </p>
+      )}
+
+      {stuck && (
+        <div className="mt-3 px-3 py-3" style={{ border: `1px solid ${LINE}`, borderRadius: 10 }}>
+          <p className="text-xs font-bold" style={{ color: INK }}>まだ動画が入ってきていません</p>
+          <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: SUB }}>
+            長い動画は、スマホがブラウザに渡しきれないことがあります。パソコンから入れるのが確実です。
+          </p>
+          <ol className="text-[11px] mt-2 leading-relaxed list-decimal pl-4" style={{ color: SUB }}>
+            <li>パソコンから入れる。iPhoneをつないで写真アプリで書き出し、その動画をこの画面にドラッグする（これが一番確実です）</li>
+            <li>スマホで続けるなら、まず10秒くらいの短い動画で試す。これが入るなら、原因は動画の長さです</li>
+            <li>本体の空き容量を見る（iPhoneは 設定 → 一般 → iPhoneストレージ）。動画と同じだけの空きが要ります</li>
+            <li>iPhoneは 設定 → 写真 →「オリジナルをダウンロード」にする（iCloudに預けたままだと渡せません）</li>
+          </ol>
+          <button
+            type="button"
+            onClick={() => setStuck(false)}
+            className="mt-2 text-[11px]"
+            style={{ color: DIM }}
+          >
+            閉じる
+          </button>
+        </div>
+      )}
 
       {pend.length > 0 && (
         <div className="mt-3" style={{ border: `1px solid ${LINE}`, borderRadius: 10 }}>
@@ -585,6 +712,11 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       >
         {running ? "追加しています…" : queued.length > 0 ? `${queued.length}件を追加する` : "追加する"}
       </button>
+      {hasBig && (
+        <p className="text-[11px] mt-2 leading-relaxed" style={{ color: DIM }}>
+          大きい動画は、追加し終わるまでに10分以上かかることがあります。終わるまで、この画面を閉じないでください。
+        </p>
+      )}
       {err && <p className="text-xs mt-2 leading-relaxed" style={{ color: "#a33" }}>{err}</p>}
       <p className="text-[11px] mt-3 leading-relaxed" style={{ color: DIM }}>
         写真はこの端末の中でJPEGに直してから入れます（iPhoneのHEICでも、どの端末でも開けます）。入れたものは、あとでGoogleドライブにも控えを取ってください。
