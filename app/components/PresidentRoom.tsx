@@ -37,7 +37,10 @@ const SURFACE  = "#FFFFFF"; // 本文の面
 
 // 名前は決まったものから差し替えていく。並び順もここで決まる。
 // id は保存に使う値なので、名前を変えても id は変えないこと。
-const MENU = [
+// children を持たせると、その項目の下にぶら下がるページになる。
+type MenuNode = { id: string; label: string; children?: { id: string; label: string }[] };
+
+const MENU: MenuNode[] = [
   { id: "m1",  label: "1" },
   { id: "m2",  label: "2" },
   { id: "m3",  label: "3" },
@@ -47,12 +50,18 @@ const MENU = [
   { id: "m7",  label: "7" },
   { id: "m8",  label: "8" },
   { id: "m9",  label: "9" },
-  { id: "m10", label: "設定" },
+  {
+    id: "m10", label: "設定",
+    children: [
+      { id: "m10-roster", label: "会員名簿" },
+    ],
+  },
 ];
 
 export default function PresidentRoom() {
   const [current, setCurrent] = useState(MENU[0].id);
-  const [drawer, setDrawer] = useState(false); // スマホでメニューを引き出しているか
+  const [opened,  setOpened]  = useState<string[]>([]); // 下の階層を開いている項目
+  const [drawer,  setDrawer]  = useState(false);        // スマホでメニューを引き出しているか
 
   // 引き出している間は、後ろの画面が動かないようにする
   useEffect(() => {
@@ -67,6 +76,18 @@ export default function PresidentRoom() {
     };
   }, [drawer]);
 
+  // 下にページを持つ項目：選ぶと同時に開く。開いているものをもう一度押すと閉じる。
+  // 開いた中身を見せたいので、この場合はスマホの引き出しを閉じない。
+  function chooseParent(node: MenuNode) {
+    if (!node.children?.length) { choose(node.id); return; }
+    const isOpen = opened.includes(node.id);
+    setCurrent(node.id);
+    setOpened(isOpen && current === node.id
+      ? opened.filter((x) => x !== node.id)
+      : [...opened.filter((x) => x !== node.id), node.id]);
+  }
+
+  // 行き先が決まる項目：選んだらスマホの引き出しは閉じる
   function choose(id: string) {
     setCurrent(id);
     setDrawer(false);
@@ -93,34 +114,80 @@ export default function PresidentRoom() {
 
         <nav aria-label="メニュー" style={{ paddingBottom: 24 }}>
           {MENU.map((m) => {
+            const kids = m.children ?? [];
             const on = m.id === current;
+            const isOpen = kids.length > 0 && opened.includes(m.id);
             return (
-              <button
-                key={m.id}
-                type="button"
-                className="pr-item"
-                aria-current={on ? "page" : undefined}
-                onClick={() => choose(m.id)}
-                style={{
-                  width: "100%",
-                  height: 42,
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "0 20px",
-                  border: "none",
-                  background: on ? SEL_BG : "transparent",
-                  boxShadow: on ? `inset 2px 0 0 ${SEL_MARK}` : "none",
-                  color: on ? INK : MUTED,
-                  fontSize: 13,
-                  fontWeight: on ? 600 : 500,
-                  letterSpacing: "0.04em",
-                  fontVariantNumeric: "tabular-nums",
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-              >
-                {m.label}
-              </button>
+              <div key={m.id}>
+                <button
+                  type="button"
+                  className="pr-item"
+                  aria-current={on ? "page" : undefined}
+                  aria-expanded={kids.length > 0 ? isOpen : undefined}
+                  onClick={() => chooseParent(m)}
+                  style={{
+                    width: "100%",
+                    height: 42,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "0 20px",
+                    border: "none",
+                    background: on ? SEL_BG : "transparent",
+                    boxShadow: on ? `inset 2px 0 0 ${SEL_MARK}` : "none",
+                    color: on ? INK : MUTED,
+                    fontSize: 13,
+                    fontWeight: on ? 600 : 500,
+                    letterSpacing: "0.04em",
+                    fontVariantNumeric: "tabular-nums",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0 }}>{m.label}</span>
+                  {kids.length > 0 && (
+                    <svg
+                      className="pr-chev"
+                      width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                      style={{ flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", opacity: 0.7 }}
+                    >
+                      <polyline points="9 6 15 12 9 18" />
+                    </svg>
+                  )}
+                </button>
+
+                {isOpen && kids.map((c) => {
+                  const cOn = c.id === current;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="pr-item"
+                      aria-current={cOn ? "page" : undefined}
+                      onClick={() => choose(c.id)}
+                      style={{
+                        width: "100%",
+                        height: 38,
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "0 20px 0 36px",
+                        border: "none",
+                        background: cOn ? SEL_BG : "transparent",
+                        boxShadow: cOn ? `inset 2px 0 0 ${SEL_MARK}` : "none",
+                        color: cOn ? INK : MUTED,
+                        fontSize: 12.5,
+                        fontWeight: cOn ? 600 : 500,
+                        letterSpacing: "0.04em",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
