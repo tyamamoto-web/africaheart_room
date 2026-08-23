@@ -12,10 +12,10 @@
      MENU の label を書き換えれば名前は差し替わる。
 
    【色の方針】
-   サークルのテーマカラーはロゴから採ったオレンジ（#F09800）。
-   ただし画面の大半は落ち着いた温かみのあるグレーで作り、
-   オレンジは「いま選んでいる場所」を示すときだけ使う。
-   大人のオフ会に似合う、静かで質のある見え方をねらう。
+   メニューはグレーだけで組む。オレンジはロゴが持っているので、
+   ボタンや選択の印には使わない。選んでいる場所は、地をひと段沈ませ、
+   左端に濃いグレーの線を1本立て、字を少し濃く太くして示す。
+   色の差は小さく、形と濃さで伝える＝大人のオフ会に似合う静かな見え方。
 
    【幅の考え方】
    ・パソコン（768px以上）＝左にメニューを出したままにする
@@ -24,14 +24,13 @@
 
 import { useEffect, useState } from "react";
 
-const ORANGE      = "#F09800"; // ロゴのオレンジ（サークルの色）
-const ORANGE_WASH = "#FBF3E6"; // 選んでいる行の地
-
-const INK     = "#201D1A"; // 主要テキスト（温かみのある黒）
-const MUTED   = "#6E675E"; // 補助テキスト
-const LINE    = "#E7E2D9"; // 繊細な罫線
-const SIDE_BG = "#F7F5F1"; // メニューの地（落ち着いたグレー）
-const SURFACE = "#FFFFFF"; // 本文の面
+const INK      = "#201D1A"; // 主要テキスト（温かみのある黒）
+const MUTED    = "#6E675E"; // 補助テキスト
+const LINE     = "#E7E2D9"; // 繊細な罫線
+const SIDE_BG  = "#F7F5F1"; // メニューの地（落ち着いたグレー）
+const SEL_BG   = "#E9E5DD"; // 選んでいる行の地（ひと段沈ませる）
+const SEL_MARK = "#3A352E"; // 選んでいる行の左端に立てる線（濃いグレー）
+const SURFACE  = "#FFFFFF"; // 本文の面
 
 // 名前は追って差し替える。並び順もここで決まる。
 const MENU = Array.from({ length: 10 }, (_, i) => ({ id: `m${i + 1}`, label: String(i + 1) }));
@@ -94,8 +93,8 @@ export default function PresidentRoom() {
                   alignItems: "center",
                   padding: "0 20px",
                   border: "none",
-                  background: on ? ORANGE_WASH : "transparent",
-                  boxShadow: on ? `inset 2px 0 0 ${ORANGE}` : "none",
+                  background: on ? SEL_BG : "transparent",
+                  boxShadow: on ? `inset 2px 0 0 ${SEL_MARK}` : "none",
                   color: on ? INK : MUTED,
                   fontSize: 13,
                   fontWeight: on ? 600 : 500,

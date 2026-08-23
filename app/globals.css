@@ -377,10 +377,10 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   min-width: 0;
 }
 
-/* 選べる行。触れたときだけ地をわずかに沈ませる */
+/* 選べる行。触れたときだけ地をわずかに沈ませる（色はグレーだけで組む） */
 .pr-item { transition: background-color .14s ease, color .14s ease; }
-.pr-item:hover:not([aria-current]) { background: #F1EEE8; color: #201D1A; }
-.pr-item:focus-visible { outline: 2px solid #A85F00; outline-offset: -2px; }
+.pr-item:hover:not([aria-current]) { background: #F1EEE9; color: #201D1A; }
+.pr-item:focus-visible { outline: 2px solid #3A352E; outline-offset: -2px; }
 
 /* パソコン：引き出し用の帯とボタンは出さない */
 .pr-bar { display: none; }
