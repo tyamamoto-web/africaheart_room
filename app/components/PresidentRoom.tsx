@@ -14,8 +14,9 @@
    【色の方針】
    メニューはグレーだけで組む。オレンジはロゴが持っているので、
    ボタンや選択の印には使わない。面は本文と同じ白にして、区切りは右の罫線1本。
-   選んでいる場所は、地をひと段沈ませ、左端に濃いグレーの線を1本立て、
-   字を少し濃く太くして示す。
+   選んでいる場所は、薄いグレーの角丸をひとつ敷いて「押されているボタン」として
+   見せ、字を少し濃く太くする。左右を少し内側に寄せてあるので、地の白との間に
+   余白ができ、帯ではなくボタンに見える。
    色の差は小さく、形と濃さで伝える＝大人のオフ会に似合う静かな見え方。
 
    【幅の考え方】
@@ -33,8 +34,9 @@ const INK      = "#1B1C1E"; // 主要テキスト（ほぼ黒）
 const MUTED    = "#63666C"; // 補助テキスト
 const LINE     = "#DFE1E4"; // 繊細な罫線
 const SIDE_BG  = "#FFFFFF"; // メニューの地（本文と同じ白。区切りは右の罫線だけ）
-const SEL_BG   = "#EDEEF0"; // 選んでいる行の地（白の上でひと段沈ませる）
-const SEL_MARK = "#35373C"; // 選んでいる行の左端に立てる線（濃いグレー）
+const SEL_BG   = "#EDEEF0"; // 選んでいる行の地（薄いグレー。これだけで選択を示す）
+const SEL_R    = 8;         // 選んでいる行の角の丸み（ボタンに見せる）
+const SEL_INSET = 10;       // 左右の内寄せ。この分だけ白が残ってボタンに見える
 const SURFACE  = "#FFFFFF"; // 本文の面
 
 // 名前は決まったものから差し替えていく。並び順もここで決まる。
@@ -128,15 +130,18 @@ export default function PresidentRoom() {
                   aria-expanded={kids.length > 0 ? isOpen : undefined}
                   onClick={() => chooseParent(m)}
                   style={{
-                    width: "100%",
-                    height: 42,
+                    // 幅は内寄せのぶんだけ縮め、減らした左右は padding で足す
+                    // （字の位置は内寄せ前と同じ 20px のまま）
+                    width: `calc(100% - ${SEL_INSET * 2}px)`,
+                    height: 38,
+                    margin: `2px ${SEL_INSET}px`,
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
-                    padding: "0 20px",
+                    padding: `0 ${20 - SEL_INSET}px`,
                     border: "none",
+                    borderRadius: SEL_R,
                     background: on ? SEL_BG : "transparent",
-                    boxShadow: on ? `inset 2px 0 0 ${SEL_MARK}` : "none",
                     color: on ? INK : MUTED,
                     fontSize: 13,
                     fontWeight: on ? 600 : 500,
@@ -169,14 +174,15 @@ export default function PresidentRoom() {
                       aria-current={cOn ? "page" : undefined}
                       onClick={() => choose(c.id)}
                       style={{
-                        width: "100%",
-                        height: 38,
+                        width: `calc(100% - ${SEL_INSET * 2}px)`,
+                        height: 34,
+                        margin: `2px ${SEL_INSET}px`,
                         display: "flex",
                         alignItems: "center",
-                        padding: "0 20px 0 36px",
+                        padding: `0 ${20 - SEL_INSET}px 0 ${36 - SEL_INSET}px`,
                         border: "none",
+                        borderRadius: SEL_R,
                         background: cOn ? SEL_BG : "transparent",
-                        boxShadow: cOn ? `inset 2px 0 0 ${SEL_MARK}` : "none",
                         color: cOn ? INK : MUTED,
                         fontSize: 12.5,
                         fontWeight: cOn ? 600 : 500,
