@@ -301,25 +301,54 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .night-stars, .night-horizon { animation: none; }
 }
 
-/* ── 社長室：暗証番号のテンキー ────────────────────────────
-   白い地に細い罫線だけの画面。押した瞬間だけ黒く反転させて、
-   指で触っても入ったことが分かるようにする。 */
-.pg-key { transition: background-color .12s ease, color .12s ease; }
-.pg-key:hover  { background: #fafafc; }
-.pg-key:active { background: #0c0d12; color: #fff; }
-.pg-key:focus-visible { outline: 2px solid #0c0d12; outline-offset: -2px; }
+/* =========================================================
+   社長室：入口のロック画面（PresidentGate）専用の演出
+   ---------------------------------------------------------
+   白基調・無駄な表示を置かない方針にしたので、動くものは
+   「立ち上がり」「間違いの揺れ」「照合中の細い線」の3つだけ。
+   クラス名は pg- で始め、他の画面に影響しないようにしている。
+   ========================================================= */
 
-@keyframes pg-shake {
-  0%, 100% { transform: translateX(0); }
-  20%      { transform: translateX(-6px); }
-  40%      { transform: translateX(6px); }
-  60%      { transform: translateX(-4px); }
-  80%      { transform: translateX(4px); }
+/* ふわっと立ち上がる */
+@keyframes pgRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
 }
-.pg-shake { animation: pg-shake .34s ease; }
+.pg-rise { animation: pgRise .45s cubic-bezier(.22,1,.36,1) both; }
 
-/* 動きを控える設定の人には揺らさない（色だけで間違いを伝える） */
+/* 角の斜めカット（無機質な面の作り方。影は付けない＝clip-pathが影を切るため） */
+.pg-clip {
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+
+/* パスワードを間違えたときだけ、左右に小さく振れる */
+@keyframes pgShake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-7px); }
+  30%  { transform: translateX(6px); }
+  45%  { transform: translateX(-4px); }
+  60%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+.pg-shake { animation: pgShake .4s ease; }
+
+/* 入力中だけ、下線が左から右へ引き直される */
+.pg-underline { transform: scaleX(0); transform-origin: left; transition: transform .3s ease-out; }
+.pg-field:focus-within .pg-underline { transform: scaleX(1); }
+
+/* 照合中に解除ボタンの下辺を流れる細い線 */
+@keyframes pgProgress {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+.pg-progress { animation: pgProgress 1.1s ease-in-out infinite; }
+
+/* 触れたときだけ枠と字を少し濃くする */
+.pg-submit:hover:not(:disabled) { border-color: #6b7180; }
+.pg-eye:hover { color: #6b7180; }
+
+/* 動きを控える設定の人には、動かさず色と形だけで伝える */
 @media (prefers-reduced-motion: reduce) {
-  .pg-shake { animation: none; }
-  .pg-key { transition: none; }
+  .pg-rise, .pg-shake, .pg-progress { animation: none; }
+  .pg-underline { transition: none; }
 }

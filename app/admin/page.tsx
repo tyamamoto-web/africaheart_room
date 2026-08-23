@@ -14,7 +14,6 @@ import {
 } from "@/lib/officerRaci";
 import { raciDefs, raciPersonSubLabel } from "@/lib/raciDefs";
 import { OFFICER_PASSCODE, OFFICER_UNLOCK_KEY } from "@/lib/officerGate";
-import { isPresidentUnlocked } from "@/lib/presidentGate";
 import PresidentGate from "@/app/components/PresidentGate";
 import {
   getOfficerTable, saveOfficerTableRow, saveOfficerTableColumns, deleteOfficerTableRow,
@@ -982,8 +981,6 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"officer" | "officer2" | "president" | "admin">("admin");
   // 役員専用タブの解錠状態と、合言葉の入力欄。解錠はタブを閉じるまで保持する。
   const [unlocked, setUnlocked] = useState(false);
-  // 社長室の解錠状態。役員専用とは別の番号なので、状態も別に持つ。
-  const [presidentUnlocked, setPresidentUnlocked] = useState(false);
   const [passInput, setPassInput] = useState("");
   const [passError, setPassError] = useState(false);
   // 役員専用：各タスクに手動でつけた優先度（この端末に保存）
@@ -1038,7 +1035,6 @@ export default function AdminPage() {
     try {
       if (sessionStorage.getItem(OFFICER_UNLOCK_KEY) === "1") setUnlocked(true);
     } catch { /* 読めなくても続行（合言葉を聞くだけ） */ }
-    if (isPresidentUnlocked()) setPresidentUnlocked(true);
   }, []);
 
   // 合言葉の判定。合っていれば解錠し、違っていれば入力欄を空にしてやり直してもらう。
@@ -1623,12 +1619,13 @@ export default function AdminPage() {
       {tab === "officer2" && unlocked && <OfficerRoleTable />}
 
       {/* ── 社長室タブ ── */}
-      {/* 暗証番号を入れるまで中身は描かない。番号は役員専用の合言葉とは別。 */}
-      {tab === "president" && !presidentUnlocked && (
-        <PresidentGate onUnlock={() => setPresidentUnlocked(true)} />
+      {/* パスワードを入れるまで中身は描かない。番号は役員専用の合言葉とは別。 */}
+      {/* 中身は追って決める。いまは意図的に何も置いていない。 */}
+      {tab === "president" && (
+        <PresidentGate>
+          <div className="px-4 pt-3 pb-10 max-w-lg mx-auto" />
+        </PresidentGate>
       )}
-      {/* 解錠後の中身は追って決める。いまは意図的に何も置いていない。 */}
-      {tab === "president" && presidentUnlocked && <div className="px-4 pt-3 pb-10 max-w-lg mx-auto" />}
 
       {tab === "admin" && (
       <div className="px-4 pt-3 max-w-lg mx-auto flex flex-col gap-4">
