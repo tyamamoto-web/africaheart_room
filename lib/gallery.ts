@@ -97,7 +97,7 @@ export type GalleryItem = {
 
 /** バケットやポリシーがまだ無いことを表すエラー（画面で案内を出し分ける） */
 export class GallerySetupError extends Error {
-  constructor(message = "ギャラリーの置き場所（gallery バケット）がまだありません") {
+  constructor(message = "ギャラリーの置き場所（gallery バケット）がまだありません。運営で用意してください") {
     super(message);
     this.name = "GallerySetupError";
   }
@@ -188,6 +188,26 @@ function toItem(sceneId: string, row: ListRow): GalleryItem {
 }
 
 /**
+ * 置き場所そのものが無いのかを確かめる。
+ *
+ * 一覧のAPIは、バケットが無くても 200 と空配列を返す（実測）。
+ * つまり「まだ1枚も無い」と「置き場所を作り忘れている」が見分けられない。
+ * そのままだと、用意を忘れたまま当日を迎えても、参加者にはただの空に見えてしまう。
+ * 公開URLのほうは無いバケットに NoSuchBucket を返すので、空のときだけこれで確かめる。
+ */
+async function bucketMissing(): Promise<boolean> {
+  try {
+    const res = await fetch(`${OBJECT}/public/${GALLERY_BUCKET}/__probe__`, {
+      cache: "no-store",
+    });
+    if (res.ok) return false;
+    return looksMissingBucket(await readText(res));
+  } catch {
+    return false; // 通信が不調なだけかもしれないので、未設定とは決めつけない
+  }
+}
+
+/**
  * 今回の回のぶんを全部読む。
  * Storageの一覧は1階層ずつしか返らないので、まずシーンのフォルダを調べ、
  * つぎに各フォルダの中身をまとめて取りにいく（フォルダの数だけ並列）。
@@ -204,7 +224,9 @@ export async function listGallery(): Promise<GalleryItem[]> {
         .map((r) => toItem(sid, r));
     })
   );
-  return chunks.flat().sort((a, b) => {
+  const items = chunks.flat();
+  if (items.length === 0 && (await bucketMissing())) throw new GallerySetupError();
+  return items.sort((a, b) => {
     const s = sceneOrder(a.sceneId) - sceneOrder(b.sceneId);
     return s !== 0 ? s : a.takenAt - b.takenAt;
   });

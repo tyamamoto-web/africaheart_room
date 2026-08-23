@@ -73,7 +73,8 @@ function Tile({
   selecting: boolean;
   onClick: () => void;
 }) {
-  // 小さい画像がまだ無い（作れなかった）ときは原寸に落とす
+  // 小さい画像がまだ無い（作れなかった）とき、写真は原寸に落とす。
+  // 動画の原寸は動画ファイルなので <img> では描けない（落とすと無駄に読むだけ）。
   const [src, setSrc] = useState(item.thumbUrl);
   const [dead, setDead] = useState(false);
   useEffect(() => {
@@ -101,7 +102,10 @@ function Tile({
           loading="lazy"
           decoding="async"
           className="w-full h-full object-cover"
-          onError={() => (src === item.thumbUrl ? setSrc(item.url) : setDead(true))}
+          onError={() => {
+            if (item.kind === "photo" && src === item.thumbUrl) setSrc(item.url);
+            else setDead(true);
+          }}
         />
       )}
       {item.kind === "video" && (
@@ -602,6 +606,7 @@ export default function GalleryFeature() {
   const [officer, setOfficer] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [reloading, setReloading] = useState(false);
 
   const load = useCallback(async () => {
     setErr("");
@@ -613,6 +618,14 @@ export default function GalleryFeature() {
       setLoading(false);
     }
   }, []);
+
+  // 運営があとから足したぶんを、開いたまま取り直す。
+  // 常時ポーリングにしないのは、画像の一覧は1回が重く、当日以外はまず増えないから。
+  const reload = useCallback(async () => {
+    setReloading(true);
+    await load();
+    setReloading(false);
+  }, [load]);
 
   useEffect(() => {
     void load();
@@ -639,10 +652,18 @@ export default function GalleryFeature() {
     setPicked((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
   }
 
+  // しぼりこみを切り替えると、選んだものが画面から消えることがある。
+  // 消えているものまで数に入れると「3件」と出して2件しか落とさない、という食い違いが出るので
+  // 件数もボタンの有効・無効も、いま見えているものだけで決める。
+  const pickedShown = useMemo(
+    () => shown.filter((i) => picked.includes(i.path)),
+    [shown, picked]
+  );
+
   async function savePicked() {
     setSaving(true);
     setSaveMsg("");
-    const targets = shown.filter((i) => picked.includes(i.path));
+    const targets = pickedShown;
     let ok = 0;
     for (let n = 0; n < targets.length; n++) {
       const it = targets[n];
@@ -684,6 +705,15 @@ export default function GalleryFeature() {
           {items.length > 0 ? `${items.length}件` : ""}
         </p>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void reload()}
+            disabled={reloading}
+            className="text-xs font-bold"
+            style={{ color: SUB, opacity: reloading ? 0.5 : 1 }}
+          >
+            {reloading ? "更新中" : "更新"}
+          </button>
           {items.length > 0 && (
             <button
               type="button"
@@ -736,6 +766,8 @@ export default function GalleryFeature() {
       {err && <p className="text-xs mt-3 leading-relaxed" style={{ color: "#a33" }}>{err}</p>}
 
       {shown.length === 0 ? (
+        // 読めなかったときは「まだありません」と言わない（上のエラー文と食い違うため）
+        err ? null : (
         <div className="py-12 text-center">
           <p className="text-sm" style={{ color: SUB }}>
             {items.length === 0 ? "当日の写真はまだありません" : "この種類はまだありません"}
@@ -746,6 +778,7 @@ export default function GalleryFeature() {
             </p>
           )}
         </div>
+        )
       ) : (
         <div className="mt-4">
           {groups.map((g) => (
@@ -777,16 +810,16 @@ export default function GalleryFeature() {
           <button
             type="button"
             onClick={() => void savePicked()}
-            disabled={saving || picked.length === 0}
+            disabled={saving || pickedShown.length === 0}
             className="w-full py-3 text-sm font-bold"
             style={{
               background: INK,
               color: "#f1efe8",
               borderRadius: 8,
-              opacity: saving || picked.length === 0 ? 0.45 : 1,
+              opacity: saving || pickedShown.length === 0 ? 0.45 : 1,
             }}
           >
-            {saving ? "保存しています…" : `${picked.length}件をまとめて保存`}
+            {saving ? "保存しています…" : `${pickedShown.length}件をまとめて保存`}
           </button>
           {isIOS() && (
             <p className="text-[11px] mt-2 leading-relaxed" style={{ color: DIM }}>

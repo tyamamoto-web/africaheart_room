@@ -59,18 +59,11 @@ export type Prepared = {
 
 type Decoded = { src: CanvasImageSource; w: number; h: number; close: () => void };
 
-// 読み込みは2通り試す。createImageBitmap のほうが速く、向きの指定もできる。
-// 古いブラウザや対応していない形式では <img> に落とす。
-async function decodeImage(file: File): Promise<Decoded> {
-  if (typeof createImageBitmap === "function") {
-    try {
-      const opts = { imageOrientation: "from-image" } as unknown as ImageBitmapOptions;
-      const bmp = await createImageBitmap(file, opts);
-      return { src: bmp, w: bmp.width, h: bmp.height, close: () => bmp.close() };
-    } catch {
-      /* 下の <img> で読み直す */
-    }
-  }
+// 読み込みは2通り試す。<img> を先にするのは「向き（EXIF）」のため。
+// createImageBitmap は速いが、向きを反映するかがブラウザの版で違う
+// （古いSafariは imageOrientation:"from-image" を無視して横倒しのまま焼ける）。
+// <img> はどのブラウザでも向きを反映して描くので、写真が回らないほうを既定にする。
+async function decodeViaImg(file: File): Promise<Decoded> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -79,11 +72,26 @@ async function decodeImage(file: File): Promise<Decoded> {
       el.onerror = () => reject(new Error("decode failed"));
       el.src = url;
     });
+    if (!img.naturalWidth || !img.naturalHeight) throw new Error("decode failed");
     return { src: img, w: img.naturalWidth, h: img.naturalHeight, close: () => URL.revokeObjectURL(url) };
   } catch (e) {
     URL.revokeObjectURL(url);
     throw e;
   }
+}
+
+async function decodeImage(file: File): Promise<Decoded> {
+  try {
+    return await decodeViaImg(file);
+  } catch {
+    /* 下の createImageBitmap で読み直す */
+  }
+  if (typeof createImageBitmap === "function") {
+    const opts = { imageOrientation: "from-image" } as unknown as ImageBitmapOptions;
+    const bmp = await createImageBitmap(file, opts);
+    return { src: bmp, w: bmp.width, h: bmp.height, close: () => bmp.close() };
+  }
+  throw new Error("decode failed");
 }
 
 // 読み込んだ画像を、長辺 maxEdge に収めたJPEGにする。
@@ -137,9 +145,13 @@ export async function prepareImage(file: File): Promise<Prepared> {
 // 箱の位置だけを読むので、何百MBの動画でも実際に読むのは moov のぶんだけ。
 const MAX_MOOV_BYTES = 32 * 1024 * 1024;
 
+// まっとうなmp4/movの一番外側の箱は ftyp/moov/mdat/free など数個しかない。
+// 壊れたファイルや別形式で、でたらめな長さを拾って延々とたどらないよう上限を置く。
+const MAX_TOP_BOXES = 64;
+
 async function findMoov(file: File): Promise<ArrayBuffer | null> {
   let off = 0;
-  while (off + 8 <= file.size) {
+  for (let seen = 0; seen < MAX_TOP_BOXES && off + 8 <= file.size; seen++) {
     const head = await file.slice(off, off + 16).arrayBuffer();
     if (head.byteLength < 8) return null;
     const dv = new DataView(head);
