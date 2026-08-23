@@ -31,10 +31,13 @@ import PresidentTable from "@/app/components/PresidentTable";
    以前は暖色寄りのグレーにしていたが、画面ではベージュに見えてしまうため、
    赤み・黄みを抜いた本物のグレーにそろえている。 */
 const INK      = "#1B1C1E"; // 主要テキスト（ほぼ黒）
-const MUTED    = "#63666C"; // 補助テキスト
+// 補助テキストの #63666C は globals.css の .pr-item が持っている（ホバーを効かせるため）
 const LINE     = "#DFE1E4"; // 繊細な罫線
 const SIDE_BG  = "#FFFFFF"; // メニューの地（本文と同じ白。区切りは右の罫線だけ）
-const SEL_BG   = "#EDEEF0"; // 選んでいる行の地（薄いグレー。これだけで選択を示す）
+/* 白 → マウスを乗せた行(#F1F2F4) → 選んでいる行(#E8EAED) の三段。
+   ホバーを見える濃さにすると #EDEEF0 では選択中と区別がつかないので、
+   選択中をもう一段だけ深くしてある。 */
+const SEL_BG   = "#E8EAED"; // 選んでいる行の地（薄いグレー。これだけで選択を示す）
 const SEL_R    = 8;         // 選んでいる行の角の丸み（ボタンに見せる）
 const SEL_INSET = 10;       // 左右の内寄せ。この分だけ白が残ってボタンに見える
 const SURFACE  = "#FFFFFF"; // 本文の面
@@ -141,8 +144,11 @@ export default function PresidentRoom() {
                     padding: `0 ${20 - SEL_INSET}px`,
                     border: "none",
                     borderRadius: SEL_R,
-                    background: on ? SEL_BG : "transparent",
-                    color: on ? INK : MUTED,
+                    // 選んでいないときは地を書かない。ここに transparent と書くと
+                    // インライン指定が勝ってしまい、CSSのホバーが効かなくなる。
+                    background: on ? SEL_BG : undefined,
+                    // 選んでいないときの色は globals.css の .pr-item が持つ
+                    color: on ? INK : undefined,
                     fontSize: 13,
                     fontWeight: on ? 600 : 500,
                     letterSpacing: "0.04em",
@@ -182,8 +188,8 @@ export default function PresidentRoom() {
                         padding: `0 ${20 - SEL_INSET}px 0 ${36 - SEL_INSET}px`,
                         border: "none",
                         borderRadius: SEL_R,
-                        background: cOn ? SEL_BG : "transparent",
-                        color: cOn ? INK : MUTED,
+                        background: cOn ? SEL_BG : undefined,
+                        color: cOn ? INK : undefined,
                         fontSize: 12.5,
                         fontWeight: cOn ? 600 : 500,
                         letterSpacing: "0.04em",
