@@ -975,9 +975,9 @@ export default function AdminPage() {
   const [roomNos,      setRoomNos]      = useState<{ A: string; B: string; C: string }>({ A: "", B: "", C: "" });
   const [roomSaving,   setRoomSaving]   = useState(false);
   const [roomMsg,      setRoomMsg]      = useState<{ kind: "ok" | "err" | "setup"; text: string } | null>(null);
-  // 管理画面のタブ（左=部屋割り・メンバー / 中=役員専用 / 右=役員専用2）。既定は左。
-  // 右の2つは合言葉を入れないと中身を出さない。役員専用2は中身がこれから決まる空のタブ。
-  const [tab, setTab] = useState<"officer" | "officer2" | "admin">("admin");
+  // 管理画面のタブ（部屋割り・メンバー / 役員専用 / 役員専用2 / 社長室）。既定はいちばん左。
+  // 役員専用と役員専用2は合言葉を入れないと中身を出さない。役員専用2と社長室は中身がこれから決まる空のタブ。
+  const [tab, setTab] = useState<"officer" | "officer2" | "president" | "admin">("admin");
   // 役員専用タブの解錠状態と、合言葉の入力欄。解錠はタブを閉じるまで保持する。
   const [unlocked, setUnlocked] = useState(false);
   const [passInput, setPassInput] = useState("");
@@ -1212,20 +1212,21 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* ── タブ切替（部屋割り・メンバー / 役員専用 / 役員専用2）── */}
+      {/* ── タブ切替（部屋割り・メンバー / 役員専用 / 役員専用2 / 社長室）── */}
       <div className="px-4 pt-3 max-w-lg mx-auto">
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "#f4f0ea" }}>
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl" style={{ background: "#f4f0ea" }}>
           {([
             { key: "admin", label: "部屋割り・メンバー" },
             { key: "officer", label: "役員専用" },
             { key: "officer2", label: "役員専用2" },
+            { key: "president", label: "社長室" },
           ] as const).map((t) => {
             const active = tab === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className="flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors"
+                className="w-full min-w-0 py-2.5 px-1 rounded-lg text-sm font-bold transition-colors"
                 style={
                   active
                     ? { background: "linear-gradient(135deg,#A8175F,#C81E77)", color: "#fff", boxShadow: "0 2px 8px rgba(168,23,95,0.25)" }
@@ -1615,6 +1616,10 @@ export default function AdminPage() {
       {/* ── 役員専用2タブ ── */}
       {/* マニュアルにあった表の見た目と操作感だけを置いてある。中身はこれから入れる。 */}
       {tab === "officer2" && unlocked && <OfficerRoleTable />}
+
+      {/* ── 社長室タブ ── */}
+      {/* 中身は追って決める。いまは意図的に何も置いていない。 */}
+      {tab === "president" && <div className="px-4 pt-3 pb-10 max-w-lg mx-auto" />}
 
       {tab === "admin" && (
       <div className="px-4 pt-3 max-w-lg mx-auto flex flex-col gap-4">
