@@ -35,8 +35,20 @@ const SEL_BG   = "#DEE0E3"; // 選んでいる行の地（ひと段沈ませる�
 const SEL_MARK = "#35373C"; // 選んでいる行の左端に立てる線（濃いグレー）
 const SURFACE  = "#FFFFFF"; // 本文の面
 
-// 名前は追って差し替える。並び順もここで決まる。
-const MENU = Array.from({ length: 10 }, (_, i) => ({ id: `m${i + 1}`, label: String(i + 1) }));
+// 名前は決まったものから差し替えていく。並び順もここで決まる。
+// id は保存に使う値なので、名前を変えても id は変えないこと。
+const MENU = [
+  { id: "m1",  label: "1" },
+  { id: "m2",  label: "2" },
+  { id: "m3",  label: "3" },
+  { id: "m4",  label: "4" },
+  { id: "m5",  label: "5" },
+  { id: "m6",  label: "6" },
+  { id: "m7",  label: "7" },
+  { id: "m8",  label: "8" },
+  { id: "m9",  label: "9" },
+  { id: "m10", label: "設定" },
+];
 
 export default function PresidentRoom() {
   const [current, setCurrent] = useState(MENU[0].id);
