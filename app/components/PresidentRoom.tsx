@@ -64,12 +64,17 @@ export default function PresidentRoom() {
       {/* ── 左のメニュー ── */}
       <aside className={`pr-side${drawer ? " is-open" : ""}`} style={{ background: SIDE_BG, borderRight: `1px solid ${LINE}` }}>
 
-        {/* サークル名。オレンジの細い線を1本だけ添える */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
-          <span aria-hidden="true" style={{ width: 2, height: 15, background: ORANGE, flexShrink: 0 }} />
-          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.10em", color: INK }}>
-            アフリカハート
-          </span>
+        {/* サークルのしるし。TOPページと同じロゴを使う */}
+        <div style={{ padding: "22px 20px 20px" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/africaheart-logo.png"
+            alt="アフリカハート"
+            width={557}
+            height={364}
+            className="select-none pointer-events-none"
+            style={{ display: "block", width: 128, height: "auto" }}
+          />
         </div>
 
         <nav aria-label="メニュー" style={{ paddingBottom: 24 }}>
@@ -130,9 +135,15 @@ export default function PresidentRoom() {
               <line x1="4" y1="17" x2="20" y2="17" />
             </svg>
           </button>
-          <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", color: MUTED }}>
-            アフリカハート
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/africaheart-logo.png"
+            alt="アフリカハート"
+            width={557}
+            height={364}
+            className="select-none pointer-events-none"
+            style={{ display: "block", width: 72, height: "auto" }}
+          />
         </div>
 
         {/* 本文。どのメニューを選んでも、いまは意図的に空にしてある。 */}
