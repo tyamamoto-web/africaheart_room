@@ -7,7 +7,7 @@
    作り直すための試作場所として使う。納得できる形になったら、
    ここの中身を既存のページへ移していく。
 
-   【いまのスコープ】左のメニュー10個だけ。
+   【いまのスコープ】左のメニュー10個だけ。本文は空。
      名前は追って決めるので、いまは 1〜10 を並べてある。
      MENU の label を書き換えれば名前は差し替わる。
 
@@ -25,7 +25,6 @@
 import { useEffect, useState } from "react";
 
 const ORANGE      = "#F09800"; // ロゴのオレンジ（サークルの色）
-const ORANGE_DEEP = "#A85F00"; // 文字に使える濃さ
 const ORANGE_WASH = "#FBF3E6"; // 選んでいる行の地
 
 const INK     = "#201D1A"; // 主要テキスト（温かみのある黒）
@@ -53,8 +52,6 @@ export default function PresidentRoom() {
       window.removeEventListener("keydown", onKey);
     };
   }, [drawer]);
-
-  const currentLabel = MENU.find((m) => m.id === current)?.label ?? "";
 
   function choose(id: string) {
     setCurrent(id);
@@ -138,15 +135,7 @@ export default function PresidentRoom() {
           </span>
         </div>
 
-        {/* いまはメニューの動きが分かるだけの見出し。中身は次のスコープで入れる。 */}
-        <div style={{ padding: "38px 28px" }}>
-          <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.22em", color: ORANGE_DEEP }}>
-            MENU
-          </p>
-          <h2 style={{ marginTop: 10, fontSize: 24, fontWeight: 600, letterSpacing: "0.02em", color: INK, fontVariantNumeric: "tabular-nums" }}>
-            {currentLabel}
-          </h2>
-        </div>
+        {/* 本文。どのメニューを選んでも、いまは意図的に空にしてある。 */}
 
       </div>
     </div>
