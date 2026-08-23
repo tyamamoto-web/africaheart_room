@@ -107,7 +107,7 @@ export default function PresidentRoom() {
             alt="アフリカハート"
             width={557}
             height={364}
-            className="select-none pointer-events-none"
+            className="pr-logo select-none pointer-events-none"
             style={{ display: "block", width: 128, height: "auto" }}
           />
         </div>
@@ -222,7 +222,7 @@ export default function PresidentRoom() {
             alt="アフリカハート"
             width={557}
             height={364}
-            className="select-none pointer-events-none"
+            className="pr-logo select-none pointer-events-none"
             style={{ display: "block", width: 72, height: "auto" }}
           />
         </div>
