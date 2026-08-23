@@ -2104,6 +2104,15 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
   );
 }
 
+/* ── ギャラリー：入口（タブ）だけ用意。中身はこれから作る ── */
+function GalleryFeature() {
+  return (
+    <p className="text-sm text-center leading-relaxed" style={{ color: "#aaa" }}>
+      準備中です。
+    </p>
+  );
+}
+
 /* ── 機能一覧（ここに追加していく）──────────────────── */
 const features: Feature[] = [
   {
@@ -2133,6 +2142,13 @@ const features: Feature[] = [
     title: "メンバープロフィール",
     description: "",
     render: (ctx) => <ProfileFeature sinceSeen={ctx.sinceSeen} onLatest={ctx.onLatest} />,
+  },
+  {
+    id: "gallery",
+    tab: "ギャラリー",
+    title: "ギャラリー",
+    description: "",
+    render: () => <GalleryFeature />,
   },
 ];
 
