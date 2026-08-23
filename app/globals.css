@@ -379,7 +379,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 
 /* 選べる行。触れたときだけ地をわずかに沈ませる（色はグレーだけで組む） */
 .pr-item { transition: background-color .14s ease, color .14s ease; }
-.pr-item:hover:not([aria-current]) { background: #E5E7E9; color: #1B1C1E; }
+.pr-item:hover:not([aria-current]) { background: #F5F6F7; color: #1B1C1E; }
 .pr-item:focus-visible { outline: 2px solid #35373C; outline-offset: -2px; }
 
 /* パソコン：引き出し用の帯とボタンは出さない */
