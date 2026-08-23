@@ -15,6 +15,7 @@ import {
 import { raciDefs, raciPersonSubLabel } from "@/lib/raciDefs";
 import { OFFICER_PASSCODE, OFFICER_UNLOCK_KEY } from "@/lib/officerGate";
 import PresidentGate from "@/app/components/PresidentGate";
+import PresidentRoom from "@/app/components/PresidentRoom";
 import {
   getOfficerTable, saveOfficerTableRow, saveOfficerTableColumns, deleteOfficerTableRow,
   insertOfficerTableRowBefore,
@@ -1620,10 +1621,10 @@ export default function AdminPage() {
 
       {/* ── 社長室タブ ── */}
       {/* パスワードを入れるまで中身は描かない。番号は役員専用の合言葉とは別。 */}
-      {/* 中身は追って決める。いまは意図的に何も置いていない。 */}
+      {/* 中身は「これからのTOPページの下書き」。ここで作り込んでから既存ページへ移す。 */}
       {tab === "president" && (
         <PresidentGate>
-          <div className="px-4 pt-3 pb-10 max-w-lg mx-auto" />
+          <PresidentRoom />
         </PresidentGate>
       )}
 

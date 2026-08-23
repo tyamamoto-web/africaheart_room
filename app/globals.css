@@ -352,3 +352,82 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .pg-rise, .pg-shake, .pg-progress { animation: none; }
   .pg-underline { transition: none; }
 }
+
+/* =========================================================
+   社長室：これからのTOPページの下書き（PresidentRoom）
+   ---------------------------------------------------------
+   パソコンでは左にメニューを出したまま、スマホではしまっておいて
+   ボタンで引き出す。クラス名は pr- で始め、他の画面に影響させない。
+   ========================================================= */
+
+.pr-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: calc(100dvh - 190px);
+  position: relative;
+}
+
+.pr-side {
+  width: 236px;
+  flex-shrink: 0;
+}
+
+.pr-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 選べる行。触れたときだけ地をわずかに沈ませる */
+.pr-item { transition: background-color .14s ease, color .14s ease; }
+.pr-item:hover:not([aria-current]) { background: #F1EEE8; color: #201D1A; }
+.pr-item:focus-visible { outline: 2px solid #A85F00; outline-offset: -2px; }
+
+/* パソコン：引き出し用の帯とボタンは出さない */
+.pr-bar { display: none; }
+
+@media (max-width: 767px) {
+  /* スマホ：メニューは画面の外にしまっておき、ボタンで引き出す */
+  .pr-side {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    width: 236px;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform .26s cubic-bezier(.22,1,.36,1);
+    box-shadow: 0 0 40px -12px rgba(32,29,26,0.28);
+  }
+  .pr-side.is-open { transform: none; }
+
+  .pr-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(32,29,26,0.34);
+  }
+
+  .pr-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .pr-menubtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    cursor: pointer;
+    line-height: 0;
+  }
+}
+
+/* 動きを控える設定の人には、すべらせずに切り替える */
+@media (prefers-reduced-motion: reduce) {
+  .pr-side { transition: none; }
+  .pr-item { transition: none; }
+}
