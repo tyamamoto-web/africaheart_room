@@ -383,7 +383,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
    #63666C は PresidentRoom.tsx の MUTED と同じ色。変えるときは両方そろえる。 */
 .pr-item { background: transparent; color: #63666C; transition: background-color .14s ease, color .14s ease; }
 /* マウスを乗せた行も、選んでいる行と同じ形のグレーで示す。
-   選んでいる行(#E8EAED)より一段だけ薄くして、どちらが選択中か分かるようにする。
+   選んでいる行(#E1E2E5)より薄くして、どちらが選択中か分かるようにする。
    指で触る画面では、押したあとに色が残ってしまうので当てない。 */
 @media (hover: hover) and (pointer: fine) {
   .pr-item:hover:not([aria-current]) { background: #F1F2F4; color: #1B1C1E; }
