@@ -66,8 +66,8 @@ export default function PresidentRoom() {
       {/* ── 左のメニュー ── */}
       <aside className={`pr-side${drawer ? " is-open" : ""}`} style={{ background: SIDE_BG, borderRight: `1px solid ${LINE}` }}>
 
-        {/* サークルのしるし。TOPページと同じロゴを使う */}
-        <div style={{ padding: "22px 20px 20px" }}>
+        {/* サークルのしるし。TOPページと同じロゴを、メニューの幅の中央に置く */}
+        <div style={{ display: "flex", justifyContent: "center", padding: "22px 20px 20px" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/africaheart-logo.png"
