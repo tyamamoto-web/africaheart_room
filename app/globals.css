@@ -435,3 +435,40 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 /* 社長室：下にページを持つ項目の三角。開くと90度まわる */
 .pr-chev { transition: transform .18s ease; }
 @media (prefers-reduced-motion: reduce) { .pr-chev { transition: none; } }
+
+/* =========================================================
+   社長室：会員名簿の表（PresidentTable）
+   ---------------------------------------------------------
+   マスは枠を持たず、表の罫線だけで区切る。書いている場所は
+   地をうすく沈ませて示す。色はグレーだけで組む。
+   ========================================================= */
+.pr-cell {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: #1B1C1E;
+}
+.pr-cell::placeholder { color: #B0B3B9; }
+.pr-cell:focus { background: #F4F5F6; box-shadow: inset 0 0 0 1px #9A9DA4; }
+.pr-cell--head { font-weight: 600; }
+
+.pr-addbtn {
+  padding: 7px 14px;
+  border: 1px solid #DFE1E4;
+  background: #FFFFFF;
+  color: #1B1C1E;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color .14s ease;
+}
+.pr-addbtn:hover { border-color: #9A9DA4; }
+.pr-addbtn:focus-visible { outline: 2px solid #35373C; outline-offset: 2px; }

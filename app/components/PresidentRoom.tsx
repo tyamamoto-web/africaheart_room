@@ -23,6 +23,7 @@
    ============================================================ */
 
 import { useEffect, useState } from "react";
+import PresidentTable from "@/app/components/PresidentTable";
 
 /* すべて色味を持たない中間色のグレー。
    以前は暖色寄りのグレーにしていたが、画面ではベージュに見えてしまうため、
@@ -227,7 +228,8 @@ export default function PresidentRoom() {
           />
         </div>
 
-        {/* 本文。どのメニューを選んでも、いまは意図的に空にしてある。 */}
+        {/* 本文。中身があるのは会員名簿だけで、ほかは意図的に空にしてある。 */}
+        {current === "m10-roster" && <PresidentTable />}
 
       </div>
     </div>
