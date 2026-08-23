@@ -16,10 +16,10 @@
    ============================================================ */
 
 const SUPA_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://klwfhpyftnirkxxcmjff.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gdajpgbfngvigrdbiwsw.supabase.co";
 const SUPA_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "sb_publishable_7xk88rvHPopcdMd9MyyE_A_XKvS1MIi";
+  "sb_publishable_MBRlmw3t4j58uDQkWJ92Ng_xglG2rB0";
 
 const ENDPOINT = `${SUPA_URL}/rest/v1/homework_result`;
 const ROW_ID = 8; // マニュアルのチェック専用の行

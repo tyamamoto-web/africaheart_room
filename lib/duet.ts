@@ -23,10 +23,10 @@ export type DuetSong = {
 // Supabase 接続情報。環境変数があれば優先、なければ既定値（公開用キー）を使用。
 // ※ sb_publishable_ キーはクライアントに公開される前提のキー。アクセス制御はRLSで担保。
 const SUPA_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://klwfhpyftnirkxxcmjff.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gdajpgbfngvigrdbiwsw.supabase.co";
 const SUPA_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "sb_publishable_7xk88rvHPopcdMd9MyyE_A_XKvS1MIi";
+  "sb_publishable_MBRlmw3t4j58uDQkWJ92Ng_xglG2rB0";
 
 export function isDuetConfigured(): boolean {
   return !!(SUPA_URL && SUPA_KEY);

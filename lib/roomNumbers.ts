@@ -25,10 +25,10 @@ import { nextEvent } from "./data";
 const EVENT_KEY = nextEvent.date;
 
 const SUPA_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://klwfhpyftnirkxxcmjff.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gdajpgbfngvigrdbiwsw.supabase.co";
 const SUPA_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "sb_publishable_7xk88rvHPopcdMd9MyyE_A_XKvS1MIi";
+  "sb_publishable_MBRlmw3t4j58uDQkWJ92Ng_xglG2rB0";
 
 // 宿題結果と同じテーブルを共用。宿題は id=1、部屋番号は id=2。
 const ENDPOINT = `${SUPA_URL}/rest/v1/homework_result`;
