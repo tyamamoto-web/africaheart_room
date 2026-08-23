@@ -24,12 +24,15 @@
 
 import { useEffect, useState } from "react";
 
-const INK      = "#201D1A"; // 主要テキスト（温かみのある黒）
-const MUTED    = "#6E675E"; // 補助テキスト
-const LINE     = "#E7E2D9"; // 繊細な罫線
-const SIDE_BG  = "#F7F5F1"; // メニューの地（落ち着いたグレー）
-const SEL_BG   = "#E9E5DD"; // 選んでいる行の地（ひと段沈ませる）
-const SEL_MARK = "#3A352E"; // 選んでいる行の左端に立てる線（濃いグレー）
+/* すべて色味を持たない中間色のグレー。
+   以前は暖色寄りのグレーにしていたが、画面ではベージュに見えてしまうため、
+   赤み・黄みを抜いた本物のグレーにそろえている。 */
+const INK      = "#1B1C1E"; // 主要テキスト（ほぼ黒）
+const MUTED    = "#63666C"; // 補助テキスト
+const LINE     = "#DFE1E4"; // 繊細な罫線
+const SIDE_BG  = "#EDEEF0"; // メニューの地（落ち着いたグレー）
+const SEL_BG   = "#DEE0E3"; // 選んでいる行の地（ひと段沈ませる）
+const SEL_MARK = "#35373C"; // 選んでいる行の左端に立てる線（濃いグレー）
 const SURFACE  = "#FFFFFF"; // 本文の面
 
 // 名前は追って差し替える。並び順もここで決まる。

@@ -379,8 +379,8 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 
 /* 選べる行。触れたときだけ地をわずかに沈ませる（色はグレーだけで組む） */
 .pr-item { transition: background-color .14s ease, color .14s ease; }
-.pr-item:hover:not([aria-current]) { background: #F1EEE9; color: #201D1A; }
-.pr-item:focus-visible { outline: 2px solid #3A352E; outline-offset: -2px; }
+.pr-item:hover:not([aria-current]) { background: #E5E7E9; color: #1B1C1E; }
+.pr-item:focus-visible { outline: 2px solid #35373C; outline-offset: -2px; }
 
 /* パソコン：引き出し用の帯とボタンは出さない */
 .pr-bar { display: none; }
@@ -397,7 +397,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
     overflow-y: auto;
     transform: translateX(-100%);
     transition: transform .26s cubic-bezier(.22,1,.36,1);
-    box-shadow: 0 0 40px -12px rgba(32,29,26,0.28);
+    box-shadow: 0 0 40px -12px rgba(27,28,30,0.30);
   }
   .pr-side.is-open { transform: none; }
 
@@ -405,7 +405,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
     position: fixed;
     inset: 0;
     z-index: 55;
-    background: rgba(32,29,26,0.34);
+    background: rgba(27,28,30,0.36);
   }
 
   .pr-bar {
