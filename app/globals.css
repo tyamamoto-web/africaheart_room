@@ -300,3 +300,26 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .fw, .fw--willow { animation: none; transform: scale(var(--s, 1)); }
   .night-stars, .night-horizon { animation: none; }
 }
+
+/* ── 社長室：暗証番号のテンキー ────────────────────────────
+   白い地に細い罫線だけの画面。押した瞬間だけ黒く反転させて、
+   指で触っても入ったことが分かるようにする。 */
+.pg-key { transition: background-color .12s ease, color .12s ease; }
+.pg-key:hover  { background: #fafafc; }
+.pg-key:active { background: #0c0d12; color: #fff; }
+.pg-key:focus-visible { outline: 2px solid #0c0d12; outline-offset: -2px; }
+
+@keyframes pg-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-6px); }
+  40%      { transform: translateX(6px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+.pg-shake { animation: pg-shake .34s ease; }
+
+/* 動きを控える設定の人には揺らさない（色だけで間違いを伝える） */
+@media (prefers-reduced-motion: reduce) {
+  .pg-shake { animation: none; }
+  .pg-key { transition: none; }
+}
