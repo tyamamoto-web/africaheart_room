@@ -45,6 +45,7 @@ import {
   type Reaction,
 } from "@/lib/reactions";
 import { karaokeRooms } from "@/lib/data";
+import GalleryFeature from "@/app/components/GalleryFeature";
 
 /* ============================================================
    動作確認ページ（タブ切り替え式）
@@ -2104,15 +2105,6 @@ function ProfileFeature({ sinceSeen, onLatest }: { sinceSeen: string; onLatest: 
   );
 }
 
-/* ── ギャラリー：入口（タブ）だけ用意。中身はこれから作る ── */
-function GalleryFeature() {
-  return (
-    <p className="text-sm text-center leading-relaxed" style={{ color: "#aaa" }}>
-      準備中です。
-    </p>
-  );
-}
-
 /* ── 機能一覧（ここに追加していく）──────────────────── */
 const features: Feature[] = [
   {
@@ -2147,7 +2139,7 @@ const features: Feature[] = [
     id: "gallery",
     tab: "ギャラリー",
     title: "ギャラリー",
-    description: "",
+    description: "当日の写真と動画です。開いて拡大したり、自分の端末に保存できます。",
     render: () => <GalleryFeature />,
   },
 ];
