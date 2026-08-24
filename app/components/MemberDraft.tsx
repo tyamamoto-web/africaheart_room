@@ -15,12 +15,12 @@
 
      ただし開催の概要（開催日・時間・場所・部屋数・会費）だけは、
      「次回のオフ会」の右の「編集」から手で入れられるようにしてある。
-     押すと、そのすぐ下に入力欄が開く。出るところと入れるところを
-     同じにしてあるので、直したものがその場で見える。
+     押すと、そのすぐ下に入力欄が開く。「保存」を押すと入力欄が閉じ、
+     そのまま概要として出る。押さずに「やめる」で閉じたぶんは残らない。
      この「編集」は役員だけのもので、本番の会員の画面には出さない。
 
    【入れた値がどこに残るか】
-     いまのところ、この端末のブラウザにだけ残る（africaheart_event_draft_v1）。
+     「保存」を押したときに、この端末のブラウザに残る（africaheart_event_draft_v1）。
      ほかの役員の画面にも、会員の本番の画面にも出ない。
      みんなで見るようにするには Supabase に移す必要がある。
 
@@ -272,10 +272,10 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
    「自分がどうなっているかを見て安心するところ」。 */
 function BeforeScreen({
   draft,
-  onChange,
+  onSave,
 }: {
   draft: EventDraft;
-  onChange: (key: keyof EventDraft, value: string) => void;
+  onSave: (next: EventDraft) => void;
 }) {
   /* 概要を書き換えているところかどうか。役員だけが使う。
      本番の会員の画面には、この「編集」は出さない。 */
@@ -300,11 +300,19 @@ function BeforeScreen({
           aria-expanded={editing}
           onClick={() => setEditing((v) => !v)}
         >
-          {editing ? "とじる" : "編集"}
+          {editing ? "やめる" : "編集"}
         </button>
       </div>
 
-      {editing && <OverviewFields draft={draft} onChange={onChange} />}
+      {editing && (
+        <OverviewFields
+          draft={draft}
+          onSave={(next) => {
+            onSave(next);
+            setEditing(false);
+          }}
+        />
+      )}
 
       {/* 入れてあるものは文字で、まだのものは帯のままで出す。
           何を入れればこの画面が埋まるのかが、そのまま見てわかる。 */}
@@ -437,11 +445,15 @@ function AfterScreen() {
    出るところと入れるところを同じ場所にしてある。 */
 function OverviewFields({
   draft,
-  onChange,
+  onSave,
 }: {
   draft: EventDraft;
-  onChange: (key: keyof EventDraft, value: string) => void;
+  onSave: (next: EventDraft) => void;
 }) {
+  /* 書きかけの控え。保存を押すまでは、ここだけが変わる。
+     押さずに閉じれば元のまま。開くたびに、いまの値から作りなおす。 */
+  const [edit, setEdit] = useState<EventDraft>(draft);
+
   return (
     <div
       style={{
@@ -472,13 +484,17 @@ function OverviewFields({
             min={f.min}
             placeholder={f.placeholder}
             inputMode={f.type === "number" ? "numeric" : undefined}
-            value={draft[f.key]}
-            onChange={(e) => onChange(f.key, e.target.value)}
+            value={edit[f.key]}
+            onChange={(e) => setEdit({ ...edit, [f.key]: e.target.value })}
           />
         </label>
       ))}
+
+      <button type="button" className="md-save" onClick={() => onSave(edit)}>
+        保存
+      </button>
       <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
-        入れたそばから、この端末に残ります。
+        保存すると、この端末に残ります。
       </p>
     </div>
   );
@@ -503,9 +519,8 @@ export default function MemberDraft() {
     }
   }, []);
 
-  /* 一文字入れるたびに残す。押し忘れる「保存」を作らないため。 */
-  const update = (key: keyof EventDraft, value: string) => {
-    const next = { ...draft, [key]: value };
+  /* 保存を押されたときに、まとめて残す。 */
+  const saveDraft = (next: EventDraft) => {
     setDraft(next);
     try {
       window.localStorage.setItem(STORE_KEY, JSON.stringify(next));
@@ -631,7 +646,7 @@ export default function MemberDraft() {
             boxShadow: "0 1px 3px rgba(27,28,30,0.04), 0 12px 32px -18px rgba(27,28,30,0.20)",
           }}
         >
-          {phase === "before" && <BeforeScreen draft={draft} onChange={update} />}
+          {phase === "before" && <BeforeScreen draft={draft} onSave={saveDraft} />}
           {phase === "day"    && <DayScreen />}
           {phase === "after"  && <AfterScreen />}
         </div>

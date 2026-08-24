@@ -480,6 +480,30 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 .md-edit:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { .md-edit { transition: none; } }
 
+/* 社長室：会員画面の下書きの、概要の「保存」。
+   ボタンの見た目は MemberDraft.tsx の Button と同じ決め方
+   （地は塗らず、外枠だけをエルメスオレンジにする）。 */
+.md-save {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 48px;
+  margin-top: 4px;
+  border: 1px solid #F37021;
+  border-radius: 12px;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: #B24809;
+  cursor: pointer;
+  transition: background-color .14s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .md-save:hover { background: rgba(243, 112, 33, 0.07); }
+}
+.md-save:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .md-save { transition: none; } }
+
 /* 社長室：会員画面の下書きの、概要を入れる欄。
    文字は16px。これより小さいと iPhone で触ったときに画面が勝手に拡大する。
    色は MemberDraft.tsx の INK / LINE / ACC_TEXT と同じもの。 */
