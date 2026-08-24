@@ -698,10 +698,6 @@ export default function MemberDraft() {
         </div>
       </div>
 
-      {/* ── 補足 ── */}
-      <p style={{ margin: "48px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM, textAlign: "center" }}>
-        文字は本文16px・補助13px。いまの会員メニューは11〜12pxが中心です。
-      </p>
     </div>
   );
 }
