@@ -237,9 +237,10 @@ function BeforeScreen() {
         </p>
       </div>
 
-      {/* この画面でしてほしいことは、アプリの外にある。それを隠さずに置く。 */}
+      {/* 出欠そのものはLINEで決まるので、この画面に残る操作は
+          「誰が来るのか見る」だけ。準備の間はこれが一番知りたいこと。 */}
       <div style={{ marginTop: 12 }}>
-        <Button tone="accent">オープンチャットを開く</Button>
+        <Button tone="accent">参加状況</Button>
       </div>
 
       <div style={{ marginTop: 44 }}>
