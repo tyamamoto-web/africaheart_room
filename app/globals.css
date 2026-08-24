@@ -502,6 +502,8 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .md-save:hover { background: rgba(243, 112, 33, 0.07); }
 }
 .md-save:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
+/* 保存している間。押せないことが見てわかるように薄くする。 */
+.md-save:disabled { border-color: #E4E5E8; color: #8B8E94; cursor: default; background: #FFFFFF; }
 @media (prefers-reduced-motion: reduce) { .md-save { transition: none; } }
 
 /* 社長室：会員画面の下書きの、概要を入れる欄。
@@ -520,6 +522,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 }
 .md-field::placeholder { color: #A8ABB0; }
 .md-field:focus { outline: 2px solid #B24809; outline-offset: -1px; border-color: transparent; }
+.md-field:disabled { color: #8B8E94; background: #FFFFFF; }
 
 /* 社長室：下にページを持つ項目の三角。開くと90度まわる */
 .pr-chev { transition: transform .18s ease; }

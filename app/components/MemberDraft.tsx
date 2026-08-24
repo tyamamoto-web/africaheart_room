@@ -20,9 +20,10 @@
      この「編集」は役員だけのもので、本番の会員の画面には出さない。
 
    【入れた値がどこに残るか】
-     「保存」を押したときに、この端末のブラウザに残る（africaheart_event_draft_v1）。
-     ほかの役員の画面にも、会員の本番の画面にも出ない。
-     みんなで見るようにするには Supabase に移す必要がある。
+     「保存」を押したときに Supabase の event_overview に入る（lib/eventOverview.ts）。
+     端末の中ではなく共有の置き場所なので、会員がそれぞれの端末から同じものを見られる。
+     読み書きの部分は画面から切り離してあるので、この画面がTOPページに移っても
+     lib/eventOverview.ts はそのまま使える。
 
    【切り替えについて】
      「準備 → 当日 → ふりかえり」は、今日の日付と開催日を見て
@@ -45,6 +46,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { eventInfo, eventStatus, nextEvent } from "@/lib/data";
+import {
+  EMPTY_OVERVIEW,
+  EventOverviewSetupError,
+  readEventOverview,
+  saveEventOverview,
+  type EventOverview,
+  type OverviewField,
+} from "@/lib/eventOverview";
 
 /* ── 今日の日付から、出す場面をきめる ───────────────────────
    会員に選ばせないための、いちばん大事なところ。
@@ -114,25 +123,13 @@ const ACC_TINT = "rgba(243,112,33,0.09)";
 
 /* ── 開催の概要（手入力）───────────────────
    これまで開催日や場所は lib/data.ts に書いてあり、書き換えられるのは
-   作った人だけだった。ここで役員が直接入れられるようにしている。 */
-
-/** 入れた値をしまっておく名前。中身の形を変えるときは末尾の数字を上げる。 */
-const STORE_KEY = "africaheart_event_draft_v1";
-
-type EventDraft = {
-  date: string;  // 2026-08-22 の形（入力欄がこの形で返す）
-  start: string; // 18:00
-  end: string;   // 21:00
-  place: string;
-  rooms: string;
-  fee: string;
-};
-
-const EMPTY_DRAFT: EventDraft = { date: "", start: "", end: "", place: "", rooms: "", fee: "" };
+   作った人だけだった。ここで役員が直接入れられるようにしている。
+   読み書きは lib/eventOverview.ts（Supabase の event_overview 表）。
+   保存すると、会員それぞれの端末から同じものが見られる。 */
 
 /* 入力欄の並び。wide が付いているものは横いっぱいに広がる。 */
 const FIELDS: {
-  key: keyof EventDraft;
+  key: OverviewField;
   label: string;
   type: string;
   wide?: boolean;
@@ -272,10 +269,14 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
    「自分がどうなっているかを見て安心するところ」。 */
 function BeforeScreen({
   draft,
+  saving,
+  error,
   onSave,
 }: {
-  draft: EventDraft;
-  onSave: (next: EventDraft) => void;
+  draft: EventOverview;
+  saving: boolean;
+  error: string;
+  onSave: (next: EventOverview) => Promise<boolean>;
 }) {
   /* 概要を書き換えているところかどうか。役員だけが使う。
      本番の会員の画面には、この「編集」は出さない。 */
@@ -307,9 +308,12 @@ function BeforeScreen({
       {editing && (
         <OverviewFields
           draft={draft}
-          onSave={(next) => {
-            onSave(next);
-            setEditing(false);
+          saving={saving}
+          error={error}
+          onSave={async (next) => {
+            // 保存できたときだけ閉じる。失敗したら開いたままにして、
+            // 打ち直しにならないようにする。
+            if (await onSave(next)) setEditing(false);
           }}
         />
       )}
@@ -445,14 +449,18 @@ function AfterScreen() {
    出るところと入れるところを同じ場所にしてある。 */
 function OverviewFields({
   draft,
+  saving,
+  error,
   onSave,
 }: {
-  draft: EventDraft;
-  onSave: (next: EventDraft) => void;
+  draft: EventOverview;
+  saving: boolean;
+  error: string;
+  onSave: (next: EventOverview) => void;
 }) {
   /* 書きかけの控え。保存を押すまでは、ここだけが変わる。
      押さずに閉じれば元のまま。開くたびに、いまの値から作りなおす。 */
-  const [edit, setEdit] = useState<EventDraft>(draft);
+  const [edit, setEdit] = useState<EventOverview>(draft);
 
   return (
     <div
@@ -484,18 +492,26 @@ function OverviewFields({
             min={f.min}
             placeholder={f.placeholder}
             inputMode={f.type === "number" ? "numeric" : undefined}
+            disabled={saving}
             value={edit[f.key]}
             onChange={(e) => setEdit({ ...edit, [f.key]: e.target.value })}
           />
         </label>
       ))}
 
-      <button type="button" className="md-save" onClick={() => onSave(edit)}>
-        保存
+      <button type="button" className="md-save" disabled={saving} onClick={() => onSave(edit)}>
+        {saving ? "保存しています" : "保存"}
       </button>
-      <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
-        保存すると、この端末に残ります。
-      </p>
+
+      {error ? (
+        <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>
+          {error}
+        </p>
+      ) : (
+        <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
+          保存すると、会員それぞれの端末から同じものが見られます。
+        </p>
+      )}
     </div>
   );
 }
@@ -506,26 +522,48 @@ export default function MemberDraft() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => setNowMs(Date.now()), []);
 
-  /* 手で入れた開催の概要。
-     最初に描くときは空のまま置き、画面に出てから端末の控えを読む。
+  /* 開催の概要。Supabase に置いてあるものを、画面に出てから読みにいく。
      （描く前に読むと、サーバーが作った画面と食い違って警告が出る） */
-  const [draft, setDraft] = useState<EventDraft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<EventOverview>(EMPTY_OVERVIEW);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORE_KEY);
-      if (raw) setDraft({ ...EMPTY_DRAFT, ...JSON.parse(raw) });
-    } catch {
-      // 控えが壊れていたら、空のまま使う（消さない）
-    }
+    let alive = true;
+    readEventOverview()
+      .then((v) => {
+        if (alive) setDraft(v);
+      })
+      .catch((e) => {
+        // 表そのものが無いときだけは、直し方が決まっているので画面に出す。
+        // それ以外（通信の失敗など）は空のままにして、画面は止めない。
+        if (alive && e instanceof EventOverviewSetupError) setNeedsSetup(true);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  /* 保存を押されたときに、まとめて残す。 */
-  const saveDraft = (next: EventDraft) => {
-    setDraft(next);
+  /* 保存を押されたとき。書けたら true を返し、入力欄を閉じてもらう。 */
+  const saveDraft = async (next: EventOverview): Promise<boolean> => {
+    setSaving(true);
+    setSaveError("");
     try {
-      window.localStorage.setItem(STORE_KEY, JSON.stringify(next));
-    } catch {
-      // 残せなくても、画面はそのまま使えるようにしておく
+      setDraft(await saveEventOverview(next));
+      setNeedsSetup(false);
+      return true;
+    } catch (e) {
+      setSaveError(
+        e instanceof EventOverviewSetupError
+          ? "共有用の表がまだありません。Supabase で setup.sql の event_overview を実行してください。"
+          : e instanceof Error
+            ? e.message
+            : "保存に失敗しました"
+      );
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -560,6 +598,12 @@ export default function MemberDraft() {
       <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM, maxWidth: "40em" }}>
         灰色の帯は、まだ入っていない場所です。開催の概要だけは「次回のオフ会」の右の「編集」から入れられます。
       </p>
+      {needsSetup && (
+        <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: ACC_TEXT, maxWidth: "40em" }}>
+          共有用の表がまだありません。Supabase の SQL Editor で supabase/setup.sql の
+          event_overview のところを実行すると、入れた概要が会員全員に届くようになります。
+        </p>
+      )}
 
       {/* ── 下書きを見てもらうための寄り道（本番にはこの切り替えは無い）── */}
       <div style={{ marginTop: 40 }}>
@@ -646,7 +690,9 @@ export default function MemberDraft() {
             boxShadow: "0 1px 3px rgba(27,28,30,0.04), 0 12px 32px -18px rgba(27,28,30,0.20)",
           }}
         >
-          {phase === "before" && <BeforeScreen draft={draft} onSave={saveDraft} />}
+          {phase === "before" && (
+            <BeforeScreen draft={draft} saving={saving} error={saveError} onSave={saveDraft} />
+          )}
           {phase === "day"    && <DayScreen />}
           {phase === "after"  && <AfterScreen />}
         </div>

@@ -152,3 +152,40 @@ drop policy if exists "gallery delete" on storage.objects;
 create policy "gallery read"   on storage.objects for select to anon using (bucket_id = 'gallery');
 create policy "gallery insert" on storage.objects for insert to anon with check (bucket_id = 'gallery');
 create policy "gallery delete" on storage.objects for delete to anon using (bucket_id = 'gallery');
+
+
+-- ============================================================
+-- オフ会の概要（開催日・時間・場所・部屋数・会費）
+-- ------------------------------------------------------------
+-- これまで開催日や場所は lib/data.ts に直接書いてあり、書き換えられるのは
+-- 作った人だけだった。この表に移すことで、役員が画面から書き換えられ、
+-- その結果を会員全員がそれぞれの端末で見られるようになる。
+--
+-- いまは1行しか使わないが、回ごとに1行ためられる形にしてある。
+-- 画面は「開催日がいちばん新しい1行」を今回のぶんとして読む。
+-- 消す操作は用意しない（delete のポリシーを作らない）。
+-- 実装は lib/eventOverview.ts を参照。
+-- ============================================================
+create table if not exists public.event_overview (
+  id         bigint generated always as identity primary key,
+  event_date date not null,                -- 開催日
+  start_time time,                         -- 開始（未定なら空のまま）
+  end_time   time,                         -- 終了（未定なら空のまま）
+  place      text not null default '',     -- 会場
+  rooms      int,                          -- 部屋数
+  fee        int,                          -- 会費（円）
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists event_overview_date_idx
+  on public.event_overview (event_date desc);
+
+alter table public.event_overview enable row level security;
+
+drop policy if exists "eo anon read"   on public.event_overview;
+drop policy if exists "eo anon insert" on public.event_overview;
+drop policy if exists "eo anon update" on public.event_overview;
+
+create policy "eo anon read"   on public.event_overview for select using (true);
+create policy "eo anon insert" on public.event_overview for insert with check (true);
+create policy "eo anon update" on public.event_overview for update using (true) with check (true);
