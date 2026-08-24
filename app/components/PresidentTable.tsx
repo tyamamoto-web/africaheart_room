@@ -29,6 +29,7 @@ const LINE = "#DFE1E4"; // 罫線
 const HEAD = "#F4F5F6"; // 見出しの行だけ、ごくうすい面
 
 const COL_MIN_W = 150;
+const NUM_W = 48; // いちばん左の、行番号だけの列
 
 type Msg = { kind: "ok" | "ng"; text: string } | null;
 
@@ -146,9 +147,16 @@ export default function PresidentTable() {
 
       {/* 横に長くなったときは、この枠の中だけが横に動く */}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: columns.length * COL_MIN_W }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: columns.length * COL_MIN_W + NUM_W }}>
           <thead>
             <tr>
+              {/* 行番号の列の、見出しのところ。数えるためだけの列なので中身は空。 */}
+              <th
+                scope="col"
+                style={{ ...cellStyle, background: HEAD, width: NUM_W, minWidth: NUM_W }}
+              >
+                <span className="sr-only">番号</span>
+              </th>
               {columns.map((c, i) => (
                 <th key={i} scope="col" style={{ ...cellStyle, background: HEAD, minWidth: COL_MIN_W }}>
                   <input
@@ -165,6 +173,25 @@ export default function PresidentTable() {
           <tbody>
             {rows.map((row, ri) => (
               <tr key={ri}>
+                {/* 何人目かが目で数えられるように。打ち込む場所ではないので入力欄にしない。
+                    列の数には入れない（名前はこれまで通り、その右の1列目のまま）。 */}
+                <th
+                  scope="row"
+                  style={{
+                    ...cellStyle,
+                    background: HEAD,
+                    width: NUM_W,
+                    minWidth: NUM_W,
+                    padding: "0 8px",
+                    textAlign: "right",
+                    fontSize: 13,
+                    fontWeight: 400,
+                    color: "#8B8E94",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {ri + 1}
+                </th>
                 {row.map((cell, ci) => (
                   <td key={ci} style={cellStyle}>
                     <input
