@@ -87,10 +87,19 @@ const SKEL  = "#ECEDEF"; // データが入る場所を示す帯
 const FACE  = "#F6F7F8"; // わずかに沈ませた面
 const WHITE = "#FFFFFF";
 
-/* 差し色。深めのオレンジにして、グレーの中で浮かず、それでいて目に入るようにする。
-   明るく彩度の高いオレンジは注意書きの色に見えてしまうので使わない。 */
-const ACC      = "#C4621D";
-const ACC_TINT = "rgba(196,98,29,0.08)";
+/* 差し色はエルメスオレンジ（Pantone 1448 / #F37021）。
+   このオレンジは鮮やかなぶん、白地に小さな字で置くと薄れて読めない
+   （白との明暗差は2.9倍しかなく、読みやすさの目安4.5倍に届かない）。
+   エルメス自身も、オレンジは箱の「面」に使い、文字は濃い色で刷っている。
+   ここでも同じ分け方にした。
+
+     ACC      … 面に塗るとき（ボタンの地、下線、点）。そのままの色を使う。
+     ACC_TEXT … 白地に字として置くとき。同じ色みのまま暗さだけ足したもの
+                （色相はどちらも22度でそろえてある）。
+     ACC_TINT … ごく薄く敷くとき。 */
+const ACC      = "#F37021"; // エルメスオレンジそのもの（面に塗る用）
+const ACC_TEXT = "#B24809"; // 同じ色みの、白地でも薄いオレンジの上でも読める濃さ（字に使う用）
+const ACC_TINT = "rgba(243,112,33,0.09)";
 
 type Phase = "before" | "day" | "after";
 
@@ -175,7 +184,8 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
         fontSize: 16,
         fontWeight: 700,
         background: accent ? ACC : WHITE,
-        color: accent ? WHITE : SUB,
+        // オレンジの面に白い字はにじんで見えるので、濃い字を置く
+        color: accent ? INK : SUB,
         border: accent ? "none" : `1px solid ${LINE}`,
       }}
     >
@@ -235,7 +245,7 @@ function DayScreen() {
           gap: 18,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 700, color: ACC, letterSpacing: "0.06em" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: ACC_TEXT, letterSpacing: "0.06em" }}>
           あなたの部屋
         </span>
         {/* 部屋の記号が入る場所 */}
@@ -327,7 +337,7 @@ export default function MemberDraft() {
     <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
 
       {/* ── この画面が何なのかの説明 ── */}
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: ACC, letterSpacing: "0.1em" }}>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: ACC_TEXT, letterSpacing: "0.1em" }}>
         下書き・見た目のみ
       </p>
       <h1 style={{ margin: "18px 0 0", fontSize: 27, fontWeight: 600, color: INK, lineHeight: 1.5 }}>
@@ -370,7 +380,7 @@ export default function MemberDraft() {
                   marginBottom: -1,
                   // 地と、選んでいないときの色は globals.css の .md-tab が持つ。
                   // ここに書くとインライン指定が勝ってしまい、CSSのホバーが効かなくなる。
-                  color: on ? ACC : undefined,
+                  color: on ? ACC_TEXT : undefined,
                   fontSize: 15,
                   fontWeight: on ? 700 : 500,
                   cursor: "pointer",
@@ -389,8 +399,10 @@ export default function MemberDraft() {
                       fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: "0.04em",
-                      color: ACC,
-                      background: ACC_TINT,
+                      // 小さい字なので、薄く敷くと読みづらい。
+                      // ボタンと同じく「オレンジの面に濃い字」にして、はっきり見せる。
+                      color: INK,
+                      background: ACC,
                       borderRadius: 999,
                       padding: "2px 8px",
                     }}
@@ -401,7 +413,7 @@ export default function MemberDraft() {
                 {/* いつの場面かの説明。狭い画面では globals.css で隠す（無くても意味は通る） */}
                 <span
                   className="md-tab-when"
-                  style={{ fontSize: 12, fontWeight: 500, color: on ? ACC : DIM, opacity: on ? 0.75 : 1 }}
+                  style={{ fontSize: 12, fontWeight: 500, color: on ? ACC_TEXT : DIM, opacity: on ? 0.75 : 1 }}
                 >
                   {p.when}
                 </span>
