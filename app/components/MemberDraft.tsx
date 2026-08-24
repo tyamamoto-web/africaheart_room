@@ -54,6 +54,8 @@ import {
   type EventOverview,
   type OverviewField,
 } from "@/lib/eventOverview";
+import { readAttendance, setAttendance } from "@/lib/attendance";
+import { readRoster, rosterNames } from "@/lib/roster";
 
 /* ── 今日の日付から、出す場面をきめる ───────────────────────
    会員に選ばせないための、いちばん大事なところ。
@@ -262,6 +264,73 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
   );
 }
 
+/* ── 参加状況 ───────────────────────────────
+   名前は会員名簿（設定 ＞ 会員名簿）の1列目から引いてくる。ここでは名前を
+   打ち込ませない。名簿と食い違うと、部屋割りにも会費にも響くため。
+
+   丸を押すと参加・不参加が入れ替わる。これは役員の操作で、
+   本番の会員の画面では押せないようにする（見るだけにする）。 */
+function AttendanceList({
+  names,
+  attending,
+  busy,
+  onToggle,
+}: {
+  names: string[];
+  attending: Set<string>;
+  busy: string;
+  onToggle: (name: string, on: boolean) => void;
+}) {
+  if (names.length === 0) {
+    return (
+      <div style={{ marginTop: 14, background: FACE, borderRadius: 12, padding: "18px 16px" }}>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.85, color: SUB }}>
+          会員名簿にまだ名前がありません。設定 ＞ 会員名簿 の1列目に入れてください。
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <p style={{ margin: 0, fontSize: 13, color: DIM }}>
+        参加 {attending.size}名 / 全{names.length}名
+      </p>
+      <div style={{ marginTop: 4 }}>
+        {names.map((name, i) => {
+          const on = attending.has(name);
+          return (
+            <button
+              key={name}
+              type="button"
+              className="md-row"
+              aria-pressed={on}
+              disabled={busy === name}
+              onClick={() => onToggle(name, !on)}
+              style={{ borderBottom: i === names.length - 1 ? "none" : `1px solid ${LINE}` }}
+            >
+              {/* 参加している人は、丸をオレンジで塗る。
+                  色だけに頼らないよう、名前も濃さを変える。 */}
+              <span
+                aria-hidden="true"
+                style={{
+                  flexShrink: 0,
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  border: `1.5px solid ${on ? ACC : LINE}`,
+                  background: on ? ACC : WHITE,
+                }}
+              />
+              <span style={{ fontSize: 16, lineHeight: 1.6, color: on ? INK : DIM }}>{name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ── 準備の画面 ─────────────────────────────
    出欠はLINEのオープンチャットで決まる。前日24時までの表明を、
    役員が名簿から登録する運用。だからこの画面では参加・不参加を
@@ -272,15 +341,27 @@ function BeforeScreen({
   saving,
   error,
   onSave,
+  names,
+  attending,
+  busyName,
+  onToggleAttendance,
 }: {
   draft: EventOverview;
   saving: boolean;
   error: string;
   onSave: (next: EventOverview) => Promise<boolean>;
+  names: string[];
+  attending: Set<string>;
+  busyName: string;
+  onToggleAttendance: (name: string, on: boolean) => void;
 }) {
   /* 概要を書き換えているところかどうか。役員だけが使う。
      本番の会員の画面には、この「編集」は出さない。 */
   const [editing, setEditing] = useState(false);
+
+  /* 参加状況を開いているかどうか。開くまでは名前を出さない
+     （準備の画面でまず知りたいのは、日にちと自分のすることなので）。 */
+  const [showList, setShowList] = useState(false);
 
   const dateText = formatDate(draft.date);
   const timeText = draft.start && draft.end ? `${draft.start} 〜 ${draft.end}` : draft.start || draft.end;
@@ -338,7 +419,22 @@ function BeforeScreen({
       {/* 出欠そのものはLINEで決まるので、この画面に残る操作は
           「誰が来るのか見る」だけ。準備の間はこれが一番知りたいこと。 */}
       <div style={{ marginTop: 36 }}>
-        <Button tone="accent">参加状況</Button>
+        <button
+          type="button"
+          className="md-cta"
+          aria-expanded={showList}
+          onClick={() => setShowList((v) => !v)}
+        >
+          参加状況
+        </button>
+        {showList && (
+          <AttendanceList
+            names={names}
+            attending={attending}
+            busy={busyName}
+            onToggle={onToggleAttendance}
+          />
+        )}
       </div>
 
       <div style={{ marginTop: 44 }}>
@@ -573,6 +669,75 @@ export default function MemberDraft() {
     return phaseFromDays(daysBetween(jstYmd(nowMs), event));
   }, [nowMs, draft.date]);
 
+  /* 会員名簿の名前と、今回の回の参加状況。
+     どちらも画面に出てから読みにいく（描く前に読むと食い違いが出る）。 */
+  const [names, setNames] = useState<string[]>([]);
+  const [attending, setAttending] = useState<Set<string>>(() => new Set());
+  const [busyName, setBusyName] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    readRoster()
+      .then((r) => {
+        if (alive) setNames(rosterNames(r));
+      })
+      .catch(() => {
+        // 読めなくても画面は止めない（名簿が空のときと同じ出し方になる）
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /* どの回のぶんかは開催日で決める。まだ入れていなければ lib/data.ts のもの。 */
+  const eventKey = useMemo(() => {
+    const d = isoYmd(draft.date) ?? parseJpDate(BASE_DATE_TEXT);
+    if (!d) return "";
+    const two = (n: number) => String(n).padStart(2, "0");
+    return `${d.y}-${two(d.m)}-${two(d.d)}`;
+  }, [draft.date]);
+
+  useEffect(() => {
+    if (!eventKey) return;
+    let alive = true;
+    readAttendance(eventKey)
+      .then((list) => {
+        if (alive) setAttending(new Set(list));
+      })
+      .catch(() => {
+        // 読めなければ、誰もチェックされていない状態で出す
+      });
+    return () => {
+      alive = false;
+    };
+  }, [eventKey]);
+
+  /* 丸を押したとき。押した1人ぶんだけを足し引きするので、
+     同じ回を別の役員がさわっていても、相手のチェックを消さない。 */
+  const toggleAttendance = async (name: string, on: boolean) => {
+    if (!eventKey) return;
+    setBusyName(name);
+    // 先に画面だけ変えて、押した手ごたえを待たせない
+    setAttending((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(name);
+      else next.delete(name);
+      return next;
+    });
+    try {
+      setAttending(new Set(await setAttendance(eventKey, name, on)));
+    } catch {
+      // 書けなかったときは、保存されているほうに戻す
+      try {
+        setAttending(new Set(await readAttendance(eventKey)));
+      } catch {
+        /* 取り直しにも失敗したら、そのままにしておく */
+      }
+    } finally {
+      setBusyName("");
+    }
+  };
+
   /* 下書きを見てもらうためだけの寄り道。
      本番にはこの切り替えは無く、上の判定だけで決まる。 */
   const [look, setLook] = useState<Phase | null>(null);
@@ -664,7 +829,16 @@ export default function MemberDraft() {
           }}
         >
           {phase === "before" && (
-            <BeforeScreen draft={draft} saving={saving} error={saveError} onSave={saveDraft} />
+            <BeforeScreen
+              draft={draft}
+              saving={saving}
+              error={saveError}
+              onSave={saveDraft}
+              names={names}
+              attending={attending}
+              busyName={busyName}
+              onToggleAttendance={toggleAttendance}
+            />
           )}
           {phase === "day"    && <DayScreen />}
           {phase === "after"  && <AfterScreen />}

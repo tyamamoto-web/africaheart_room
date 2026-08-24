@@ -40,6 +40,8 @@ export const SHARED_ROW = {
   legacyManualRaci: 7, // 旧イベント運営マニュアルの役割（今は未使用・中身は空）
   legacyManualCheck: 8, // 旧イベント運営マニュアルのチェック（今は未使用・中身は空）
   survey: 9, // 参加者アンケートの回答
+  roster: 10, // 社長室：会員名簿（設定）
+  attendance: 11, // 社長室：参加状況（今回の回に来る人）
 } as const;
 
 /** 1回に送れる大きさの目安。これを超えたら書かずに知らせる。 */
