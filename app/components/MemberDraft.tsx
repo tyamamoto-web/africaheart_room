@@ -14,8 +14,10 @@
      帯の位置と大きさが、そのまま「そこに何が入るか」を表す。
 
      ただし開催の概要（開催日・時間・場所・部屋数・会費）だけは、
-     横の入力欄から手で入れられるようにしてある。入れた値はその場で
-     スマホの画面に出る。
+     「次回のオフ会」の右の「編集」から手で入れられるようにしてある。
+     押すと、そのすぐ下に入力欄が開く。出るところと入れるところを
+     同じにしてあるので、直したものがその場で見える。
+     この「編集」は役員だけのもので、本番の会員の画面には出さない。
 
    【入れた値がどこに残るか】
      いまのところ、この端末のブラウザにだけ残る（africaheart_event_draft_v1）。
@@ -268,7 +270,17 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
    役員が名簿から登録する運用。だからこの画面では参加・不参加を
    選ばせない。会員にとってここは「押すところ」ではなく、
    「自分がどうなっているかを見て安心するところ」。 */
-function BeforeScreen({ draft }: { draft: EventDraft }) {
+function BeforeScreen({
+  draft,
+  onChange,
+}: {
+  draft: EventDraft;
+  onChange: (key: keyof EventDraft, value: string) => void;
+}) {
+  /* 概要を書き換えているところかどうか。役員だけが使う。
+     本番の会員の画面には、この「編集」は出さない。 */
+  const [editing, setEditing] = useState(false);
+
   const dateText = formatDate(draft.date);
   const timeText = draft.start && draft.end ? `${draft.start} 〜 ${draft.end}` : draft.start || draft.end;
   const footText = [
@@ -278,10 +290,25 @@ function BeforeScreen({ draft }: { draft: EventDraft }) {
 
   return (
     <>
+      {/* 見出しの右に「編集」。押すと、すぐ下に入力欄が開く。
+          出るところと入れるところが同じなので、直したものがその場で見える。 */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+        <Label>次回のオフ会</Label>
+        <button
+          type="button"
+          className="md-edit"
+          aria-expanded={editing}
+          onClick={() => setEditing((v) => !v)}
+        >
+          {editing ? "とじる" : "編集"}
+        </button>
+      </div>
+
+      {editing && <OverviewFields draft={draft} onChange={onChange} />}
+
       {/* 入れてあるものは文字で、まだのものは帯のままで出す。
           何を入れればこの画面が埋まるのかが、そのまま見てわかる。 */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Label>次回のオフ会</Label>
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
         {dateText
           ? <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1.4 }}>{dateText}</p>
           : <Bar w={190} h={27} />}
@@ -406,8 +433,9 @@ function AfterScreen() {
 }
 
 /* ── 開催の概要を入れるところ ─────────────
-   役員が使う。入れたそばから左（狭い画面では下）のスマホに出る。 */
-function OverviewPanel({
+   「次回のオフ会」のすぐ下で開く。別の画面に行かせず、
+   出るところと入れるところを同じ場所にしてある。 */
+function OverviewFields({
   draft,
   onChange,
 }: {
@@ -415,39 +443,42 @@ function OverviewPanel({
   onChange: (key: keyof EventDraft, value: string) => void;
 }) {
   return (
-    <div className="md-form" style={{ background: FACE, borderRadius: 16, padding: "26px 24px 24px" }}>
-      <Label>開催の概要</Label>
-      <p style={{ margin: "12px 0 0", fontSize: 13, lineHeight: 1.85, color: SUB }}>
-        ここに入れたものが、そのまま会員の画面に出ます。
-      </p>
-
-      <div style={{ marginTop: 22, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        {FIELDS.map((f) => (
-          <label
-            key={f.key}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              gridColumn: f.wide ? "1 / -1" : undefined,
-            }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 700, color: SUB }}>{f.label}</span>
-            <input
-              className="md-field"
-              type={f.type}
-              min={f.min}
-              placeholder={f.placeholder}
-              inputMode={f.type === "number" ? "numeric" : undefined}
-              value={draft[f.key]}
-              onChange={(e) => onChange(f.key, e.target.value)}
-            />
-          </label>
-        ))}
-      </div>
-
-      <p style={{ margin: "20px 0 0", fontSize: 12, lineHeight: 1.85, color: DIM }}>
-        入れたそばから、この端末に残ります。いまはまだ、ほかの人の画面には出ません。
+    <div
+      style={{
+        marginTop: 14,
+        background: FACE,
+        borderRadius: 12,
+        padding: "18px 16px 16px",
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 14,
+      }}
+    >
+      {FIELDS.map((f) => (
+        <label
+          key={f.key}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 7,
+            minWidth: 0,
+            gridColumn: f.wide ? "1 / -1" : undefined,
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 700, color: SUB }}>{f.label}</span>
+          <input
+            className="md-field"
+            type={f.type}
+            min={f.min}
+            placeholder={f.placeholder}
+            inputMode={f.type === "number" ? "numeric" : undefined}
+            value={draft[f.key]}
+            onChange={(e) => onChange(f.key, e.target.value)}
+          />
+        </label>
+      ))}
+      <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
+        入れたそばから、この端末に残ります。
       </p>
     </div>
   );
@@ -498,7 +529,7 @@ export default function MemberDraft() {
   const phase = look ?? autoPhase;
 
   return (
-    <div style={{ padding: "48px 32px 96px", maxWidth: 980, margin: "0 auto" }}>
+    <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
 
       {/* ── この画面が何なのかの説明 ── */}
       <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: ACC_TEXT, letterSpacing: "0.1em" }}>
@@ -512,7 +543,7 @@ export default function MemberDraft() {
         会員は何も選ばず、開いたら「いま自分がすること」だけが出ています。
       </p>
       <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM, maxWidth: "40em" }}>
-        灰色の帯は、まだ入っていない場所です。開催の概要だけは手で入れられるので、入れるとその場で出ます。
+        灰色の帯は、まだ入っていない場所です。開催の概要だけは「次回のオフ会」の右の「編集」から入れられます。
       </p>
 
       {/* ── 下書きを見てもらうための寄り道（本番にはこの切り替えは無い）── */}
@@ -587,29 +618,23 @@ export default function MemberDraft() {
         </div>
       </div>
 
-      {/* ── スマホの枠と、その概要を入れるところ ──
-          広い画面では横に並べ、狭い画面では入力を上、スマホを下にする
-          （並びの入れ替えは globals.css の .md-split が持つ）。 */}
-      <div className="md-split" style={{ marginTop: 52 }}>
-        <div style={{ justifySelf: "center" }}>
-          <div
-            style={{
-              width: 356,
-              maxWidth: "100%",
-              borderRadius: 30,
-              border: `1px solid ${LINE}`,
-              background: WHITE,
-              padding: "40px 28px 48px",
-              boxShadow: "0 1px 3px rgba(27,28,30,0.04), 0 12px 32px -18px rgba(27,28,30,0.20)",
-            }}
-          >
-            {phase === "before" && <BeforeScreen draft={draft} />}
-            {phase === "day"    && <DayScreen />}
-            {phase === "after"  && <AfterScreen />}
-          </div>
+      {/* ── スマホの枠 ── */}
+      <div style={{ display: "flex", justifyContent: "center", padding: "56px 0 0" }}>
+        <div
+          style={{
+            width: 356,
+            maxWidth: "100%",
+            borderRadius: 30,
+            border: `1px solid ${LINE}`,
+            background: WHITE,
+            padding: "40px 28px 48px",
+            boxShadow: "0 1px 3px rgba(27,28,30,0.04), 0 12px 32px -18px rgba(27,28,30,0.20)",
+          }}
+        >
+          {phase === "before" && <BeforeScreen draft={draft} onChange={update} />}
+          {phase === "day"    && <DayScreen />}
+          {phase === "after"  && <AfterScreen />}
         </div>
-
-        <OverviewPanel draft={draft} onChange={update} />
       </div>
 
       {/* ── 補足 ── */}

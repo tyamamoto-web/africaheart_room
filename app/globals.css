@@ -458,19 +458,27 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 }
 @media (prefers-reduced-motion: reduce) { .md-tab { transition: none; } }
 
-/* 社長室：会員画面の下書きの、スマホと入力欄の並び。
-   広いところは横に並べ、狭いところは入力を上に持ってくる
-   （手で入れてから、その下で結果を見る流れにするため）。 */
-.md-split {
-  display: grid;
-  grid-template-columns: 356px minmax(0, 1fr);
-  gap: 44px;
-  align-items: start;
+/* 社長室：会員画面の下書きの、「編集」。
+   見出しの右に小さく置くだけなので、地も枠も持たせない。
+   色は MemberDraft.tsx の SUB / INK / ACC_TEXT と同じもの。 */
+.md-edit {
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #63666C;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color .14s ease;
 }
-@media (max-width: 900px) {
-  .md-split { grid-template-columns: minmax(0, 1fr); gap: 32px; }
-  .md-split > .md-form { order: -1; }
+@media (hover: hover) and (pointer: fine) {
+  .md-edit:hover { color: #1B1C1E; }
 }
+.md-edit:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .md-edit { transition: none; } }
 
 /* 社長室：会員画面の下書きの、概要を入れる欄。
    文字は16px。これより小さいと iPhone で触ったときに画面が勝手に拡大する。
