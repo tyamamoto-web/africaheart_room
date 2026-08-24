@@ -296,32 +296,9 @@ function BeforeScreen({ draft }: { draft: EventDraft }) {
           : <Bar w={96} h={14} />}
       </div>
 
-      {/* 準備の間、会員がいちばん確かめたいのはここ。
-          見るだけの場所なので、面はごく浅く沈ませるにとどめる
-          （差し色の面は、当日の「あなたの部屋」ひとつに取っておく）。 */}
-      <div
-        style={{
-          marginTop: 36,
-          padding: "22px 20px 24px",
-          borderRadius: 14,
-          background: FACE,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <Label>あなたの出欠</Label>
-        {/* 「参加」などの状態が入る場所 */}
-        <Bar w={104} h={22} />
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.85, color: SUB }}>
-          出欠はLINEのオープンチャットでお知らせください。
-          前日24時までのぶんが、ここに入ります。
-        </p>
-      </div>
-
       {/* 出欠そのものはLINEで決まるので、この画面に残る操作は
           「誰が来るのか見る」だけ。準備の間はこれが一番知りたいこと。 */}
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: 36 }}>
         <Button tone="accent">参加状況</Button>
       </div>
 
