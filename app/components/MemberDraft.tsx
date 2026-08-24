@@ -525,7 +525,6 @@ export default function MemberDraft() {
   /* 開催の概要。Supabase に置いてあるものを、画面に出てから読みにいく。
      （描く前に読むと、サーバーが作った画面と食い違って警告が出る） */
   const [draft, setDraft] = useState<EventOverview>(EMPTY_OVERVIEW);
-  const [needsSetup, setNeedsSetup] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -535,10 +534,9 @@ export default function MemberDraft() {
       .then((v) => {
         if (alive) setDraft(v);
       })
-      .catch((e) => {
-        // 表そのものが無いときだけは、直し方が決まっているので画面に出す。
-        // それ以外（通信の失敗など）は空のままにして、画面は止めない。
-        if (alive && e instanceof EventOverviewSetupError) setNeedsSetup(true);
+      .catch(() => {
+        // 読めなくても空のままにして、画面は止めない。
+        // 表そのものが無いときは、保存を押したときに入力欄の中で伝える。
       });
     return () => {
       alive = false;
@@ -551,7 +549,6 @@ export default function MemberDraft() {
     setSaveError("");
     try {
       setDraft(await saveEventOverview(next));
-      setNeedsSetup(false);
       return true;
     } catch (e) {
       setSaveError(
@@ -584,32 +581,8 @@ export default function MemberDraft() {
   return (
     <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
 
-      {/* ── この画面が何なのかの説明 ── */}
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: ACC_TEXT, letterSpacing: "0.1em" }}>
-        下書き・見た目のみ
-      </p>
-      <h1 style={{ margin: "18px 0 0", fontSize: 27, fontWeight: 600, color: INK, lineHeight: 1.5 }}>
-        会員がスマホで見る画面
-      </h1>
-      <p style={{ margin: "18px 0 0", fontSize: 16, lineHeight: 1.95, color: SUB, maxWidth: "40em" }}>
-        メニューを選ばせるのをやめて、開催日からの日数で中身が変わる形にした案です。
-        会員は何も選ばず、開いたら「いま自分がすること」だけが出ています。
-      </p>
-      <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM, maxWidth: "40em" }}>
-        灰色の帯は、まだ入っていない場所です。開催の概要だけは「次回のオフ会」の右の「編集」から入れられます。
-      </p>
-      {needsSetup && (
-        <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: ACC_TEXT, maxWidth: "40em" }}>
-          共有用の表がまだありません。Supabase の SQL Editor で supabase/setup.sql の
-          event_overview のところを実行すると、入れた概要が会員全員に届くようになります。
-        </p>
-      )}
-
       {/* ── 下書きを見てもらうための寄り道（本番にはこの切り替えは無い）── */}
-      <div style={{ marginTop: 40 }}>
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: DIM }}>
-          確認用に、ほかの場面も見る
-        </p>
+      <div>
         <div
           role="tablist"
           aria-label="場面の切り替え（確認用）"
