@@ -44,7 +44,8 @@
      老眼が始まる年齢には小さすぎる。その差もここで見えるようにした。
    ============================================================ */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { eventInfo, eventStatus, nextEvent } from "@/lib/data";
 import {
   EMPTY_OVERVIEW,
@@ -264,70 +265,115 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
   );
 }
 
-/* ── 参加状況 ───────────────────────────────
+/* ── 参加状況（ポップアップ）─────────────────
+   「参加状況」を押すと、画面の手前にこれが開く。
    名前は会員名簿（設定 ＞ 会員名簿）の1列目から引いてくる。ここでは名前を
    打ち込ませない。名簿と食い違うと、部屋割りにも会費にも響くため。
 
    丸を押すと参加・不参加が入れ替わる。これは役員の操作で、
-   本番の会員の画面では押せないようにする（見るだけにする）。 */
-function AttendanceList({
+   本番の会員の画面では押せないようにする（見るだけにする）。
+
+   置き場所は画面のいちばん外（document.body）。スマホの枠の中に入れると
+   枠に切られてしまうので、外に出して手前に重ねている。 */
+function AttendanceDialog({
   names,
   attending,
   busy,
   onToggle,
+  onClose,
 }: {
   names: string[];
   attending: Set<string>;
   busy: string;
   onToggle: (name: string, on: boolean) => void;
+  onClose: () => void;
 }) {
-  if (names.length === 0) {
-    return (
-      <div style={{ marginTop: 14, background: FACE, borderRadius: 12, padding: "18px 16px" }}>
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.85, color: SUB }}>
-          会員名簿にまだ名前がありません。設定 ＞ 会員名簿 の1列目に入れてください。
-        </p>
-      </div>
-    );
-  }
+  const boxRef = useRef<HTMLDivElement>(null);
 
-  return (
-    <div style={{ marginTop: 14 }}>
-      <p style={{ margin: 0, fontSize: 13, color: DIM }}>
-        参加 {attending.size}名 / 全{names.length}名
-      </p>
-      <div style={{ marginTop: 4 }}>
-        {names.map((name, i) => {
-          const on = attending.has(name);
-          return (
-            <button
-              key={name}
-              type="button"
-              className="md-row"
-              aria-pressed={on}
-              disabled={busy === name}
-              onClick={() => onToggle(name, !on)}
-              style={{ borderBottom: i === names.length - 1 ? "none" : `1px solid ${LINE}` }}
-            >
-              {/* 参加している人は、丸をオレンジで塗る。
-                  色だけに頼らないよう、名前も濃さを変える。 */}
-              <span
-                aria-hidden="true"
-                style={{
-                  flexShrink: 0,
-                  width: 20,
-                  height: 20,
-                  borderRadius: "50%",
-                  border: `1.5px solid ${on ? ACC : LINE}`,
-                  background: on ? ACC : WHITE,
-                }}
-              />
-              <span style={{ fontSize: 16, lineHeight: 1.6, color: on ? INK : DIM }}>{name}</span>
+  useEffect(() => {
+    // Esc で閉じる。開いている間は、後ろの画面を動かさない。
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // 開いたらここに来たことが分かるように、枠そのものに焦点を移す。
+    boxRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  return createPortal(
+    // 外の暗いところを押しても閉じる。
+    <div className="md-scrim" role="presentation" onClick={onClose}>
+      <div
+        ref={boxRef}
+        className="md-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="md-dialog-title"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="md-dialog-head">
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+            <p id="md-dialog-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: INK }}>
+              参加状況
+            </p>
+            <button type="button" className="md-edit" onClick={onClose}>
+              閉じる
             </button>
-          );
-        })}
+          </div>
+          {names.length > 0 && (
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: DIM }}>
+              参加 {attending.size}名 / 全{names.length}名
+            </p>
+          )}
+        </div>
+
+        <div className="md-dialog-body">
+          {names.length === 0 ? (
+            <p style={{ margin: "4px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
+              会員名簿にまだ名前がありません。設定 ＞ 会員名簿 の1列目に入れてください。
+            </p>
+          ) : (
+            names.map((name, i) => {
+              const on = attending.has(name);
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  className="md-row"
+                  aria-pressed={on}
+                  disabled={busy === name}
+                  onClick={() => onToggle(name, !on)}
+                  style={{ borderBottom: i === names.length - 1 ? "none" : `1px solid ${LINE}` }}
+                >
+                  {/* 参加している人は、丸をオレンジで塗る。
+                      色だけに頼らないよう、名前も濃さを変える。 */}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      flexShrink: 0,
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: `1.5px solid ${on ? ACC : LINE}`,
+                      background: on ? ACC : WHITE,
+                    }}
+                  />
+                  <span style={{ fontSize: 16, lineHeight: 1.6, color: on ? INK : DIM }}>{name}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -359,8 +405,9 @@ function BeforeScreen({
      本番の会員の画面には、この「編集」は出さない。 */
   const [editing, setEditing] = useState(false);
 
-  /* 参加状況を開いているかどうか。開くまでは名前を出さない
-     （準備の画面でまず知りたいのは、日にちと自分のすることなので）。 */
+  /* 参加状況のポップアップを開いているかどうか。
+     （準備の画面でまず知りたいのは日にちと自分のすることなので、
+       名前の一覧は押したときだけ手前に出す） */
   const [showList, setShowList] = useState(false);
 
   const dateText = formatDate(draft.date);
@@ -428,11 +475,12 @@ function BeforeScreen({
           参加状況
         </button>
         {showList && (
-          <AttendanceList
+          <AttendanceDialog
             names={names}
             attending={attending}
             busy={busyName}
             onToggle={onToggleAttendance}
+            onClose={() => setShowList(false)}
           />
         )}
       </div>

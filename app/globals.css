@@ -551,6 +551,43 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 @media (prefers-reduced-motion: reduce) {
   .md-cta, .md-row { transition: none; }
 }
+
+/* 社長室：参加状況のポップアップ。
+   スマホの枠の中に置くと枠に切られるので、画面のいちばん外に出して手前に重ねる。 */
+.md-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(27, 28, 30, 0.44);
+  animation: md-fade .16s ease;
+}
+.md-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 400px;
+  /* 名前が増えても画面からはみ出さない。あふれたぶんは中だけが動く。 */
+  max-height: min(80vh, 620px);
+  background: #FFFFFF;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px -20px rgba(27, 28, 30, 0.45);
+  overflow: hidden;
+  animation: md-rise .16s ease;
+}
+.md-dialog:focus { outline: none; }
+/* 見出しは動かさず、名前のところだけが動くようにしている。 */
+.md-dialog-head { flex-shrink: 0; padding: 24px 24px 14px; border-bottom: 1px solid #E4E5E8; }
+.md-dialog-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 24px 20px; }
+
+@keyframes md-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes md-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .md-scrim, .md-dialog { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) { .md-save { transition: none; } }
 
 /* 社長室：会員画面の下書きの、概要を入れる欄。
