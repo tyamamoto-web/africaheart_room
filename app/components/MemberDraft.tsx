@@ -198,7 +198,11 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
   );
 }
 
-/* ── 準備の画面 ───────────────────────────── */
+/* ── 準備の画面 ─────────────────────────────
+   出欠はLINEのオープンチャットで決まる。前日24時までの表明を、
+   役員が名簿から登録する運用。だからこの画面では参加・不参加を
+   選ばせない。会員にとってここは「押すところ」ではなく、
+   「自分がどうなっているかを見て安心するところ」。 */
 function BeforeScreen() {
   return (
     <>
@@ -210,9 +214,32 @@ function BeforeScreen() {
         <Bar w={96} h={15} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 40 }}>
-        <Button tone="accent">参加します</Button>
-        <Button>今回は見送ります</Button>
+      {/* 準備の間、会員がいちばん確かめたいのはここ。
+          見るだけの場所なので、面はごく浅く沈ませるにとどめる
+          （差し色の面は、当日の「あなたの部屋」ひとつに取っておく）。 */}
+      <div
+        style={{
+          marginTop: 36,
+          padding: "22px 20px 24px",
+          borderRadius: 14,
+          background: FACE,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <Label>あなたの出欠</Label>
+        {/* 「参加」などの状態が入る場所 */}
+        <Bar w={104} h={22} />
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.85, color: SUB }}>
+          出欠はLINEのオープンチャットでお知らせください。
+          前日24時までのぶんが、ここに入ります。
+        </p>
+      </div>
+
+      {/* この画面でしてほしいことは、アプリの外にある。それを隠さずに置く。 */}
+      <div style={{ marginTop: 12 }}>
+        <Button tone="accent">オープンチャットを開く</Button>
       </div>
 
       <div style={{ marginTop: 44 }}>
