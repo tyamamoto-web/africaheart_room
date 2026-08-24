@@ -488,7 +488,9 @@ function BeforeScreen({
       <div style={{ marginTop: 44 }}>
         <Label>このあとの準備</Label>
         <div style={{ marginTop: 6 }}>
-          <TodoRow text="宿題の曲を決める" />
+          {/* 宿題は抽選で決まるので、会員がすることは
+              候補を出すことと、決まった結果を見にくること。 */}
+          <TodoRow text="宿題の曲を追加・確認する" />
           <TodoRow text="デュエットの相手をさがす" />
           {/* 会費は概要のほうに出るようになったので、ここには置かない。
               代わりに、当日の会話のきっかけになるものを1つ。 */}
