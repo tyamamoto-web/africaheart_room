@@ -93,7 +93,8 @@ const WHITE = "#FFFFFF";
    エルメス自身も、オレンジは箱の「面」に使い、文字は濃い色で刷っている。
    ここでも同じ分け方にした。
 
-     ACC      … 面に塗るとき（ボタンの地、下線、点）。そのままの色を使う。
+     ACC      … 線や小さな面に置くとき（ボタンの枠、タブの下線、点、
+                「今日」の印）。そのままの色を使う。
      ACC_TEXT … 白地に字として置くとき。同じ色みのまま暗さだけ足したもの
                 （色相はどちらも22度でそろえてある）。
      ACC_TINT … ごく薄く敷くとき。 */
@@ -170,7 +171,10 @@ function TodoRow({ text, last }: { text: string; last?: boolean }) {
   );
 }
 
-/* 押すところ。差し色を使うのは、その画面でいちばんしてほしいこと1つだけ。 */
+/* 押すところ。地は塗らず、外枠だけで示す。
+   その画面でいちばんしてほしいこと1つだけ枠をオレンジにして、
+   ほかは薄いグレーの枠にする。太さは同じ1pxのままにしてあるので、
+   並べたときに高さも字の位置もそろい、色の違いだけが伝わる。 */
 function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?: "accent" | "quiet" }) {
   const accent = tone === "accent";
   return (
@@ -183,10 +187,10 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
         borderRadius: 12,
         fontSize: 16,
         fontWeight: 700,
-        background: accent ? ACC : WHITE,
-        // オレンジの面に白い字はにじんで見えるので、濃い字を置く
-        color: accent ? INK : SUB,
-        border: accent ? "none" : `1px solid ${LINE}`,
+        background: WHITE,
+        // 白地に置く字なので、オレンジは濃いほう（ACC_TEXT）を使う
+        color: accent ? ACC_TEXT : SUB,
+        border: `1px solid ${accent ? ACC : LINE}`,
       }}
     >
       {children}
