@@ -490,7 +490,9 @@ function BeforeScreen({
         <div style={{ marginTop: 6 }}>
           <TodoRow text="宿題の曲を決める" />
           <TodoRow text="デュエットの相手をさがす" />
-          <TodoRow text="会費と持ち物をみる" last />
+          {/* 会費は概要のほうに出るようになったので、ここには置かない。
+              代わりに、当日の会話のきっかけになるものを1つ。 */}
+          <TodoRow text="近況をひとこと書く" last />
         </div>
       </div>
     </>
