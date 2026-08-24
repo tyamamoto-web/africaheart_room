@@ -9,16 +9,24 @@
      置いてある。
 
    【ここで作っているのは外見だけ】
-     中身（データ）は一切入れていない。名前・日付・部屋番号のような
-     実際の値が入る場所には、灰色の帯を置いてある。
+     中身（データ）はまだつないでいない。名前・部屋番号のような値が
+     入る場所には、灰色の帯を置いてある。
      帯の位置と大きさが、そのまま「そこに何が入るか」を表す。
-     まだ何も保存しないし、どこにもつながっていない。
+
+     ただし開催の概要（開催日・時間・場所・部屋数・会費）だけは、
+     横の入力欄から手で入れられるようにしてある。入れた値はその場で
+     スマホの画面に出る。
+
+   【入れた値がどこに残るか】
+     いまのところ、この端末のブラウザにだけ残る（africaheart_event_draft_v1）。
+     ほかの役員の画面にも、会員の本番の画面にも出ない。
+     みんなで見るようにするには Supabase に移す必要がある。
 
    【切り替えについて】
      「準備 → 当日 → ふりかえり」は、今日の日付と開催日を見て
      ひとりでに決まる。会員は何も選ばない。ここが案の要。
-     基準の開催日は lib/data.ts が持っているものを使うので、
-     開催日を書き換えれば、この画面の判定もついてくる。
+     基準にする開催日は、上で入れた開催日。入れていなければ
+     lib/data.ts が持っているものを使う。
 
      下に付いている切り替えは、下書きを見てもらうための寄り道。
      今日の日付で選ばれたものには「今日」の印が付く。本番にこれは無い。
@@ -101,6 +109,63 @@ const WHITE = "#FFFFFF";
 const ACC      = "#F37021"; // エルメスオレンジそのもの（面に塗る用）
 const ACC_TEXT = "#B24809"; // 同じ色みの、白地でも薄いオレンジの上でも読める濃さ（字に使う用）
 const ACC_TINT = "rgba(243,112,33,0.09)";
+
+/* ── 開催の概要（手入力）───────────────────
+   これまで開催日や場所は lib/data.ts に書いてあり、書き換えられるのは
+   作った人だけだった。ここで役員が直接入れられるようにしている。 */
+
+/** 入れた値をしまっておく名前。中身の形を変えるときは末尾の数字を上げる。 */
+const STORE_KEY = "africaheart_event_draft_v1";
+
+type EventDraft = {
+  date: string;  // 2026-08-22 の形（入力欄がこの形で返す）
+  start: string; // 18:00
+  end: string;   // 21:00
+  place: string;
+  rooms: string;
+  fee: string;
+};
+
+const EMPTY_DRAFT: EventDraft = { date: "", start: "", end: "", place: "", rooms: "", fee: "" };
+
+/* 入力欄の並び。wide が付いているものは横いっぱいに広がる。 */
+const FIELDS: {
+  key: keyof EventDraft;
+  label: string;
+  type: string;
+  wide?: boolean;
+  placeholder?: string;
+  min?: string;
+}[] = [
+  { key: "date",  label: "開催日",     type: "date", wide: true },
+  { key: "start", label: "開始",       type: "time" },
+  { key: "end",   label: "終了",       type: "time" },
+  { key: "place", label: "場所",       type: "text", wide: true, placeholder: "会場の名前" },
+  { key: "rooms", label: "部屋数",     type: "number", min: "1" },
+  { key: "fee",   label: "会費（円）", type: "number", min: "0" },
+];
+
+const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** 入力欄の「2026-08-22」から年月日を取り出す。空や書きかけなら null。 */
+function isoYmd(iso: string): Ymd | null {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
+}
+
+/** 「2026年8月22日（土）」の形にする。曜日は世界時で数えるのでずれない。 */
+function formatDate(iso: string): string | null {
+  const d = isoYmd(iso);
+  if (!d) return null;
+  const w = WEEK[new Date(Date.UTC(d.y, d.m - 1, d.d)).getUTCDay()];
+  return `${d.y}年${d.m}月${d.d}日（${w}）`;
+}
+
+/** 4000 → 4,000。端末の設定で書き方が変わらないように、自前で入れる。 */
+function comma(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
 type Phase = "before" | "day" | "after";
 
@@ -203,15 +268,32 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
    役員が名簿から登録する運用。だからこの画面では参加・不参加を
    選ばせない。会員にとってここは「押すところ」ではなく、
    「自分がどうなっているかを見て安心するところ」。 */
-function BeforeScreen() {
+function BeforeScreen({ draft }: { draft: EventDraft }) {
+  const dateText = formatDate(draft.date);
+  const timeText = draft.start && draft.end ? `${draft.start} 〜 ${draft.end}` : draft.start || draft.end;
+  const footText = [
+    draft.rooms && `${draft.rooms}部屋`,
+    draft.fee && `会費 ${comma(draft.fee)}円`,
+  ].filter(Boolean).join(" ・ ");
+
   return (
     <>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* 入れてあるものは文字で、まだのものは帯のままで出す。
+          何を入れればこの画面が埋まるのかが、そのまま見てわかる。 */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Label>次回のオフ会</Label>
-        {/* 日にちが入る場所 */}
-        <Bar w={190} h={27} />
-        {/* あと何日か */}
-        <Bar w={96} h={15} />
+        {dateText
+          ? <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1.4 }}>{dateText}</p>
+          : <Bar w={190} h={27} />}
+        {timeText
+          ? <p style={{ margin: 0, fontSize: 16, color: SUB, lineHeight: 1.6 }}>{timeText}</p>
+          : <Bar w={120} h={16} />}
+        {draft.place
+          ? <p style={{ margin: 0, fontSize: 16, color: SUB, lineHeight: 1.6 }}>{draft.place}</p>
+          : <Bar w={170} h={16} />}
+        {footText
+          ? <p style={{ margin: 0, fontSize: 13, color: DIM, lineHeight: 1.6 }}>{footText}</p>
+          : <Bar w={96} h={14} />}
       </div>
 
       {/* 準備の間、会員がいちばん確かめたいのはここ。
@@ -346,19 +428,92 @@ function AfterScreen() {
   );
 }
 
+/* ── 開催の概要を入れるところ ─────────────
+   役員が使う。入れたそばから左（狭い画面では下）のスマホに出る。 */
+function OverviewPanel({
+  draft,
+  onChange,
+}: {
+  draft: EventDraft;
+  onChange: (key: keyof EventDraft, value: string) => void;
+}) {
+  return (
+    <div className="md-form" style={{ background: FACE, borderRadius: 16, padding: "26px 24px 24px" }}>
+      <Label>開催の概要</Label>
+      <p style={{ margin: "12px 0 0", fontSize: 13, lineHeight: 1.85, color: SUB }}>
+        ここに入れたものが、そのまま会員の画面に出ます。
+      </p>
+
+      <div style={{ marginTop: 22, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {FIELDS.map((f) => (
+          <label
+            key={f.key}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              gridColumn: f.wide ? "1 / -1" : undefined,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: SUB }}>{f.label}</span>
+            <input
+              className="md-field"
+              type={f.type}
+              min={f.min}
+              placeholder={f.placeholder}
+              inputMode={f.type === "number" ? "numeric" : undefined}
+              value={draft[f.key]}
+              onChange={(e) => onChange(f.key, e.target.value)}
+            />
+          </label>
+        ))}
+      </div>
+
+      <p style={{ margin: "20px 0 0", fontSize: 12, lineHeight: 1.85, color: DIM }}>
+        入れたそばから、この端末に残ります。いまはまだ、ほかの人の画面には出ません。
+      </p>
+    </div>
+  );
+}
+
 export default function MemberDraft() {
   /* 時計。最初に描くときと、画面に出たあとの両方で同じ数え方をする。
      日付をまたいだまま開きっぱなしにされても、次に開いたときには正しくなる。 */
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => setNowMs(Date.now()), []);
 
-  /* 今日の日付から、出す場面をきめる。ここが「会員に選ばせない」の中身。 */
+  /* 手で入れた開催の概要。
+     最初に描くときは空のまま置き、画面に出てから端末の控えを読む。
+     （描く前に読むと、サーバーが作った画面と食い違って警告が出る） */
+  const [draft, setDraft] = useState<EventDraft>(EMPTY_DRAFT);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORE_KEY);
+      if (raw) setDraft({ ...EMPTY_DRAFT, ...JSON.parse(raw) });
+    } catch {
+      // 控えが壊れていたら、空のまま使う（消さない）
+    }
+  }, []);
+
+  /* 一文字入れるたびに残す。押し忘れる「保存」を作らないため。 */
+  const update = (key: keyof EventDraft, value: string) => {
+    const next = { ...draft, [key]: value };
+    setDraft(next);
+    try {
+      window.localStorage.setItem(STORE_KEY, JSON.stringify(next));
+    } catch {
+      // 残せなくても、画面はそのまま使えるようにしておく
+    }
+  };
+
+  /* 今日の日付から、出す場面をきめる。ここが「会員に選ばせない」の中身。
+     基準にするのは手で入れた開催日。入れていなければ lib/data.ts のもの。 */
   const autoPhase = useMemo<Phase>(() => {
-    const event = parseJpDate(BASE_DATE_TEXT);
+    const event = isoYmd(draft.date) ?? parseJpDate(BASE_DATE_TEXT);
     // 開催日が読み取れないときだけ、判定をあきらめて「準備」を出す。
     if (!event) return "before";
     return phaseFromDays(daysBetween(jstYmd(nowMs), event));
-  }, [nowMs]);
+  }, [nowMs, draft.date]);
 
   /* 下書きを見てもらうためだけの寄り道。
      本番にはこの切り替えは無く、上の判定だけで決まる。 */
@@ -366,7 +521,7 @@ export default function MemberDraft() {
   const phase = look ?? autoPhase;
 
   return (
-    <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
+    <div style={{ padding: "48px 32px 96px", maxWidth: 980, margin: "0 auto" }}>
 
       {/* ── この画面が何なのかの説明 ── */}
       <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: ACC_TEXT, letterSpacing: "0.1em" }}>
@@ -380,7 +535,7 @@ export default function MemberDraft() {
         会員は何も選ばず、開いたら「いま自分がすること」だけが出ています。
       </p>
       <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM, maxWidth: "40em" }}>
-        中身はまだ入れていません。灰色の帯は、実際の日にちや部屋番号が入る場所です。
+        灰色の帯は、まだ入っていない場所です。開催の概要だけは手で入れられるので、入れるとその場で出ます。
       </p>
 
       {/* ── 下書きを見てもらうための寄り道（本番にはこの切り替えは無い）── */}
@@ -455,23 +610,29 @@ export default function MemberDraft() {
         </div>
       </div>
 
-      {/* ── スマホの枠 ── */}
-      <div style={{ display: "flex", justifyContent: "center", padding: "56px 0 0" }}>
-        <div
-          style={{
-            width: 356,
-            maxWidth: "100%",
-            borderRadius: 30,
-            border: `1px solid ${LINE}`,
-            background: WHITE,
-            padding: "40px 28px 48px",
-            boxShadow: "0 1px 3px rgba(27,28,30,0.04), 0 12px 32px -18px rgba(27,28,30,0.20)",
-          }}
-        >
-          {phase === "before" && <BeforeScreen />}
-          {phase === "day"    && <DayScreen />}
-          {phase === "after"  && <AfterScreen />}
+      {/* ── スマホの枠と、その概要を入れるところ ──
+          広い画面では横に並べ、狭い画面では入力を上、スマホを下にする
+          （並びの入れ替えは globals.css の .md-split が持つ）。 */}
+      <div className="md-split" style={{ marginTop: 52 }}>
+        <div style={{ justifySelf: "center" }}>
+          <div
+            style={{
+              width: 356,
+              maxWidth: "100%",
+              borderRadius: 30,
+              border: `1px solid ${LINE}`,
+              background: WHITE,
+              padding: "40px 28px 48px",
+              boxShadow: "0 1px 3px rgba(27,28,30,0.04), 0 12px 32px -18px rgba(27,28,30,0.20)",
+            }}
+          >
+            {phase === "before" && <BeforeScreen draft={draft} />}
+            {phase === "day"    && <DayScreen />}
+            {phase === "after"  && <AfterScreen />}
+          </div>
         </div>
+
+        <OverviewPanel draft={draft} onChange={update} />
       </div>
 
       {/* ── 補足 ── */}
