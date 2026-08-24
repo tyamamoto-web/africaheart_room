@@ -311,28 +311,17 @@ export default function MemberDraft() {
   useEffect(() => setNowMs(Date.now()), []);
 
   /* 今日の日付から、出す場面をきめる。ここが「会員に選ばせない」の中身。 */
-  const judged = useMemo(() => {
-    const today = jstYmd(nowMs);
+  const autoPhase = useMemo<Phase>(() => {
     const event = parseJpDate(BASE_DATE_TEXT);
     // 開催日が読み取れないときだけ、判定をあきらめて「準備」を出す。
-    if (!event) return { today, event: null, daysUntil: null, phase: "before" as Phase };
-    const daysUntil = daysBetween(today, event);
-    return { today, event, daysUntil, phase: phaseFromDays(daysUntil) };
+    if (!event) return "before";
+    return phaseFromDays(daysBetween(jstYmd(nowMs), event));
   }, [nowMs]);
 
   /* 下書きを見てもらうためだけの寄り道。
      本番にはこの切り替えは無く、上の判定だけで決まる。 */
   const [look, setLook] = useState<Phase | null>(null);
-  const phase = look ?? judged.phase;
-
-  const phaseName = PHASES.find((p) => p.id === judged.phase)?.label ?? "";
-
-  // 「あと3日です」「2日たちました」「今日です」の言い分け。
-  const distance =
-    judged.daysUntil === null ? null
-    : judged.daysUntil > 0 ? `開催まであと${judged.daysUntil}日`
-    : judged.daysUntil === 0 ? "開催は今日"
-    : `開催から${-judged.daysUntil}日がたちました`;
+  const phase = look ?? autoPhase;
 
   return (
     <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
@@ -352,39 +341,8 @@ export default function MemberDraft() {
         中身はまだ入れていません。灰色の帯は、実際の日にちや部屋番号が入る場所です。
       </p>
 
-      {/* ── 今日の日付から出した答え ── */}
-      <div
-        style={{
-          marginTop: 40,
-          padding: "24px 26px",
-          borderRadius: 14,
-          border: `1px solid ${LINE}`,
-          background: FACE,
-        }}
-      >
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>
-          今日の日付から
-        </p>
-        <p style={{ margin: "14px 0 0", fontSize: 17, lineHeight: 1.85, color: INK }}>
-          {judged.event ? (
-            <>
-              今日は{judged.today.m}月{judged.today.d}日。{distance}。だから
-              <span style={{ color: ACC, fontWeight: 700 }}>「{phaseName}」</span>
-              を出しています。
-            </>
-          ) : (
-            <>開催日を読み取れなかったので、ひとまず<span style={{ color: ACC, fontWeight: 700 }}>「準備」</span>を出しています。</>
-          )}
-        </p>
-        <p style={{ margin: "12px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM }}>
-          基準にしている開催日：{BASE_DATE_TEXT}
-          <br />
-          この日付は lib/data.ts が持っているものです。書き換えれば、この画面もついてきます。
-        </p>
-      </div>
-
       {/* ── 下書きを見てもらうための寄り道（本番にはこの切り替えは無い）── */}
-      <div style={{ marginTop: 28 }}>
+      <div style={{ marginTop: 40 }}>
         <p style={{ margin: "0 0 12px", fontSize: 13, color: DIM }}>
           確認用に、ほかの場面も見る
         </p>
@@ -395,14 +353,14 @@ export default function MemberDraft() {
         >
           {PHASES.map((p) => {
             const on = p.id === phase;
-            const isToday = p.id === judged.phase;
+            const isToday = p.id === autoPhase;
             return (
               <button
                 key={p.id}
                 type="button"
                 role="tab"
                 aria-selected={on}
-                onClick={() => setLook(p.id === judged.phase ? null : p.id)}
+                onClick={() => setLook(p.id === autoPhase ? null : p.id)}
                 className="md-tab"
                 style={{
                   padding: "14px 20px 15px",
