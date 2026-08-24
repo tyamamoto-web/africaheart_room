@@ -15,10 +15,13 @@
      まだ何も保存しないし、どこにもつながっていない。
 
    【切り替えについて】
-     本番では、開催日からの日数で「準備 → 当日 → ふりかえり」が
-     ひとりでに切り替わる。会員は何も選ばない。
-     ここでは3つとも見たいので、確認用に手で切り替えられるように
-     してある。この切り替えは下書きだけのもの。
+     「準備 → 当日 → ふりかえり」は、今日の日付と開催日を見て
+     ひとりでに決まる。会員は何も選ばない。ここが案の要。
+     基準の開催日は lib/data.ts が持っているものを使うので、
+     開催日を書き換えれば、この画面の判定もついてくる。
+
+     下に付いている切り替えは、下書きを見てもらうための寄り道。
+     今日の日付で選ばれたものには「今日」の印が付く。本番にこれは無い。
 
    【色】
      グレーだけで組み、オレンジは「いま押すところ」「いまの場面」に
@@ -30,7 +33,50 @@
      老眼が始まる年齢には小さすぎる。その差もここで見えるようにした。
    ============================================================ */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { eventInfo, eventStatus, nextEvent } from "@/lib/data";
+
+/* ── 今日の日付から、出す場面をきめる ───────────────────────
+   会員に選ばせないための、いちばん大事なところ。
+   基準にする開催日は lib/data.ts が持っているものをそのまま使う
+   （告知中なら nextEvent、それ以外は eventInfo）。
+   開催日を書き換えれば、この画面の判定もついてくる。 */
+
+/** どの開催日を基準にするか。告知中の回があるならそちらを見る。 */
+const BASE_DATE_TEXT = eventStatus === "announced" ? nextEvent.date : eventInfo.date;
+
+type Ymd = { y: number; m: number; d: number };
+
+/** 「2026年8月22日（土）」のような書き方から年月日を取り出す。読めなければ null。 */
+function parseJpDate(text: string): Ymd | null {
+  const m = text.match(/(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日/);
+  if (!m) return null;
+  return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
+}
+
+/* いまの日本時間の年月日。
+   置いてあるサーバーは世界時で動くので、そのまま日付を読むと
+   日本の早朝に1日ずれる。時計の値を9時間ずらしてから読むことで、
+   サーバーでも手元の端末でも同じ日付になる。 */
+function jstYmd(nowMs: number): Ymd {
+  const t = new Date(nowMs + 9 * 60 * 60 * 1000);
+  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
+}
+
+/* 日数の差（後 − 前）。時刻を持たない年月日どうしで数えるので、
+   時差でも夏時間でもずれない。 */
+function daysBetween(from: Ymd, to: Ymd): number {
+  const a = Date.UTC(from.y, from.m - 1, from.d);
+  const b = Date.UTC(to.y, to.m - 1, to.d);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** 開催日まであと何日か（＋なら未来、0なら当日、−なら過ぎている）から場面をきめる。 */
+function phaseFromDays(daysUntil: number): Phase {
+  if (daysUntil > 0) return "before";
+  if (daysUntil === 0) return "day";
+  return "after";
+}
 
 /* 色。グレーは社長室のメニューと同じ並びから取っている（新しい灰色を足さない）。 */
 const INK   = "#1B1C1E"; // 主要な文字
@@ -259,7 +305,34 @@ function AfterScreen() {
 }
 
 export default function MemberDraft() {
-  const [phase, setPhase] = useState<Phase>("before");
+  /* 時計。最初に描くときと、画面に出たあとの両方で同じ数え方をする。
+     日付をまたいだまま開きっぱなしにされても、次に開いたときには正しくなる。 */
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => setNowMs(Date.now()), []);
+
+  /* 今日の日付から、出す場面をきめる。ここが「会員に選ばせない」の中身。 */
+  const judged = useMemo(() => {
+    const today = jstYmd(nowMs);
+    const event = parseJpDate(BASE_DATE_TEXT);
+    // 開催日が読み取れないときだけ、判定をあきらめて「準備」を出す。
+    if (!event) return { today, event: null, daysUntil: null, phase: "before" as Phase };
+    const daysUntil = daysBetween(today, event);
+    return { today, event, daysUntil, phase: phaseFromDays(daysUntil) };
+  }, [nowMs]);
+
+  /* 下書きを見てもらうためだけの寄り道。
+     本番にはこの切り替えは無く、上の判定だけで決まる。 */
+  const [look, setLook] = useState<Phase | null>(null);
+  const phase = look ?? judged.phase;
+
+  const phaseName = PHASES.find((p) => p.id === judged.phase)?.label ?? "";
+
+  // 「あと3日です」「2日たちました」「今日です」の言い分け。
+  const distance =
+    judged.daysUntil === null ? null
+    : judged.daysUntil > 0 ? `開催まであと${judged.daysUntil}日`
+    : judged.daysUntil === 0 ? "開催は今日"
+    : `開催から${-judged.daysUntil}日がたちました`;
 
   return (
     <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
@@ -277,55 +350,107 @@ export default function MemberDraft() {
       </p>
       <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM, maxWidth: "40em" }}>
         中身はまだ入れていません。灰色の帯は、実際の日にちや部屋番号が入る場所です。
-        本番は日付でひとりでに切り替わりますが、ここでは3つとも見たいので手で切り替えます。
       </p>
 
-      {/* ── 確認用の切り替え ── */}
+      {/* ── 今日の日付から出した答え ── */}
       <div
-        role="tablist"
-        aria-label="場面の切り替え"
-        style={{ display: "flex", gap: 4, marginTop: 44, borderBottom: `1px solid ${LINE}` }}
+        style={{
+          marginTop: 40,
+          padding: "24px 26px",
+          borderRadius: 14,
+          border: `1px solid ${LINE}`,
+          background: FACE,
+        }}
       >
-        {PHASES.map((p) => {
-          const on = p.id === phase;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              onClick={() => setPhase(p.id)}
-              className="md-tab"
-              style={{
-                padding: "14px 20px 15px",
-                border: "none",
-                // 選んでいるところだけ差し色。下の線1本で示し、面は塗らない。
-                borderBottom: `2px solid ${on ? ACC : "transparent"}`,
-                marginBottom: -1,
-                // 地と、選んでいないときの色は globals.css の .md-tab が持つ。
-                // ここに書くとインライン指定が勝ってしまい、CSSのホバーが効かなくなる。
-                color: on ? ACC : undefined,
-                fontSize: 15,
-                fontWeight: on ? 700 : 500,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "baseline",
-                gap: 10,
-                // 狭い画面で1字ずつ折り返さないようにする
-                whiteSpace: "nowrap",
-              }}
-            >
-              {p.label}
-              {/* いつの場面かの説明。狭い画面では globals.css で隠す（無くても意味は通る） */}
-              <span
-                className="md-tab-when"
-                style={{ fontSize: 12, fontWeight: 500, color: on ? ACC : DIM, opacity: on ? 0.75 : 1 }}
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>
+          今日の日付から
+        </p>
+        <p style={{ margin: "14px 0 0", fontSize: 17, lineHeight: 1.85, color: INK }}>
+          {judged.event ? (
+            <>
+              今日は{judged.today.m}月{judged.today.d}日。{distance}。だから
+              <span style={{ color: ACC, fontWeight: 700 }}>「{phaseName}」</span>
+              を出しています。
+            </>
+          ) : (
+            <>開催日を読み取れなかったので、ひとまず<span style={{ color: ACC, fontWeight: 700 }}>「準備」</span>を出しています。</>
+          )}
+        </p>
+        <p style={{ margin: "12px 0 0", fontSize: 13, lineHeight: 1.9, color: DIM }}>
+          基準にしている開催日：{BASE_DATE_TEXT}
+          <br />
+          この日付は lib/data.ts が持っているものです。書き換えれば、この画面もついてきます。
+        </p>
+      </div>
+
+      {/* ── 下書きを見てもらうための寄り道（本番にはこの切り替えは無い）── */}
+      <div style={{ marginTop: 28 }}>
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: DIM }}>
+          確認用に、ほかの場面も見る
+        </p>
+        <div
+          role="tablist"
+          aria-label="場面の切り替え（確認用）"
+          style={{ display: "flex", gap: 4, borderBottom: `1px solid ${LINE}` }}
+        >
+          {PHASES.map((p) => {
+            const on = p.id === phase;
+            const isToday = p.id === judged.phase;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setLook(p.id === judged.phase ? null : p.id)}
+                className="md-tab"
+                style={{
+                  padding: "14px 20px 15px",
+                  border: "none",
+                  // 選んでいるところだけ差し色。下の線1本で示し、面は塗らない。
+                  borderBottom: `2px solid ${on ? ACC : "transparent"}`,
+                  marginBottom: -1,
+                  // 地と、選んでいないときの色は globals.css の .md-tab が持つ。
+                  // ここに書くとインライン指定が勝ってしまい、CSSのホバーが効かなくなる。
+                  color: on ? ACC : undefined,
+                  fontSize: 15,
+                  fontWeight: on ? 700 : 500,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 8,
+                  // 狭い画面で1字ずつ折り返さないようにする
+                  whiteSpace: "nowrap",
+                }}
               >
-                {p.when}
-              </span>
-            </button>
-          );
-        })}
+                {p.label}
+                {/* 今日の日付で選ばれたのがどれかを示す。狭い画面でもこれだけは残す。 */}
+                {isToday && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      color: ACC,
+                      background: ACC_TINT,
+                      borderRadius: 999,
+                      padding: "2px 8px",
+                    }}
+                  >
+                    今日
+                  </span>
+                )}
+                {/* いつの場面かの説明。狭い画面では globals.css で隠す（無くても意味は通る） */}
+                <span
+                  className="md-tab-when"
+                  style={{ fontSize: 12, fontWeight: 500, color: on ? ACC : DIM, opacity: on ? 0.75 : 1 }}
+                >
+                  {p.when}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── スマホの枠 ── */}
