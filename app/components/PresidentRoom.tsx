@@ -7,8 +7,8 @@
    作り直すための試作場所として使う。納得できる形になったら、
    ここの中身を既存のページへ移していく。
 
-   【いまのスコープ】左のメニューだけ。本文は空。
-     名前は追って決めるので、いまは 1〜15 と「設定」を並べてある。
+   【いまのスコープ】左のメニューと、その先頭の「会員画面（案）」だけ。
+     残りの 1〜15 は名前も中身もこれから決める空の枠。
      MENU の label を書き換えれば名前は差し替わる。
      足すときは MENU に一行足すだけでよい（id は空いている番号を使う）。
 
@@ -27,6 +27,7 @@
 
 import { useEffect, useState } from "react";
 import PresidentTable from "@/app/components/PresidentTable";
+import MemberDraft from "@/app/components/MemberDraft";
 
 /* すべて色味を持たない中間色のグレー。
    以前は暖色寄りのグレーにしていたが、画面ではベージュに見えてしまうため、
@@ -53,6 +54,8 @@ const SURFACE  = "#FFFFFF"; // 本文の面
 type MenuNode = { id: string; label: string; children?: { id: string; label: string }[] };
 
 const MENU: MenuNode[] = [
+  // 会員がスマホで見る画面の下書き（見た目だけ）。中身は app/components/MemberDraft.tsx。
+  { id: "m17", label: "会員画面（案）" },
   { id: "m1",  label: "1" },
   { id: "m2",  label: "2" },
   { id: "m3",  label: "3" },
@@ -254,7 +257,8 @@ export default function PresidentRoom() {
           />
         </div>
 
-        {/* 本文。中身があるのは会員名簿だけで、ほかは意図的に空にしてある。 */}
+        {/* 本文。中身があるのは会員画面（案）と会員名簿だけで、ほかは意図的に空にしてある。 */}
+        {current === "m17" && <MemberDraft />}
         {current === "m10-roster" && <PresidentTable />}
 
       </div>
