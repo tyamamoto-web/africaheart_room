@@ -23,6 +23,9 @@
      入れたものを Supabase Storage から読んで出している（lib/gallery.ts）。
      マスを押すと拡げて見られ、「すべて見る」で場面ごとの一覧が開く。
 
+     「当日」のタイムテーブル（時間・企画名）も、役員が「編集」から手で入れる。
+     保存先は共有の置き場所（lib/timetable.ts）なので、会員全員が同じものを見る。
+
    【入れた値がどこに残るか】
      「保存」を押したときに Supabase の event_overview に入る（lib/eventOverview.ts）。
      端末の中ではなく共有の置き場所なので、会員がそれぞれの端末から同じものを見られる。
@@ -84,6 +87,7 @@ import {
 import { readAttendance, setAttendance } from "@/lib/attendance";
 import { readRoster, rosterNames } from "@/lib/roster";
 import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
+import { readTimetable, saveTimetable, type TimetableRow } from "@/lib/timetable";
 
 /* ── 日付まわりの小道具 ───────────────────────
    場面の判定そのものは lib/eventOverview.ts（eventPhase）にある。
@@ -557,6 +561,153 @@ function BeforeScreen({
 }
 
 /* ── 当日の画面 ───────────────────────────── */
+/* ── 当日のタイムテーブル ─────────────────────
+   時間と企画名を役員が手で入れる表。lib/timetable.ts に保存し、全員で共有する。
+   まだ何も無いときは、空のマスを4行出す（表があること自体が分かるように）。
+   「編集」で打ち込む形に変わり、「保存」で戻る。概要の入力と同じ作り。
+   この「編集」は役員だけのもので、本番の会員の画面には出さない。 */
+const EMPTY_TIMETABLE_ROWS = 4;
+const blankRow = (): TimetableRow => ({ time: "", title: "" });
+
+function TimetableSection() {
+  // null は「まだ読んでいる」。読めたら配列（0行もありうる）。
+  const [rows, setRows] = useState<TimetableRow[] | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState<TimetableRow[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    readTimetable()
+      .then((r) => {
+        if (alive) setRows(r);
+      })
+      .catch(() => {
+        if (alive) setRows([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const startEdit = () => {
+    const base = rows ?? [];
+    // 空なら空の行を4つ。あれば末尾に空の行を1つ足して、続きを打てるようにする。
+    setEdit(base.length ? [...base, blankRow()] : Array.from({ length: EMPTY_TIMETABLE_ROWS }, blankRow));
+    setError("");
+    setEditing(true);
+  };
+  const setCell = (i: number, key: keyof TimetableRow, v: string) =>
+    setEdit((rs) => rs.map((r, n) => (n === i ? { ...r, [key]: v } : r)));
+  const removeRow = (i: number) => setEdit((rs) => rs.filter((_, n) => n !== i));
+  const addRow = () => setEdit((rs) => [...rs, blankRow()]);
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      setRows(await saveTimetable(edit));
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const view = rows && rows.length ? rows : Array.from({ length: EMPTY_TIMETABLE_ROWS }, blankRow);
+
+  return (
+    <div style={{ marginTop: 34 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+        <Label>タイムテーブル</Label>
+        <button
+          type="button"
+          className="md-edit"
+          aria-expanded={editing}
+          disabled={rows === null}
+          onClick={() => (editing ? setEditing(false) : startEdit())}
+        >
+          {editing ? "やめる" : "編集"}
+        </button>
+      </div>
+
+      <table className="md-table" style={{ marginTop: 14 }}>
+        <thead>
+          <tr>
+            <th scope="col" className="md-table-time">時間</th>
+            <th scope="col">企画</th>
+            {editing && (
+              <th scope="col" className="md-table-x">
+                <span className="sr-only">消す</span>
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {(editing ? edit : view).map((r, i) => (
+            <tr key={i}>
+              {editing ? (
+                <>
+                  <td className="md-table-time">
+                    <input
+                      className="md-cell"
+                      value={r.time}
+                      placeholder="12:00"
+                      aria-label={`${i + 1}行目の時間`}
+                      onChange={(e) => setCell(i, "time", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="md-cell"
+                      value={r.title}
+                      placeholder="企画名"
+                      aria-label={`${i + 1}行目の企画`}
+                      onChange={(e) => setCell(i, "title", e.target.value)}
+                    />
+                  </td>
+                  <td className="md-table-x">
+                    <button type="button" className="md-rowx" aria-label={`${i + 1}行目を消す`} onClick={() => removeRow(i)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+                      </svg>
+                    </button>
+                  </td>
+                </>
+              ) : (
+                <>
+                  <td className="md-table-time">{r.time}</td>
+                  <td>{r.title}</td>
+                </>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {editing && (
+        <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+          <button type="button" className="md-addrow" onClick={addRow}>
+            行を追加
+          </button>
+          <button type="button" className="md-save" disabled={saving} onClick={save}>
+            {saving ? "保存しています" : "保存"}
+          </button>
+          {error ? (
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>{error}</p>
+          ) : (
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
+              保存すると、会員それぞれの端末から同じものが見られます。時間も企画名も空の行は残りません。
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DayScreen() {
   return (
     <>
@@ -586,6 +737,9 @@ function DayScreen() {
         {/* 部屋番号が入る場所 */}
         <Bar w={92} h={16} />
       </div>
+
+      {/* 当日の流れ。時間と企画名は役員が手で入れ、全員で共有する。 */}
+      <TimetableSection />
 
       <div style={{ marginTop: 34, display: "flex", flexDirection: "column", gap: 14 }}>
         <Label>このあと</Label>
