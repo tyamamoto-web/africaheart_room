@@ -563,7 +563,7 @@ function DayScreen() {
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {/* いまの場面であることを、差し色の点ひとつで示す */}
         <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: ACC }} />
-        <Label>いまの時間</Label>
+        <Label>部屋割</Label>
       </div>
 
       {/* 当日いちばん知りたいのは「自分がどの部屋か」。ここだけ大きく取る。 */}
