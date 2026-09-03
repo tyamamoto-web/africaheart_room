@@ -894,10 +894,6 @@ function DayScreen({ attendeeCount }: { attendeeCount: number }) {
       {/* 部屋割と当日の流れは一体なので、ひとつの表にまとめてある。
           次のコマも表に載るので、「このあと」のような別の欄は置かない。 */}
       <RoomPlan attendeeCount={attendeeCount} />
-
-      <div style={{ marginTop: 40 }}>
-        <Button>歌う順番をきめる</Button>
-      </div>
     </>
   );
 }
