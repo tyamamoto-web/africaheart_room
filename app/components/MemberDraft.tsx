@@ -597,11 +597,6 @@ function DayScreen() {
       <div style={{ marginTop: 40 }}>
         <Button>歌う順番をきめる</Button>
       </div>
-
-      <div style={{ marginTop: 34, display: "flex", flexDirection: "column", gap: 12 }}>
-        <Label>困ったときの連絡先</Label>
-        <Bar w="60%" h={16} />
-      </div>
     </>
   );
 }
