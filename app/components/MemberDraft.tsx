@@ -174,11 +174,13 @@ function comma(digits: string): string {
 type Phase = EventPhase;
 
 /* 三つの場面の名前。会員がふだん使う言葉のままにしてある。
-   when は範囲の説明で、名前だけで迷わないための添え。 */
+   when は範囲の説明で、名前だけで迷わないための添え。
+   境目は「日時確定」＝開催日と開始時刻の両方が入った時点（lib/eventOverview.ts の isAnnounced）。
+   「告知」と書くと、告知の前から始まるのか後から始まるのかが読めないので、この言い方にした。 */
 const PHASES: { id: Phase; label: string; when: string }[] = [
-  { id: "before", label: "準備",       when: "告知 〜 前日" },
+  { id: "before", label: "準備",       when: "日時確定 〜 前日" },
   { id: "day",    label: "当日",       when: "開催日" },
-  { id: "after",  label: "ふりかえり", when: "翌日 〜 次の告知" },
+  { id: "after",  label: "ふりかえり", when: "翌日 〜 次の日時確定" },
 ];
 
 /* 実際のデータが入る場所を示す帯。中身を作らずに、形だけを見せるためのもの。 */
@@ -429,7 +431,7 @@ function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null 
   );
 }
 
-/* ── 準備の画面（告知 〜 前日）─────────────────
+/* ── 準備の画面（日時確定 〜 前日）───────────────
    出欠はLINEのオープンチャットで決まる。前日24時までの表明を、
    役員が名簿から登録する運用。だからこの画面では参加・不参加を
    選ばせない。会員にとってここは「押すところ」ではなく、
