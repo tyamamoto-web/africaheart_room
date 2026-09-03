@@ -191,3 +191,49 @@ export async function saveEventOverview(v: EventOverview): Promise<EventOverview
   // 書けたのに中身が返らないときは、送ったものをそのまま返す（画面を止めない）。
   return row ? fromRow(row) : v;
 }
+
+/* ── 場面（告知〜前日 / 当日 / ふりかえり）の判定 ───────────────
+   会員の画面は、今日の日付と概要を見て、場面がひとりでに決まる（会員は選ばない）。
+   決まりは次のとおり。
+
+     告知 〜 前日 … 告知が済んでいて、開催日がまだ来ていない
+     当日        … 開催日そのもの
+     ふりかえり  … 開催日の翌日から、次の回が告知されるまで
+
+   「告知が済んだ」とみなすのは、日にちと開始時刻の両方が入ったとき。
+   日にちだけ入れて時刻がまだなら告知前で、前の回の「ふりかえり」が続く。
+   ここは画面のことを知らないので、どの画面から呼んでも同じ答えになる。 */
+
+export type EventPhase = "before" | "day" | "after";
+export type Ymd = { y: number; m: number; d: number };
+
+/** "2026-09-26" を年月日に。読めなければ null。 */
+export function isoYmd(iso: string): Ymd | null {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
+}
+
+/* 日数の差（後 − 前）。時刻を持たない年月日どうしで数えるので、
+   時差でも夏時間でもずれない。 */
+export function daysBetween(from: Ymd, to: Ymd): number {
+  const a = Date.UTC(from.y, from.m - 1, from.d);
+  const b = Date.UTC(to.y, to.m - 1, to.d);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** 告知が済んでいるか。日にちと開始時刻の両方が入って、はじめて告知とみなす。 */
+export function isAnnounced(v: EventOverview): boolean {
+  return isoYmd(v.date) !== null && /^\d{2}:\d{2}$/.test(v.start);
+}
+
+/** 今日（年月日）がどの場面か。 */
+export function eventPhase(v: EventOverview, today: Ymd): EventPhase {
+  const event = isoYmd(v.date);
+  // 告知前は、前の回のふりかえりが続いている
+  if (!event || !isAnnounced(v)) return "after";
+  const days = daysBetween(today, event);
+  if (days > 0) return "before";
+  if (days === 0) return "day";
+  return "after";
+}

@@ -30,10 +30,13 @@
      lib/eventOverview.ts はそのまま使える。
 
    【切り替えについて】
-     「準備 → 当日 → ふりかえり」は、今日の日付と開催日を見て
+     「オフ会まで → 当日 → ふりかえり」は、今日の日付と概要を見て
      ひとりでに決まる。会員は何も選ばない。ここが案の要。
-     基準にする開催日は、上で入れた開催日。入れていなければ
-     lib/data.ts が持っているものを使う。
+       オフ会まで … 告知が済んでいて、開催日の前日まで
+       当日       … 開催日
+       ふりかえり … 開催日の翌日から、次の回が告知されるまで
+     「告知が済んだ」は、開催日と開始時刻の両方が入ったとき。
+     判定そのものは lib/eventOverview.ts の eventPhase にある。
 
      下に付いている切り替えは、下書きを見てもらうための寄り道。
      今日の日付で選ばれたものには「今日」の印が付く。本番にこれは無い。
@@ -56,23 +59,24 @@ import {
   EventOverviewSetupError,
   readEventOverview,
   saveEventOverview,
+  eventPhase,
+  isoYmd,
   type EventOverview,
+  type EventPhase,
   type OverviewField,
+  type Ymd,
 } from "@/lib/eventOverview";
 import { readAttendance, setAttendance } from "@/lib/attendance";
 import { readRoster, rosterNames } from "@/lib/roster";
 import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
 
-/* ── 今日の日付から、出す場面をきめる ───────────────────────
-   会員に選ばせないための、いちばん大事なところ。
-   基準にする開催日は lib/data.ts が持っているものをそのまま使う
-   （告知中なら nextEvent、それ以外は eventInfo）。
-   開催日を書き換えれば、この画面の判定もついてくる。 */
+/* ── 日付まわりの小道具 ───────────────────────
+   場面の判定そのものは lib/eventOverview.ts（eventPhase）にある。
+   ここにあるのは「今日は何日か」を出すものと、参加状況の置き場所の鍵に使う
+   lib/data.ts の日付の読み取りだけ。 */
 
-/** どの開催日を基準にするか。告知中の回があるならそちらを見る。 */
+/** 参加状況の鍵に使う、lib/data.ts の開催日（概要に開催日が無いときの控え）。 */
 const BASE_DATE_TEXT = eventStatus === "announced" ? nextEvent.date : eventInfo.date;
-
-type Ymd = { y: number; m: number; d: number };
 
 /** 「2026年8月22日（土）」のような書き方から年月日を取り出す。読めなければ null。 */
 function parseJpDate(text: string): Ymd | null {
@@ -88,21 +92,6 @@ function parseJpDate(text: string): Ymd | null {
 function jstYmd(nowMs: number): Ymd {
   const t = new Date(nowMs + 9 * 60 * 60 * 1000);
   return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
-}
-
-/* 日数の差（後 − 前）。時刻を持たない年月日どうしで数えるので、
-   時差でも夏時間でもずれない。 */
-function daysBetween(from: Ymd, to: Ymd): number {
-  const a = Date.UTC(from.y, from.m - 1, from.d);
-  const b = Date.UTC(to.y, to.m - 1, to.d);
-  return Math.round((b - a) / 86_400_000);
-}
-
-/** 開催日まであと何日か（＋なら未来、0なら当日、−なら過ぎている）から場面をきめる。 */
-function phaseFromDays(daysUntil: number): Phase {
-  if (daysUntil > 0) return "before";
-  if (daysUntil === 0) return "day";
-  return "after";
 }
 
 /* 色。グレーは社長室のメニューと同じ並びから取っている（新しい灰色を足さない）。 */
@@ -154,13 +143,6 @@ const FIELDS: {
 
 const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
 
-/** 入力欄の「2026-08-22」から年月日を取り出す。空や書きかけなら null。 */
-function isoYmd(iso: string): Ymd | null {
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
-}
-
 /** 「2026年8月22日（土）」の形にする。曜日は世界時で数えるのでずれない。 */
 function formatDate(iso: string): string | null {
   const d = isoYmd(iso);
@@ -174,10 +156,10 @@ function comma(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-type Phase = "before" | "day" | "after";
+type Phase = EventPhase;
 
 const PHASES: { id: Phase; label: string; when: string }[] = [
-  { id: "before", label: "準備",       when: "告知 〜 前日" },
+  { id: "before", label: "オフ会まで", when: "告知 〜 前日" },
   { id: "day",    label: "当日",       when: "開催日" },
   { id: "after",  label: "ふりかえり", when: "翌日 〜 次の告知" },
 ];
@@ -225,7 +207,7 @@ function Circle() {
   );
 }
 
-/* 準備の画面でならべる、やることの1行。 */
+/* オフ会までの画面でならべる、やることの1行。 */
 function TodoRow({ text, last }: { text: string; last?: boolean }) {
   return (
     <div
@@ -382,7 +364,7 @@ function AttendanceDialog({
   );
 }
 
-/* ── 準備の画面 ─────────────────────────────
+/* ── オフ会までの画面 ───────────────────────
    出欠はLINEのオープンチャットで決まる。前日24時までの表明を、
    役員が名簿から登録する運用。だからこの画面では参加・不参加を
    選ばせない。会員にとってここは「押すところ」ではなく、
@@ -411,7 +393,7 @@ function BeforeScreen({
   const [editing, setEditing] = useState(false);
 
   /* 参加状況のポップアップを開いているかどうか。
-     （準備の画面でまず知りたいのは日にちと自分のすることなので、
+     （オフ会までの画面でまず知りたいのは日にちと自分のすることなので、
        名前の一覧は押したときだけ手前に出す） */
   const [showList, setShowList] = useState(false);
 
@@ -469,7 +451,7 @@ function BeforeScreen({
       </div>
 
       {/* 出欠そのものはLINEで決まるので、この画面に残る操作は
-          「誰が来るのか見る」だけ。準備の間はこれが一番知りたいこと。 */}
+          「誰が来るのか見る」だけ。オフ会までの間はこれが一番知りたいこと。 */}
       <div style={{ marginTop: 36 }}>
         <button
           type="button"
@@ -1000,6 +982,7 @@ function OverviewFields({
       ) : (
         <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
           保存すると、会員それぞれの端末から同じものが見られます。
+          開催日と開始の両方が入ると告知済みになり、画面が「オフ会まで」に変わります。
         </p>
       )}
     </div>
@@ -1055,13 +1038,9 @@ export default function MemberDraft() {
   };
 
   /* 今日の日付から、出す場面をきめる。ここが「会員に選ばせない」の中身。
-     基準にするのは手で入れた開催日。入れていなければ lib/data.ts のもの。 */
-  const autoPhase = useMemo<Phase>(() => {
-    const event = isoYmd(draft.date) ?? parseJpDate(BASE_DATE_TEXT);
-    // 開催日が読み取れないときだけ、判定をあきらめて「準備」を出す。
-    if (!event) return "before";
-    return phaseFromDays(daysBetween(jstYmd(nowMs), event));
-  }, [nowMs, draft.date]);
+     見るのは手で入れた概要だけ。開催日と開始時刻の両方が入って「告知済み」、
+     それまでは前の回のふりかえりが続く（決まりは lib/eventOverview.ts）。 */
+  const autoPhase = useMemo<Phase>(() => eventPhase(draft, jstYmd(nowMs)), [nowMs, draft]);
 
   /* 会員名簿の名前と、今回の回の参加状況。
      どちらも画面に出てから読みにいく（描く前に読むと食い違いが出る）。 */
