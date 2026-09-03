@@ -750,7 +750,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 .md-step-label {
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.04em;
   color: #8B8E94;
 }
 /* 済んだ場面：薄く塗る */

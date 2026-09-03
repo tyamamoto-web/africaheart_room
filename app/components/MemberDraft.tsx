@@ -30,14 +30,13 @@
      lib/eventOverview.ts はそのまま使える。
 
    【切り替えについて】
-     「前奏 → 本番 → 余韻」は、今日の日付と概要を見て
+     「オフ会まで → 当日 → ふりかえり」は、今日の日付と概要を見て
      ひとりでに決まる。会員は何も選ばない。ここが案の要。
-       前奏 … 告知が済んでいて、開催日の前日まで
-       本番 … 開催日
-       余韻 … 開催日の翌日から、次の回が告知されるまで
-     名前はカラオケの画面に出る「前奏」から取った。曲が始まる前・歌っている間・
-     歌い終わったあとの静けさ、の三つに、オフ会の前・当日・あとを重ねている。
-     「フェーズ」「段階」のような言葉は使わない。
+       オフ会まで … 告知が済んでいて、開催日の前日まで
+       当日       … 開催日
+       ふりかえり … 開催日の翌日から、次の回が告知されるまで
+     名前は会員がふだん使う言葉のまま。比喩や「フェーズ」「段階」のような
+     言葉は使わない（凝った名前は、かえって分かりにくくなる）。
      「告知が済んだ」は、開催日と開始時刻の両方が入ったとき。
      判定そのものは lib/eventOverview.ts の eventPhase にある。
 
@@ -171,12 +170,12 @@ function comma(digits: string): string {
 
 type Phase = EventPhase;
 
-/* 三つの場面の名前。カラオケの「前奏」になぞらえて、前・当日・あとを
-   2文字ずつでそろえている。when は範囲の説明で、名前だけで迷わないための添え。 */
+/* 三つの場面の名前。会員がふだん使う言葉のままにしてある。
+   when は範囲の説明で、名前だけで迷わないための添え。 */
 const PHASES: { id: Phase; label: string; when: string }[] = [
-  { id: "before", label: "前奏", when: "告知 〜 前日" },
-  { id: "day",    label: "本番", when: "開催日" },
-  { id: "after",  label: "余韻", when: "翌日 〜 次の告知" },
+  { id: "before", label: "オフ会まで", when: "告知 〜 前日" },
+  { id: "day",    label: "当日",       when: "開催日" },
+  { id: "after",  label: "ふりかえり", when: "翌日 〜 次の告知" },
 ];
 
 /* 実際のデータが入る場所を示す帯。中身を作らずに、形だけを見せるためのもの。 */
@@ -222,7 +221,7 @@ function Circle() {
   );
 }
 
-/* 前奏の画面でならべる、やることの1行。 */
+/* オフ会までの画面でならべる、やることの1行。 */
 function TodoRow({ text, last }: { text: string; last?: boolean }) {
   return (
     <div
@@ -427,7 +426,7 @@ function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null 
   );
 }
 
-/* ── 前奏の画面（告知 〜 前日）───────────────
+/* ── オフ会までの画面（告知 〜 前日）───────────
    出欠はLINEのオープンチャットで決まる。前日24時までの表明を、
    役員が名簿から登録する運用。だからこの画面では参加・不参加を
    選ばせない。会員にとってここは「押すところ」ではなく、
@@ -456,7 +455,7 @@ function BeforeScreen({
   const [editing, setEditing] = useState(false);
 
   /* 参加状況のポップアップを開いているかどうか。
-     （前奏の画面でまず知りたいのは日にちと自分のすることなので、
+     （オフ会までの画面でまず知りたいのは日にちと自分のすることなので、
        名前の一覧は押したときだけ手前に出す） */
   const [showList, setShowList] = useState(false);
 
@@ -514,7 +513,7 @@ function BeforeScreen({
       </div>
 
       {/* 出欠そのものはLINEで決まるので、この画面に残る操作は
-          「誰が来るのか見る」だけ。前奏の間はこれが一番知りたいこと。 */}
+          「誰が来るのか見る」だけ。オフ会までの間はこれが一番知りたいこと。 */}
       <div style={{ marginTop: 36 }}>
         <button
           type="button"
@@ -1045,7 +1044,7 @@ function OverviewFields({
       ) : (
         <p style={{ gridColumn: "1 / -1", margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
           保存すると、会員それぞれの端末から同じものが見られます。
-          開催日と開始の両方が入ると告知済みになり、画面が「前奏」に変わります。
+          開催日と開始の両方が入ると告知済みになり、画面が「オフ会まで」に変わります。
         </p>
       )}
     </div>
@@ -1229,8 +1228,7 @@ export default function MemberDraft() {
                 {/* 今日の日付で選ばれたのがどれかを、小さな灯りで示す（札は貼らない）。
                     本番にはこの切り替えごと無く、枠の中の帯が同じことを伝える。 */}
                 {isToday && <span className="md-live" aria-hidden="true" />}
-                {/* 2文字の名前なので、少しだけ字間をあけて落ち着かせる */}
-                <span style={{ letterSpacing: "0.08em" }}>{p.label}</span>
+                <span>{p.label}</span>
                 {/* いつの場面かの説明。狭い画面では globals.css で隠す（無くても意味は通る） */}
                 <span
                   className="md-tab-when"
