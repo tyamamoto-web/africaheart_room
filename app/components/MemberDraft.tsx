@@ -891,15 +891,9 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
 function DayScreen({ attendeeCount }: { attendeeCount: number }) {
   return (
     <>
-      {/* 部屋割と当日の流れは一体なので、ひとつの表にまとめてある */}
+      {/* 部屋割と当日の流れは一体なので、ひとつの表にまとめてある。
+          次のコマも表に載るので、「このあと」のような別の欄は置かない。 */}
       <RoomPlan attendeeCount={attendeeCount} />
-
-      <div style={{ marginTop: 34, display: "flex", flexDirection: "column", gap: 14 }}>
-        <Label>このあと</Label>
-        {/* 次のコマの時間と部屋が入る場所 */}
-        <Bar w="72%" h={16} />
-        <Bar w="52%" h={16} />
-      </div>
 
       <div style={{ marginTop: 40 }}>
         <Button>歌う順番をきめる</Button>
