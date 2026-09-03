@@ -7,7 +7,7 @@
    作り直すための試作場所として使う。納得できる形になったら、
    ここの中身を既存のページへ移していく。
 
-   【いまのスコープ】左のメニューと、「会員画面（案）」と「設定 ＞ 会員名簿」だけ。
+   【いまのスコープ】左のメニューと、「Member Screen UI/UX」（会員画面の試作）と「設定 ＞ 会員名簿」だけ。
      MENU の label を書き換えれば名前は差し替わる。
      足すときは MENU に一行足すだけでよい（id は空いている番号を使う）。
 
@@ -54,11 +54,12 @@ type MenuNode = { id: string; label: string; children?: { id: string; label: str
 
 const MENU: MenuNode[] = [
   // 会員がスマホで見る画面の下書き（見た目だけ）。中身は app/components/MemberDraft.tsx。
-  { id: "m17", label: "会員画面（案）" },
+  // メニューの名前は英語表記（会員画面UIUX → Member Screen UI/UX）。
+  { id: "m17", label: "Member Screen UI/UX" },
   // 以前ここに「1〜15」という名前も中身も無い枠が並んでいたが、
   // 何も入っていない行がメニューを長くするだけだったので外した。
   // 項目を足すときは、ここに一行足す。id は "m1"〜"m9"・"m11"〜"m16" が空いている
-  // （"m10" は設定、"m17" は会員画面（案）が使っている）。
+  // （"m10" は設定、"m17" は Member Screen UI/UX が使っている）。
   {
     id: "m10", label: "設定",
     children: [
@@ -243,7 +244,7 @@ export default function PresidentRoom() {
           />
         </div>
 
-        {/* 本文。中身があるのは会員画面（案）と会員名簿だけで、ほかは意図的に空にしてある。 */}
+        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と会員名簿だけ。 */}
         {current === "m17" && <MemberDraft />}
         {current === "m10-roster" && <PresidentTable />}
 
