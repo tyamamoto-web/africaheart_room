@@ -1189,12 +1189,9 @@ export default function MemberDraft() {
     <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
 
       {/* ── 下書きを見てもらうための寄り道（本番にはこの切り替えは無い）── */}
-      <div>
-        <div
-          role="tablist"
-          aria-label="場面の切り替え（確認用）"
-          style={{ display: "flex", gap: 4, borderBottom: `1px solid ${LINE}` }}
-        >
+      {/* 下の線は外側に持たせ、3つの幅は globals.css の .md-tabs でそろえる */}
+      <div style={{ borderBottom: `1px solid ${LINE}` }}>
+        <div role="tablist" aria-label="場面の切り替え（確認用）" className="md-tabs">
           {PHASES.map((p) => {
             const on = p.id === phase;
             const isToday = p.id === autoPhase;
@@ -1210,8 +1207,8 @@ export default function MemberDraft() {
                   // 余白は globals.css の .md-tab が持つ（狭い画面で詰めるため、ここには書かない）
                   border: "none",
                   // 選んでいるところだけ差し色。下の線1本で示し、面は塗らない。
+                  // （外側の線との重なりは .md-tabs の margin-bottom が受け持つ）
                   borderBottom: `2px solid ${on ? ACC : "transparent"}`,
-                  marginBottom: -1,
                   // 地と、選んでいないときの色は globals.css の .md-tab が持つ。
                   // ここに書くとインライン指定が勝ってしまい、CSSのホバーが効かなくなる。
                   color: on ? ACC_TEXT : undefined,

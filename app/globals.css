@@ -444,6 +444,17 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
    地と、選んでいないときの文字色はここが持つ。選んでいるところだけ部品側が上書きする。
    （選んでいないときの色を部品側でインラインに書くと、下のホバー指定に勝ってしまう）
    #63666C は MemberDraft.tsx の SUB と同じ色。変えるときは両方そろえる。 */
+/* 3つを同じ幅にそろえる。幅は、いちばん幅の要るもの（ふりかえり＋説明）に合わせ、
+   ほかの2つもその幅にする。width を max-content にした grid の 1fr は、
+   いちばん大きい列の幅に全部そろう（横いっぱいには広げない）。 */
+.md-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  margin-bottom: -1px; /* 選んでいるものの2pxの線を、外側の1pxの線に重ねる */
+}
 .md-tab { padding: 12px 20px 13px; background: transparent; color: #63666C; transition: color .14s ease, border-color .14s ease; }
 /* 指で触る画面では、押したあとに色が残ってしまうので当てない。 */
 @media (hover: hover) and (pointer: fine) {
@@ -453,8 +464,9 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 /* スマホ：切り替えが1字ずつ折り返してしまうので、
    「告知〜前日」などの説明は隠して、名前だけにする。 */
 @media (max-width: 620px) {
-  /* 3つ並べて 375px に収まる幅（灯りのぶんも含めて）にしている */
-  .md-tab { padding-left: 11px; padding-right: 11px; }
+  /* スマホでは画面の幅を3等分する（375px で1つ約104px。灯り付きの「ふりかえり」が 101px） */
+  .md-tabs { width: auto; gap: 0; }
+  .md-tab { padding-left: 6px; padding-right: 6px; }
   .md-tab-when { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .md-tab { transition: none; } }
