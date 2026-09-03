@@ -1207,7 +1207,7 @@ export default function MemberDraft() {
                 onClick={() => setLook(p.id === autoPhase ? null : p.id)}
                 className="md-tab"
                 style={{
-                  padding: "12px 20px 13px",
+                  // 余白は globals.css の .md-tab が持つ（狭い画面で詰めるため、ここには書かない）
                   border: "none",
                   // 選んでいるところだけ差し色。下の線1本で示し、面は塗らない。
                   borderBottom: `2px solid ${on ? ACC : "transparent"}`,
