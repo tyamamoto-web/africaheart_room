@@ -1207,7 +1207,7 @@ export default function MemberDraft() {
                 onClick={() => setLook(p.id === autoPhase ? null : p.id)}
                 className="md-tab"
                 style={{
-                  padding: "14px 20px 15px",
+                  padding: "12px 20px 13px",
                   border: "none",
                   // 選んでいるところだけ差し色。下の線1本で示し、面は塗らない。
                   borderBottom: `2px solid ${on ? ACC : "transparent"}`,
@@ -1218,21 +1218,28 @@ export default function MemberDraft() {
                   fontSize: 15,
                   fontWeight: on ? 700 : 500,
                   cursor: "pointer",
+                  // 名前と説明を上下2段に分ける。横に並べると、どこまでが名前か
+                  // 一目で分かりにくかったため。
                   display: "flex",
-                  alignItems: "baseline",
-                  gap: 8,
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 5,
+                  textAlign: "left",
                   // 狭い画面で1字ずつ折り返さないようにする
                   whiteSpace: "nowrap",
                 }}
               >
-                {/* 今日の日付で選ばれたのがどれかを、小さな灯りで示す（札は貼らない）。
+                {/* 上段：名前。今日の日付で選ばれたものには小さな灯りを添える（札は貼らない）。
                     本番にはこの切り替えごと無く、枠の中の帯が同じことを伝える。 */}
-                {isToday && <span className="md-live" aria-hidden="true" />}
-                <span>{p.label}</span>
-                {/* いつの場面かの説明。狭い画面では globals.css で隠す（無くても意味は通る） */}
+                <span style={{ display: "flex", alignItems: "center", gap: 8, lineHeight: 1.3 }}>
+                  {isToday && <span className="md-live" aria-hidden="true" />}
+                  <span>{p.label}</span>
+                </span>
+                {/* 下段：いつの場面かの説明。名前より小さく、色も落とす。
+                    狭い画面では globals.css で隠す（無くても意味は通る） */}
                 <span
                   className="md-tab-when"
-                  style={{ fontSize: 12, fontWeight: 500, color: on ? ACC_TEXT : DIM, opacity: on ? 0.75 : 1 }}
+                  style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3, letterSpacing: "0.02em", color: on ? SUB : DIM }}
                 >
                   {p.when}
                 </span>
