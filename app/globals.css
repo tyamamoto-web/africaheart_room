@@ -697,6 +697,121 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .md-viewer { animation: none; }
   .md-viewer-btn { transition: none; }
 }
+
+/* 社長室：会員画面の、いまの位置を示す帯。
+   三つの場面を1本の線でつなぎ、いまの場面の点だけをオレンジに灯す。
+   済んだ点は薄く塗り、まだの点は輪だけ。線も、いまの点までをオレンジで引く。
+   色は MemberDraft.tsx の ACC / LINE / INK / DIM と同じもの。 */
+.md-rail {
+  position: relative;
+  padding-bottom: 22px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid #E4E5E8;
+}
+/* 線。点の中心どうしをつなぐので、左右を1列ぶんの半分だけ内側に寄せる。 */
+.md-rail-line {
+  position: absolute;
+  top: 5px;
+  left: calc(100% / 6);
+  right: calc(100% / 6);
+  height: 1px;
+}
+.md-rail-track { position: absolute; inset: 0; background: #E4E5E8; }
+.md-rail-fill {
+  position: absolute;
+  top: -0.5px;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(243, 112, 33, 0.35), #F37021);
+  transition: width .4s ease;
+}
+.md-rail-steps {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.md-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.md-step-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px solid #E4E5E8;
+  background: #FFFFFF;
+}
+.md-step-label {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: #8B8E94;
+}
+/* 済んだ場面：薄く塗る */
+.md-step.is-done .md-step-dot { border-color: transparent; background: rgba(243, 112, 33, 0.38); }
+.md-step.is-done .md-step-label { color: #63666C; }
+/* いまの場面：灯して、ゆっくり呼吸させる */
+.md-step.is-now .md-step-dot {
+  border-color: transparent;
+  background: #F37021;
+  box-shadow: 0 0 0 4px rgba(243, 112, 33, 0.14), 0 0 14px rgba(243, 112, 33, 0.65);
+  animation: md-breathe 2.6s ease-in-out infinite;
+}
+.md-step.is-now .md-step-label { color: #1B1C1E; font-weight: 700; }
+
+/* 日数の読み上げ。「D-23」を横に広い書体で大きく、その横に日本語で意味を添える。 */
+.md-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 22px;
+}
+.md-readout-num {
+  font-family: var(--font-readout), var(--font-inter), sans-serif;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: #1B1C1E;
+  font-variant-numeric: tabular-nums;
+}
+.md-readout-cap {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: #8B8E94;
+}
+/* 数字が無いとき（告知前）は、説明だけが残るので少し大きく、少し濃く。 */
+.md-readout-cap:only-child {
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: #63666C;
+}
+
+/* 切り替え（確認用）の、いまの場面に付ける小さな灯り。「今日」の札の代わり。 */
+.md-live {
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #F37021;
+  box-shadow: 0 0 0 3px rgba(243, 112, 33, 0.14), 0 0 8px rgba(243, 112, 33, 0.6);
+  animation: md-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes md-breathe {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(243, 112, 33, 0.14), 0 0 14px rgba(243, 112, 33, 0.65); }
+  50%      { box-shadow: 0 0 0 7px rgba(243, 112, 33, 0.08), 0 0 22px rgba(243, 112, 33, 0.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .md-step.is-now .md-step-dot, .md-live { animation: none; }
+  .md-rail-fill { transition: none; }
+}
 @media (prefers-reduced-motion: reduce) { .md-save { transition: none; } }
 
 /* 社長室：会員画面の下書きの、概要を入れる欄。

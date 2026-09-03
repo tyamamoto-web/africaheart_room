@@ -41,8 +41,16 @@
      「告知が済んだ」は、開催日と開始時刻の両方が入ったとき。
      判定そのものは lib/eventOverview.ts の eventPhase にある。
 
+     開いた瞬間にどこにいるかが分かるよう、枠の中のいちばん上に帯を置いた。
+     三つの場面を1本の線でつなぎ、いまの場面の点だけをオレンジに灯して、
+     その下に「D-23」のように開催日までの日数を大きく出す（当日は D-DAY、
+     過ぎたら D+〇）。「今日」のような札を貼らなくても、光っている点と数字で伝わる。
+     本番でもこの帯はそのまま使う。
+
      下に付いている切り替えは、下書きを見てもらうための寄り道。
-     今日の日付で選ばれたものには「今日」の印が付く。本番にこれは無い。
+     いまの場面には小さな灯りが付く。本番にこれは無い（帯が同じことを伝える）。
+     別の場面を見ているあいだは、帯の点はその場面に合わせ、日数は出さない
+     （その日にならないと本当の数が無いので、うそを出さない）。
 
    【色】
      グレーだけで組み、オレンジは「いま押すところ」「いまの場面」に
@@ -62,7 +70,9 @@ import {
   EventOverviewSetupError,
   readEventOverview,
   saveEventOverview,
+  daysBetween,
   eventPhase,
+  isAnnounced,
   isoYmd,
   type EventOverview,
   type EventPhase,
@@ -366,6 +376,54 @@ function AttendanceDialog({
       </div>
     </div>,
     document.body
+  );
+}
+
+/* ── いまの位置を示す帯（枠の中のいちばん上）───────────
+   三つの場面を1本の線でつなぎ、いまの場面の点だけをオレンジに灯す。
+   済んだ場面の点は薄く塗り、まだの場面の点は輪だけ。線も、いまの点までをオレンジで引く。
+   その下に「D-23」のように開催日までの日数を大きく出す。
+   「今日」のような札を貼らなくても、開いた瞬間にどこにいるかが分かるようにするため。
+   見た目は globals.css の .md-rail 〜 .md-readout。 */
+type Readout = { big: string; caption: string };
+
+/** 帯に出す日数。開催日までなら D-〇、当日は D-DAY、過ぎていれば D+〇。
+    告知前（日にちか開始時刻が無い）は数を出さず、待っている旨だけ。 */
+function readoutFor(v: EventOverview, today: Ymd): Readout {
+  const event = isoYmd(v.date);
+  if (!event || !isAnnounced(v)) return { big: "", caption: "次回の告知を待っています" };
+  const n = daysBetween(today, event);
+  if (n > 0) return { big: `D-${n}`, caption: `開催まで ${n}日` };
+  if (n === 0) return { big: "D-DAY", caption: "きょうが開催日" };
+  return { big: `D+${-n}`, caption: `開催から ${-n}日` };
+}
+
+function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null }) {
+  const idx = Math.max(PHASES.findIndex((p) => p.id === phase), 0);
+  return (
+    <div className="md-rail" role="group" aria-label="いまの場面">
+      <div className="md-rail-line" aria-hidden="true">
+        <span className="md-rail-track" />
+        <span className="md-rail-fill" style={{ width: `${(idx / (PHASES.length - 1)) * 100}%` }} />
+      </div>
+      <ol className="md-rail-steps">
+        {PHASES.map((p, i) => {
+          const state = i < idx ? "done" : i === idx ? "now" : "next";
+          return (
+            <li key={p.id} className={`md-step is-${state}`} aria-current={state === "now" ? "step" : undefined}>
+              <span className="md-step-dot" aria-hidden="true" />
+              <span className="md-step-label">{p.label}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {readout && (
+        <div className="md-readout">
+          {readout.big && <span className="md-readout-num">{readout.big}</span>}
+          <span className="md-readout-cap">{readout.caption}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1121,6 +1179,13 @@ export default function MemberDraft() {
   const [look, setLook] = useState<Phase | null>(null);
   const phase = look ?? autoPhase;
 
+  /* 帯の日数。いまの場面を見ているときだけ本当の数を出す。
+     別の場面を見ているあいだは出さない（その日の数はまだ無いので、うそを出さない）。 */
+  const readout = useMemo<Readout | null>(
+    () => (phase === autoPhase ? readoutFor(draft, jstYmd(nowMs)) : null),
+    [phase, autoPhase, draft, nowMs]
+  );
+
   return (
     <div style={{ padding: "48px 32px 96px", maxWidth: 760, margin: "0 auto" }}>
 
@@ -1161,26 +1226,11 @@ export default function MemberDraft() {
                   whiteSpace: "nowrap",
                 }}
               >
+                {/* 今日の日付で選ばれたのがどれかを、小さな灯りで示す（札は貼らない）。
+                    本番にはこの切り替えごと無く、枠の中の帯が同じことを伝える。 */}
+                {isToday && <span className="md-live" aria-hidden="true" />}
                 {/* 2文字の名前なので、少しだけ字間をあけて落ち着かせる */}
                 <span style={{ letterSpacing: "0.08em" }}>{p.label}</span>
-                {/* 今日の日付で選ばれたのがどれかを示す。狭い画面でもこれだけは残す。 */}
-                {isToday && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.04em",
-                      // 小さい字なので、薄く敷くと読みづらい。
-                      // ボタンと同じく「オレンジの面に濃い字」にして、はっきり見せる。
-                      color: INK,
-                      background: ACC,
-                      borderRadius: 999,
-                      padding: "2px 8px",
-                    }}
-                  >
-                    今日
-                  </span>
-                )}
                 {/* いつの場面かの説明。狭い画面では globals.css で隠す（無くても意味は通る） */}
                 <span
                   className="md-tab-when"
@@ -1207,6 +1257,9 @@ export default function MemberDraft() {
             boxShadow: "0 1px 3px rgba(27,28,30,0.04), 0 12px 32px -18px rgba(27,28,30,0.20)",
           }}
         >
+          {/* 開いた瞬間に、いまどこにいるかが分かる帯。本番でもこのまま。 */}
+          <TimingRail phase={phase} readout={readout} />
+
           {phase === "before" && (
             <BeforeScreen
               draft={draft}
