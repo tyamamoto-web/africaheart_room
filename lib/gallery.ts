@@ -122,9 +122,9 @@ export function publicUrl(path: string): string {
  * 動画も1コマ取り出して同じところに置くので、一覧では写真も動画も同じ扱いで並べられる。
  * thumbs はフォルダなので、一覧を読むときは自動で除かれる（フォルダは id=null で返るため）。
  */
-function thumbPathFor(sceneId: string, name: string): string {
+function thumbPathFor(sceneId: string, name: string, eventKey: string = GALLERY_EVENT): string {
   const base = name.replace(/\.[^.]+$/, "");
-  return `${GALLERY_EVENT}/${sceneId}/thumbs/${base}.jpg`;
+  return `${eventKey}/${sceneId}/thumbs/${base}.jpg`;
 }
 
 async function readText(res: Response): Promise<string> {
@@ -168,20 +168,20 @@ async function listPrefix(prefix: string): Promise<ListRow[]> {
   return Array.isArray(body) ? (body as ListRow[]) : [];
 }
 
-function toItem(sceneId: string, row: ListRow): GalleryItem {
+function toItem(sceneId: string, row: ListRow, eventKey: string = GALLERY_EVENT): GalleryItem {
   const ext = (row.name.split(".").pop() || "").toLowerCase();
   const mime = row.metadata?.mimetype || "";
   const kind: GalleryItem["kind"] =
     mime.startsWith("video/") || VIDEO_EXT.has(ext) ? "video" : "photo";
   const ts = Number(row.name.split("-")[0]);
-  const path = `${GALLERY_EVENT}/${sceneId}/${row.name}`;
+  const path = `${eventKey}/${sceneId}/${row.name}`;
   return {
     path,
     name: row.name,
     sceneId,
     kind,
     url: publicUrl(path),
-    thumbUrl: publicUrl(thumbPathFor(sceneId, row.name)),
+    thumbUrl: publicUrl(thumbPathFor(sceneId, row.name, eventKey)),
     takenAt: Number.isFinite(ts) && ts > 0 ? ts : 0,
     size: row.metadata?.size ?? 0,
   };
@@ -208,20 +208,21 @@ async function bucketMissing(): Promise<boolean> {
 }
 
 /**
- * 今回の回のぶんを全部読む。
+ * 指定した回のぶんを全部読む。eventKey はフォルダ名（例 "2026-08-22"）。
+ * 「前回の回」を見せたいとき（ふりかえりの画面）はこちらを使う。
  * Storageの一覧は1階層ずつしか返らないので、まずシーンのフォルダを調べ、
  * つぎに各フォルダの中身をまとめて取りにいく（フォルダの数だけ並列）。
  */
-export async function listGallery(): Promise<GalleryItem[]> {
-  const folders = await listPrefix(`${GALLERY_EVENT}/`);
+export async function listGalleryFor(eventKey: string): Promise<GalleryItem[]> {
+  const folders = await listPrefix(`${eventKey}/`);
   const sceneIds = folders.filter((r) => r.id === null).map((r) => r.name);
   const chunks = await Promise.all(
     sceneIds.map(async (sid) => {
-      const rows = await listPrefix(`${GALLERY_EVENT}/${sid}/`);
+      const rows = await listPrefix(`${eventKey}/${sid}/`);
       // Supabaseが空フォルダを保つために置く .emptyFolderPlaceholder は除く
       return rows
         .filter((r) => r.id !== null && !r.name.startsWith("."))
-        .map((r) => toItem(sid, r));
+        .map((r) => toItem(sid, r, eventKey));
     })
   );
   const items = chunks.flat();
@@ -230,6 +231,11 @@ export async function listGallery(): Promise<GalleryItem[]> {
     const s = sceneOrder(a.sceneId) - sceneOrder(b.sceneId);
     return s !== 0 ? s : a.takenAt - b.takenAt;
   });
+}
+
+/** 今回の回（lib/data.ts の nextEvent の日付のフォルダ）のぶんを全部読む。 */
+export function listGallery(): Promise<GalleryItem[]> {
+  return listGalleryFor(GALLERY_EVENT);
 }
 
 /* ── 書く ───────────────────────────────────────── */
@@ -461,7 +467,9 @@ export async function deleteFromGallery(item: GalleryItem): Promise<void> {
     throw new Error(`削除に失敗しました (${res.status})`);
   }
   try {
-    await removeObject(thumbPathFor(item.sceneId, item.name));
+    // どの回のものかは path の先頭にある（今回の回でないものを消すときも、その回の thumbs を消す）
+    const eventKey = item.path.split("/")[0] || GALLERY_EVENT;
+    await removeObject(thumbPathFor(item.sceneId, item.name, eventKey));
   } catch {
     /* 小さい画像が残っても表示には出ない */
   }

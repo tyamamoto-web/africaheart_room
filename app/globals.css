@@ -588,6 +588,115 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 @media (prefers-reduced-motion: reduce) {
   .md-scrim, .md-dialog { animation: none; }
 }
+
+/* 社長室：ふりかえりの写真と動画の1マス。押すと拡げて見る。
+   色は MemberDraft.tsx の SKEL / INK と同じもの。 */
+.md-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ECEDEF;
+  font-family: inherit;
+  cursor: pointer;
+}
+.md-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* 動画の印。押すのはマス全体なので、印そのものは触れないようにしておく。 */
+.md-tile-mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+/* 9マス目の「残り○件」。写真の上に暗い面を重ねて数字を置く。 */
+.md-tile-more {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(27, 28, 30, 0.55);
+  color: #FFFFFF;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.md-tile:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
+
+/* 1枚を拡げて見るところ。暗い面に1枚だけ置く。
+   一覧（md-scrim, z-index 80）の上に重なるので、それより手前にする。 */
+.md-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  background: rgba(27, 28, 30, 0.96);
+  color: #FFFFFF;
+  animation: md-fade .16s ease;
+}
+.md-viewer:focus { outline: none; }
+.md-viewer-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.md-viewer-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px 24px;
+}
+.md-viewer-body img,
+.md-viewer-body video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 100px);
+  max-height: calc(100dvh - 100px);
+  object-fit: contain;
+}
+.md-viewer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 22px;
+  background: transparent;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background-color .14s ease;
+}
+.md-viewer-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.12);
+}
+.md-viewer-nav.is-prev { left: 8px; }
+.md-viewer-nav.is-next { right: 8px; }
+@media (hover: hover) and (pointer: fine) {
+  .md-viewer-btn:hover { background: rgba(255, 255, 255, 0.2); }
+}
+.md-viewer-btn:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .md-viewer { animation: none; }
+  .md-viewer-btn { transition: none; }
+}
 @media (prefers-reduced-motion: reduce) { .md-save { transition: none; } }
 
 /* 社長室：会員画面の下書きの、概要を入れる欄。

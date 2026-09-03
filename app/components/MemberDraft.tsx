@@ -19,6 +19,10 @@
      そのまま概要として出る。押さずに「やめる」で閉じたぶんは残らない。
      この「編集」は役員だけのもので、本番の会員の画面には出さない。
 
+     もうひとつ、「ふりかえり」の写真と動画は、前回（8月22日・諏訪）に実際に
+     入れたものを Supabase Storage から読んで出している（lib/gallery.ts）。
+     マスを押すと拡げて見られ、「すべて見る」で場面ごとの一覧が開く。
+
    【入れた値がどこに残るか】
      「保存」を押したときに Supabase の event_overview に入る（lib/eventOverview.ts）。
      端末の中ではなく共有の置き場所なので、会員がそれぞれの端末から同じものを見られる。
@@ -44,7 +48,7 @@
      老眼が始まる年齢には小さすぎる。その差もここで見えるようにした。
    ============================================================ */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { eventInfo, eventStatus, nextEvent } from "@/lib/data";
 import {
@@ -57,6 +61,7 @@ import {
 } from "@/lib/eventOverview";
 import { readAttendance, setAttendance } from "@/lib/attendance";
 import { readRoster, rosterNames } from "@/lib/roster";
+import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
 
 /* ── 今日の日付から、出す場面をきめる ───────────────────────
    会員に選ばせないための、いちばん大事なところ。
@@ -551,21 +556,353 @@ function DayScreen() {
   );
 }
 
+/* ── 前回の写真と動画 ─────────────────────────
+   ふりかえりの画面に出す写真と動画。前回（8月22日・諏訪）に運営が入れたものを、
+   Supabase Storage の gallery/2026-08-22/ から読む（lib/gallery.ts）。
+   本番では「いま終わったばかりの回」の日付にする。ここは下書きなので、
+   諏訪の回に決め打ちしてある。
+
+   一覧用の小さい画像は、写真には全部あるが、動画には1本も無い
+   （動画は1本が100MBを超え、端末で1コマ取り出せなかった）。
+   だから動画のマスは、暗い面に再生の印を置くだけにしている。
+   9マスの見本には写真を先に出し、動画はそのあとに回す。暗いマスが
+   並ぶより、その日の様子が一目で伝わるほうを取った。 */
+const LAST_GALLERY = { key: "2026-08-22", place: "諏訪" };
+const PREVIEW_COUNT = 9; // 見本のマスの数（3列×3段）
+
+function PlayMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="11" fill="rgba(255,255,255,0.92)" />
+      <path d="M9.5 7.5 L17 12 L9.5 16.5 Z" fill={INK} />
+    </svg>
+  );
+}
+
+/* 写真か動画の1マス。more を渡すと「残り○件」のマスになる。 */
+function MediaTile({ item, more, onClick }: { item: GalleryItem; more?: number; onClick: () => void }) {
+  // 動画は一覧用の画像が無いので、はじめから何も読まない（原寸は動画ファイルなので img では描けない）。
+  const [src, setSrc] = useState(item.kind === "photo" ? item.thumbUrl : "");
+  const label = more ? `残り${more}件をすべて見る` : item.kind === "video" ? "動画を開く" : "写真を開く";
+  return (
+    <button
+      type="button"
+      className="md-tile"
+      onClick={onClick}
+      aria-label={label}
+      style={{ background: item.kind === "video" ? INK : SKEL }}
+    >
+      {src && (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          // 小さい画像が無ければ原寸に落とす。それも無ければ灰色のまま。
+          onError={() => setSrc(src === item.thumbUrl ? item.url : "")}
+        />
+      )}
+      {item.kind === "video" && !more && (
+        <span className="md-tile-mark">
+          <PlayMark />
+        </span>
+      )}
+      {more ? <span className="md-tile-more">+{more}</span> : null}
+    </button>
+  );
+}
+
+/* 場面（フォルダ）ごとにまとめる。listGalleryFor が場面順→時刻順に並べて返すので、
+   となり合うものを束ねるだけでよい。 */
+function groupByScene(items: GalleryItem[]): { sceneId: string; items: GalleryItem[] }[] {
+  const out: { sceneId: string; items: GalleryItem[] }[] = [];
+  for (const it of items) {
+    const last = out[out.length - 1];
+    if (last && last.sceneId === it.sceneId) last.items.push(it);
+    else out.push({ sceneId: it.sceneId, items: [it] });
+  }
+  return out;
+}
+
+/* 1枚を拡げて見る。暗い面に1枚だけ置き、左右で前後に動く。
+   置き場所は参加状況と同じく画面のいちばん外（document.body）。 */
+function MediaViewer({
+  items,
+  index,
+  onIndex,
+  onClose,
+}: {
+  items: GalleryItem[];
+  index: number;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+}) {
+  const item = items[index];
+  const boxRef = useRef<HTMLDivElement>(null);
+  const touchX = useRef<number | null>(null);
+  const [playFailed, setPlayFailed] = useState(false);
+
+  useEffect(() => {
+    setPlayFailed(false);
+  }, [item.path]);
+
+  useEffect(() => {
+    const go = (d: number) => {
+      const n = index + d;
+      if (n >= 0 && n < items.length) onIndex(n);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // 後ろに「すべて見る」の一覧が開いていても、それは閉じない（こちらだけ閉じる）。
+        // 同じ document に付いている一覧の Esc も止めるので Immediate のほう。
+        e.stopImmediatePropagation();
+        onClose();
+      } else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "ArrowRight") go(1);
+    };
+    // 捕捉の段で受けるので、後ろの一覧の Esc より先に届く。
+    document.addEventListener("keydown", onKey, true);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    boxRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [index, items.length, onIndex, onClose]);
+
+  const go = (d: number) => {
+    const n = index + d;
+    if (n >= 0 && n < items.length) onIndex(n);
+  };
+
+  return createPortal(
+    <div
+      ref={boxRef}
+      className="md-viewer"
+      role="dialog"
+      aria-modal="true"
+      aria-label={item.kind === "video" ? "動画" : "写真"}
+      tabIndex={-1}
+      onTouchStart={(e) => {
+        touchX.current = e.touches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={(e) => {
+        const s = touchX.current;
+        touchX.current = null;
+        if (s == null) return;
+        const d = (e.changedTouches[0]?.clientX ?? s) - s;
+        if (Math.abs(d) > 48) go(d < 0 ? 1 : -1);
+      }}
+    >
+      <div className="md-viewer-head">
+        <button type="button" className="md-viewer-btn" onClick={onClose} aria-label="閉じる">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5 L19 19 M19 5 L5 19" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+          </svg>
+        </button>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", opacity: 0.85 }}>
+          {sceneLabel(item.sceneId)}
+        </p>
+        <span style={{ minWidth: 44, textAlign: "right", fontSize: 13, opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>
+          {index + 1} / {items.length}
+        </span>
+      </div>
+
+      <div className="md-viewer-body">
+        {index > 0 && (
+          <button type="button" className="md-viewer-btn md-viewer-nav is-prev" onClick={() => go(-1)} aria-label="前へ">
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 4 L7 12 L15 20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+        {item.kind === "video" ? (
+          playFailed ? (
+            <div style={{ textAlign: "center", padding: "0 24px" }}>
+              <p style={{ margin: 0, fontSize: 14 }}>この端末では再生できない形式です</p>
+            </div>
+          ) : (
+            <video
+              key={item.path}
+              src={item.url}
+              controls
+              playsInline
+              preload="metadata"
+              onError={() => setPlayFailed(true)}
+            />
+          )
+        ) : (
+          <img key={item.path} src={item.url} alt="" />
+        )}
+        {index < items.length - 1 && (
+          <button type="button" className="md-viewer-btn md-viewer-nav is-next" onClick={() => go(1)} aria-label="次へ">
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 4 L17 12 L9 20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* 「すべて見る」で開く一覧。場面ごとに見出しを付けて3列に並べる。
+   枠の作りは参加状況のポップアップと同じ（md-scrim / md-dialog）。 */
+function GalleryDialog({
+  items,
+  onOpen,
+  onClose,
+}: {
+  items: GalleryItem[];
+  onOpen: (index: number) => void;
+  onClose: () => void;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    boxRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  const groups = groupByScene(items);
+  const photos = items.filter((i) => i.kind === "photo").length;
+
+  return createPortal(
+    <div className="md-scrim" role="presentation" onClick={onClose}>
+      <div
+        ref={boxRef}
+        className="md-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="md-gallery-title"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="md-dialog-head">
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+            <p id="md-gallery-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: INK }}>
+              今回の写真と動画
+            </p>
+            <button type="button" className="md-edit" onClick={onClose}>
+              閉じる
+            </button>
+          </div>
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: DIM }}>
+            写真 {photos}枚 ・ 動画 {items.length - photos}本
+          </p>
+        </div>
+
+        <div className="md-dialog-body">
+          {groups.map((g) => (
+            <div key={g.sceneId} style={{ marginTop: 18 }}>
+              <Label>{sceneLabel(g.sceneId)}</Label>
+              <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                {g.items.map((it) => (
+                  <MediaTile key={it.path} item={it} onClick={() => onOpen(items.indexOf(it))} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 /* ── ふりかえりの画面 ─────────────────────── */
 function AfterScreen() {
+  // null は「まだ読んでいる」。読めたら配列（0件もありうる）。
+  const [items, setItems] = useState<GalleryItem[] | null>(null);
+  const [error, setError] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const [view, setView] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    listGalleryFor(LAST_GALLERY.key)
+      .then((list) => {
+        if (alive) setItems(list);
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setItems([]);
+        setError(e instanceof Error ? e.message : "写真の読み込みに失敗しました");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 見本のマスは写真を先に。動画は一覧用の画像が無く、暗いマスにしかならないため。
+  const preview = useMemo(() => {
+    if (!items) return [];
+    return [...items.filter((i) => i.kind === "photo"), ...items.filter((i) => i.kind === "video")];
+  }, [items]);
+
+  const total = items?.length ?? 0;
+  const photos = items ? items.filter((i) => i.kind === "photo").length : 0;
+  // 9マスに収まらないときは、9マス目を「残り○件」にする。
+  const spill = total > PREVIEW_COUNT;
+  const shown = spill ? preview.slice(0, PREVIEW_COUNT - 1) : preview;
+  const moreTile = spill ? preview[PREVIEW_COUNT - 1] : null;
+  const rest = spill ? total - (PREVIEW_COUNT - 1) : 0;
+
+  const closeAll = useCallback(() => setShowAll(false), []);
+  const closeView = useCallback(() => setView(null), []);
+
+  const d = isoYmd(LAST_GALLERY.key);
+  const when = d ? `${d.m}月${d.d}日` : LAST_GALLERY.key;
+
   return (
     <>
-      <Label>今回の写真と動画</Label>
-
-      {/* 写真が並ぶ場所。3列に並ぶことだけが分かればよい。 */}
-      <div
-        aria-hidden="true"
-        style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}
-      >
-        {Array.from({ length: 9 }, (_, i) => (
-          <span key={i} style={{ display: "block", aspectRatio: "1 / 1", borderRadius: 8, background: SKEL }} />
-        ))}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+        <Label>今回の写真と動画</Label>
+        {total > 0 && (
+          <button type="button" className="md-edit" onClick={() => setShowAll(true)}>
+            すべて見る
+          </button>
+        )}
       </div>
+
+      {items === null ? (
+        // 読んでいる間は、これまでどおり灰色の枠を出しておく（形は同じなので画面が跳ねない）。
+        <div
+          aria-hidden="true"
+          style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}
+        >
+          {Array.from({ length: PREVIEW_COUNT }, (_, i) => (
+            <span key={i} style={{ display: "block", aspectRatio: "1 / 1", borderRadius: 8, background: SKEL }} />
+          ))}
+        </div>
+      ) : total === 0 ? (
+        <p style={{ margin: "16px 0 0", fontSize: 14, lineHeight: 1.9, color: error ? ACC_TEXT : SUB }}>
+          {error || "まだ写真が入っていません。"}
+        </p>
+      ) : (
+        <>
+          <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+            {shown.map((it) => (
+              <MediaTile key={it.path} item={it} onClick={() => setView(items.indexOf(it))} />
+            ))}
+            {moreTile && <MediaTile key="more" item={moreTile} more={rest} onClick={() => setShowAll(true)} />}
+          </div>
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: DIM }}>
+            {when} {LAST_GALLERY.place} ・ 写真 {photos}枚 ・ 動画 {total - photos}本
+          </p>
+        </>
+      )}
 
       <div style={{ marginTop: 40 }}>
         <Label>ひとこと</Label>
@@ -588,6 +925,11 @@ function AfterScreen() {
         <Label>次回のオフ会</Label>
         <Bar w="66%" h={16} />
       </div>
+
+      {showAll && items && <GalleryDialog items={items} onOpen={setView} onClose={closeAll} />}
+      {view !== null && items && items[view] && (
+        <MediaViewer items={items} index={view} onIndex={setView} onClose={closeView} />
+      )}
     </>
   );
 }
