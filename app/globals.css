@@ -826,55 +826,15 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .md-rail-fill { transition: none; }
 }
 
-/* 社長室：当日のタイムテーブル。線だけの表（会員名簿と同じ考え方）。
-   色は MemberDraft.tsx の INK / DIM / LINE / FACE / ACC_TEXT と同じもの。 */
-.md-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+/* 社長室：当日の部屋割の入力（枠ごとの時間・企画名・A室・B室）。
+   欄の見た目は概要の入力（.md-field）と同じ。名前は複数行なので textarea。 */
+.md-field--area {
+  height: auto;
+  min-height: 72px;
+  padding: 12px 14px;
+  line-height: 1.5;
+  resize: vertical;
 }
-.md-table th,
-.md-table td {
-  border: 1px solid #E4E5E8;
-  padding: 0 12px;
-  vertical-align: middle;
-}
-.md-table th {
-  height: 34px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #8B8E94;
-  background: #F6F7F8;
-}
-.md-table td {
-  height: 46px;
-  font-size: 16px;
-  color: #1B1C1E;
-  overflow-wrap: anywhere;
-}
-.md-table .md-table-time {
-  width: 92px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.md-table .md-table-x { width: 40px; padding: 0; text-align: center; }
-/* 打ち込むときのマス。枠は表の線が受け持つので、入力欄そのものは裸にする。 */
-.md-cell {
-  width: 100%;
-  height: 44px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 16px; /* これより小さいと iPhone で触ったときに画面が勝手に拡大する */
-  color: #1B1C1E;
-  outline: none;
-}
-.md-cell::placeholder { color: #B8BABF; }
-.md-table td:focus-within { box-shadow: inset 0 0 0 2px #B24809; }
 /* 行を消す。小さな×だけ。 */
 .md-rowx {
   display: inline-flex;
