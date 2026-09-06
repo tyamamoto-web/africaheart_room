@@ -36,6 +36,11 @@
      表の描き方は app/components/PlanTable.tsx（設定 ＞ アーカイブと共通）。
      保存先は共有の置き場所（lib/timetable.ts）なので、会員全員が同じものを見る。
 
+     「準備」の「このあとの準備」の3行は、9/6 から押せるようになっている。
+     押すと、そのことをする場所（設定 ＞ 宿題ルーレット／デュエット／プロフィール）が
+     そのまま開く。行と場所の対応を持っているのは app/components/PresidentRoom.tsx で、
+     この画面は機能の id（"homework" など）を渡すだけ。
+
    【入れた値がどこに残るか】
      「保存」を押したときに Supabase の event_overview に入る（lib/eventOverview.ts）。
      端末の中ではなく共有の置き場所なので、会員がそれぞれの端末から同じものを見られる。
@@ -264,21 +269,52 @@ function Circle() {
   );
 }
 
-/* 準備の画面でならべる、やることの1行。 */
-function TodoRow({ text, last }: { text: string; last?: boolean }) {
+/* 準備の画面でならべる、やることの1行。
+   9/6 から、行そのものが押すところになっている。押すと、そのことをする場所
+   （設定 の下の 宿題ルーレット・デュエット・プロフィール）がそのまま開く。
+   「やること」と「する場所」が離れていると、読んだあとにメニューから
+   探し直すことになるので、その一手間を無くした。
+
+   丸は「まだ済んでいない」の印で、押すところではない（印は付かない）。
+   押すのは行のぜんぶ。右の山形が「ここから先がある」と言う。
+   色はグレーのまま。この画面のオレンジは「いま押すところ」＝参加状況ひとつの
+   ためのもので、3行にも差すとそちらが目に入らなくなる。
+
+   間の取り方と大きさは前と同じ（.md-todo は参加状況の行 .md-row とそろえてある）。
+   下の線だけは、最後の行で消したいのでここでインラインに持たせている。 */
+function TodoRow({
+  text,
+  to,
+  onOpen,
+  last,
+}: {
+  text: string;
+  /** 開き先。app/components/memberFeatures.tsx の id（名前を変えても id は変えないこと）。 */
+  to: string;
+  onOpen: (featureId: string) => void;
+  last?: boolean;
+}) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        padding: "16px 0",
-        borderBottom: last ? "none" : `1px solid ${LINE}`,
-      }}
+    <button
+      type="button"
+      className="md-todo"
+      onClick={() => onOpen(to)}
+      style={{ borderBottom: last ? "none" : `1px solid ${LINE}` }}
     >
       <Circle />
-      <span style={{ fontSize: 16, color: INK, lineHeight: 1.6 }}>{text}</span>
-    </div>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 16, color: INK, lineHeight: 1.6 }}>{text}</span>
+      {/* 山形は小さく、字との間も詰める（左の丸との 14 より狭い 8）。
+          スマホの幅では字が1行に収まるかどうかが数pxで決まるので、
+          ここを広く取ると「宿題の曲を追加・確認する」の最後の1字だけが
+          下の行に落ちてしまう。gap は行ぜんぶに効くので、負の余白で戻している。 */}
+      <svg
+        width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={DIM}
+        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+        style={{ flexShrink: 0, marginLeft: -6 }}
+      >
+        <polyline points="9 6 15 12 9 18" />
+      </svg>
+    </button>
   );
 }
 
@@ -572,6 +608,7 @@ function BeforeScreen({
   attending,
   busyName,
   onToggleAttendance,
+  onOpenFeature,
   today,
 }: {
   draft: EventOverview;
@@ -582,6 +619,8 @@ function BeforeScreen({
   attending: Set<string>;
   busyName: string;
   onToggleAttendance: (name: string, on: boolean) => void;
+  /** 「このあとの準備」の行から、設定の下のその機能を開く。 */
+  onOpenFeature: (featureId: string) => void;
   /** いまの日本時間の年月日。予告を出すかどうかの判定に使う。 */
   today: Ymd;
 }) {
@@ -675,11 +714,12 @@ function BeforeScreen({
         <div style={{ marginTop: 6 }}>
           {/* 宿題は抽選で決まるので、会員がすることは
               候補を出すことと、決まった結果を見にくること。 */}
-          <TodoRow text="宿題の曲を追加・確認する" />
-          <TodoRow text="デュエットの相手をさがす" />
+          <TodoRow text="宿題の曲を追加・確認する" to="homework" onOpen={onOpenFeature} />
+          <TodoRow text="デュエットの相手をさがす" to="duet" onOpen={onOpenFeature} />
           {/* 会費は概要のほうに出るようになったので、ここには置かない。
-              代わりに、当日の会話のきっかけになるものを1つ。 */}
-          <TodoRow text="近況をひとこと書く" last />
+              代わりに、当日の会話のきっかけになるものを1つ。
+              近況はプロフィールの中にある欄なので、行き先はプロフィール。 */}
+          <TodoRow text="近況をひとこと書く" to="profile" onOpen={onOpenFeature} last />
         </div>
       </div>
 
@@ -1327,7 +1367,14 @@ function OverviewFields({
   );
 }
 
-export default function MemberDraft() {
+export default function MemberDraft({
+  onOpenFeature,
+}: {
+  /** 「このあとの準備」の行から、設定の下のその機能を開く。
+      渡すのは app/components/memberFeatures.tsx の id（"homework" など）だけで、
+      メニューのどの項目に当たるかは app/components/PresidentRoom.tsx が知っている。 */
+  onOpenFeature: (featureId: string) => void;
+}) {
   /* 時計。最初に描くときと、画面に出たあとの両方で同じ数え方をする。
      日付をまたいだまま開きっぱなしにされても、次に開いたときには正しくなる。 */
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -1548,6 +1595,7 @@ export default function MemberDraft() {
               attending={attending}
               busyName={busyName}
               onToggleAttendance={toggleAttendance}
+              onOpenFeature={onOpenFeature}
               today={jstYmd(nowMs)}
             />
           )}

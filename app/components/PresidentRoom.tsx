@@ -13,6 +13,8 @@
      足すときは MENU に一行足すだけでよい（id は空いている番号を使う）。
      ただし設定の下の5機能だけは app/components/memberFeatures.tsx の一覧から作っているので、
      名前を変える・機能を足すのはそちらで（会員メニューにも同時に反映される）。
+     会員ページの「このあとの準備」の3行からも、設定の下のその機能へ直に移れる
+     （9/6。下の openFeature が、機能の id をメニューの項目の id に読み替えている）。
 
    【色の方針】
    メニューはグレーだけで組む。オレンジはロゴが持っているので、
@@ -120,6 +122,22 @@ export default function PresidentRoom() {
   function choose(id: string) {
     setCurrent(id);
     setDrawer(false);
+  }
+
+  // 会員ページの「このあとの準備」の行から、設定の下のその機能へ移る（9/6）。
+  // 受け取るのは app/components/memberFeatures.tsx の id（"homework" など）で、
+  // メニューの項目の id は "m10-<id>"。この対応を知っているのはここだけにして、
+  // 会員ページ側（MemberDraft.tsx）はメニューの作りを知らないままにしてある。
+  // 設定も開いた状態にするので、移った先が左のメニューでも分かる。
+  // 押すのは長い画面の下のほうなので、上まで戻してから見せる。
+  function openFeature(featureId: string) {
+    const id = `m10-${featureId}`;
+    const parent = MENU.find((m) => m.children?.some((c) => c.id === id));
+    if (!parent) return; // id を書き換えないかぎり、ここには来ない
+    setCurrent(id);
+    setOpened((o) => (o.includes(parent.id) ? o : [...o, parent.id]));
+    setDrawer(false);
+    window.scrollTo({ top: 0 });
   }
 
   return (
@@ -265,7 +283,7 @@ export default function PresidentRoom() {
 
         {/* 本文。中身があるのは 会員ページ（会員がスマホで見る画面）と、
             設定の会員名簿・アーカイブ・会員メニューの5機能・アンケート。 */}
-        {current === "m17" && <MemberDraft />}
+        {current === "m17" && <MemberDraft onOpenFeature={openFeature} />}
         {current === "m10-roster" && <PresidentTable />}
         {current === "m10-archive" && <PresidentArchive />}
         {featureId !== "" && <PresidentFeature key={featureId} id={featureId} />}
