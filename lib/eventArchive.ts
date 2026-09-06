@@ -12,6 +12,12 @@
      ・lib/data.ts の karaokeRooms … 8/22（諏訪）の部屋割り表そのもの。
    このアプリで部屋割りを組んだのはこの3回で、それより前の回の記録は無い。
 
+   【枠の補足（note）】
+     集合・宿題・デュエットなどの枠に付いていた補足（退席の時刻、宿題のお題、
+     「Aルームに全員集合」など。lib/archive.ts の timeSlots の detail）は、
+     その枠の最後の行の note に入れ、表ではその行の下に小さく出す。
+     以前の /archive の画面に出ていたものと同じで、落とさずに残す。
+
    【部屋番号】
      A・B の記号に、当日の実際の部屋番号が分かっている回は「A 215」のように添える。
        7/26 … A=215／B=220（lib/archive.ts の note より。C室の番号は記録が無い）
@@ -26,7 +32,7 @@
 
 import { archivedEvents, type ArchivedEvent } from "./archive";
 import { karaokeRooms } from "./data";
-import type { TimetableRow } from "./timetable";
+import type { PlanRow } from "./timetable";
 
 /** 1回ぶんの記録。key は開催日（"2026-08-22"）で、並び順と見出しに使う。 */
 export type ArchiveEvent = {
@@ -34,7 +40,7 @@ export type ArchiveEvent = {
   place: string;
   /** その回のひとこと（欠席・部屋の使い方など）。無ければ出さない。 */
   note?: string;
-  rows: TimetableRow[];
+  rows: PlanRow[];
   participants: string[];
 };
 
@@ -55,9 +61,11 @@ function roomLabel(eventKey: string, room: RoomKey): string {
 
 /** lib/archive.ts の凍結コピー（時間割＋誰がどの部屋か）を、4列の表の行にする。 */
 function fromFrozen(ev: ArchivedEvent): ArchiveEvent {
-  const rows: TimetableRow[] = [];
+  const rows: PlanRow[] = [];
   for (const slot of ev.timeSlots) {
     const time = `${slot.startTime}〜${slot.endTime}`;
+    const note = slot.detail?.trim() || undefined; // 枠に付いていた補足（無ければ出さない）
+    const from = rows.length;
     if (slot.type === "rotation") {
       const assign = ev.rotations[slot.id] ?? {};
       for (const room of ROOM_ORDER) {
@@ -69,6 +77,8 @@ function fromFrozen(ev: ArchivedEvent): ArchiveEvent {
       // 集合・宿題・デュエット・ラストソング・片付けは全員で1部屋
       rows.push({ time, room: roomLabel(ev.id, "A"), title: slot.label, names: [] });
     }
+    // 補足はその枠の最後の行に付ける（表では、その枠の下に出る）
+    if (note && rows.length > from) rows[rows.length - 1].note = note;
   }
   return {
     key: ev.id,
@@ -86,11 +96,16 @@ const suwa: ArchiveEvent = {
   place: "JOYJOY 諏訪インター店",
   note: "夏の歌宴 完全燃焼 in 諏訪。カラオケは12:00〜17:40で、そのあと焼肉と花火。",
   participants: karaokeRooms.attendees,
-  rows: karaokeRooms.slots.flatMap((s): TimetableRow[] =>
-    s.rooms && s.rooms.length > 0
-      ? s.rooms.map((r) => ({ time: s.time, room: roomLabel(SUWA_KEY, r.key), title: s.label, names: r.members }))
-      : [{ time: s.time, room: roomLabel(SUWA_KEY, karaokeRooms.allRoom), title: s.label, names: [] }]
-  ),
+  rows: karaokeRooms.slots.flatMap((s): PlanRow[] => {
+    const rows: PlanRow[] =
+      s.rooms && s.rooms.length > 0
+        ? s.rooms.map((r) => ({ time: s.time, room: roomLabel(SUWA_KEY, r.key), title: s.label, names: r.members }))
+        : [{ time: s.time, room: roomLabel(SUWA_KEY, karaokeRooms.allRoom), title: s.label, names: [] }];
+    // 枠の補足があれば最後の行に（8/22 はどの枠にも無い。入れれば自動で出る）
+    const note = s.detail?.trim() || undefined;
+    if (note) rows[rows.length - 1].note = note;
+    return rows;
+  }),
 };
 
 /** すべての回。新しいほうが先。 */

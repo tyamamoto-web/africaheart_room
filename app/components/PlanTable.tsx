@@ -15,12 +15,16 @@
      （コマ①を2部屋でやるときは、時間と企画が1つで、部屋と名前が2段になる）。
      名前が空の行は「全員」として出し、地の色を変える（過去の回の表と同じ扱い）。
      部屋番号は、出てきた順に色を当てる（1つめ・2つめ。3つめからは色なし）。
+     行にメモ（note。集合の枠の退席時刻や宿題のお題など、枠に付いていた補足）があれば、
+     その行の下に横いっぱいの1段で小さく出す。時間をつないだ枠の途中の行だと段を
+     はさめない（つなぎが崩れる）ので、そのときは名前のマスの中に出す。
 
    罫線・文字の大きさ・中央ぞろえは、過去の回の部屋割り表
    （app/components/KaraokeRooms.tsx）にそろえてある。
    ============================================================ */
 
-import type { TimetableRow } from "@/lib/timetable";
+import { Fragment } from "react";
+import type { PlanRow } from "@/lib/timetable";
 
 type RoomTone = { bg: string; fg: string };
 type Tone = {
@@ -71,7 +75,7 @@ function splitTime(time: string): [string, string] {
 
 /* 何行ぶんをつないで描くか。0 は「上の行がまとめて描いているので、この行では描かない」。 */
 type Span = { time: number; title: number };
-function spansOf(rows: TimetableRow[]): Span[] {
+function spansOf(rows: PlanRow[]): Span[] {
   const out: Span[] = rows.map(() => ({ time: 1, title: 1 }));
   let i = 0;
   while (i < rows.length) {
@@ -102,7 +106,7 @@ export default function PlanTable({
   variant,
   minWidth = 280, // スマホの枠の中（幅298px）に収まる大きさ。設定の画面ではもっと広く渡す
 }: {
-  rows: TimetableRow[];
+  rows: PlanRow[];
   /** 全員の人数。「全員（9名）」と出すのに使う。0なら人数は出さない。 */
   total: number;
   variant: "day" | "archive";
@@ -165,8 +169,14 @@ export default function PlanTable({
               const empty = !r.time.trim() && !r.room.trim() && !r.title.trim() && r.names.length === 0;
               const all = !empty && r.names.length === 0; // 名前が空 ＝ 全員で集まる行
               const rt = toneOf(r.room);
+              // 枠の補足。この行で時間のつなぎが終わるなら下に1段、途中なら名前のマスの中
+              const note = empty ? "" : (r.note ?? "").trim();
+              const groupEnds = i + 1 >= rows.length || spans[i + 1].time > 0;
+              const noteBelow = note !== "" && groupEnds;
+              const noteInCell = note !== "" && !groupEnds;
               return (
-                <tr key={i} style={all ? { background: T.all.bg } : undefined}>
+                <Fragment key={i}>
+                <tr style={all ? { background: T.all.bg } : undefined}>
                   {sp.time > 0 && (
                     <td
                       rowSpan={sp.time}
@@ -239,8 +249,31 @@ export default function PlanTable({
                         </p>
                       </>
                     )}
+                    {noteInCell && (
+                      <p style={{ margin: "4px 0 0", fontSize: 11, lineHeight: 1.5, textAlign: "center", color: T.sub, whiteSpace: "pre-line", wordBreak: "break-word" }}>
+                        {note}
+                      </p>
+                    )}
                   </td>
                 </tr>
+                {noteBelow && (
+                  <tr style={all ? { background: T.all.bg } : undefined}>
+                    <td
+                      colSpan={4}
+                      style={{
+                        padding: "0 12px 9px",
+                        fontSize: 11.5,
+                        lineHeight: 1.65,
+                        color: T.sub,
+                        whiteSpace: "pre-line",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {note}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>

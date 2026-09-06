@@ -38,6 +38,14 @@ export type TimetableRow = {
 
 export const blankTimetableRow = (): TimetableRow => ({ time: "", room: "", title: "", names: [] });
 
+/**
+ * 表（app/components/PlanTable.tsx）に出すときの行。TimetableRow に、行の下へ小さく添える
+ * メモ（note）を足したもの。メモは当日の部屋割には無く、ここにも保存しない。
+ * 設定 ＞ アーカイブの過去の回で、集合や宿題の枠に付いていた補足
+ * （退席の時刻、宿題のお題など。lib/archive.ts の detail）を出すのに使う。
+ */
+export type PlanRow = TimetableRow & { note?: string };
+
 function toNames(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim() !== "") : [];
 }
