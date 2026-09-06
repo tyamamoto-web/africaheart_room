@@ -105,6 +105,7 @@ import {
   splitNames,
   type TimetableRow,
 } from "@/lib/timetable";
+import { eventTeaser, showTeaser } from "@/lib/eventTeaser";
 import PlanTable from "@/app/components/PlanTable";
 
 /* ── 日付まわりの小道具 ───────────────────────
@@ -186,6 +187,16 @@ function formatDate(iso: string): string | null {
   if (!d) return null;
   const w = WEEK[new Date(Date.UTC(d.y, d.m - 1, d.d)).getUTCDay()];
   return `${d.y}年${d.m}月${d.d}日（${w}）`;
+}
+
+/** 「10月31日」と「（土）」に分ける。予告に使う。
+    年は付けない（そのすぐ上に、今回の「2026年」が大きく出ているため）。
+    曜日は日付から数えるので、手で書いて間違えることがない（formatDate と同じ数え方）。 */
+function shortDateParts(iso: string): { md: string; week: string } | null {
+  const d = isoYmd(iso);
+  if (!d) return null;
+  const w = WEEK[new Date(Date.UTC(d.y, d.m - 1, d.d)).getUTCDay()];
+  return { md: `${d.m}月${d.d}日`, week: `（${w}）` };
 }
 
 /** 4000 → 4,000。端末の設定で書き方が変わらないように、自前で入れる。 */
@@ -454,6 +465,94 @@ function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null 
   );
 }
 
+/* ── その次の回の予告 ───────────────────────
+   中身は lib/eventTeaser.ts。「準備」のいちばん下と、「ふりかえり」の
+   「次回のオフ会」のところの両方に出す。出してよいかの判定（今回より後で、
+   まだ来ていない日）は lib/eventTeaser.ts の showTeaser が持っていて、
+   出さないときは何も描かない。
+
+      いちばん下に置く。上の3つ（次回のオフ会 → 参加状況 → このあとの準備）は
+      「何の会か」「誰が来るのか」「自分は何をするのか」で1本につながっていて、
+      その途中に別の日付を入れると、今回の話を読んでいる間に次回を抱えることになる。
+      手紙を書き終えてから足す追伸と同じで、読み終えたあとに気づけばよい。
+
+      上との間は 40。やることの最後の行が下に16px持っていて、last なので線も
+      無いから、見た目では56px空く。上の間は36と44なので、この画面でいちばん広い
+      沈黙が、いちばん大きな話題の変わり目に来る。線は引かない（ここに1本引くと、
+      やることの4行目が切れたように見える）。
+
+      ここだけ中央に寄せる。この画面の文章はぜんぶ左ぞろえで、左の列は
+      「会員自身のこと」（自分の会・自分の出欠・自分のやること）が並ぶ場所。
+      予告は会員のすることではないので、列から外して真ん中に置く。
+      枠も地も線も足さずに「これは別の種類のもの」と言える、いちばん軽いやり方。
+
+      大きさと濃さは、別々の行に預ける。日付は26px＝いちばん上の「D-23」と同じ
+      大きさで、上が「この回まであと何日」、下が「そのつぎはこの日」と同じ声で言う。
+      ただし色は SUB なので、今回の 22px・太字・INK より軽い。大きいが、上には立たない。
+      会の名前は16pxのまま、この塊で唯一の濃い字にする。
+
+      オレンジは使わない。この画面のオレンジは「いま押すところ」「いまの場面」の
+      ためのもので、2か月先の会はそのどちらでもない。3か所目に差すと、
+      いま押してほしいところ（参加状況）が目に入りにくくなる。
+      ハロウィンらしさは、名前の字間を空けた組み方だけで出す（貼り紙の見出しのように）。
+      最後の1字のうしろにも字間が付くので、marginRight を同じぶん負にして
+      見た目の中心をそろえる。
+
+      まだ決まっていないことは、灰色の帯（Bar）ではなく言葉で言う。
+      帯は「ここに値が入る」という約束なので、決まっていないものに使うと嘘になる。
+*/
+function Teaser({ currentIso, today }: { currentIso: string; today: Ymd }) {
+  const teaser = showTeaser(eventTeaser, currentIso, today) ? eventTeaser : null;
+  const teaserDate = teaser ? shortDateParts(teaser.date) : null;
+  if (!teaser || !teaserDate) return null;
+  return (
+    <div style={{ marginTop: 40, textAlign: "center" }}>
+      <Label>予告</Label>
+
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* 日付。狭い端末では曜日だけが下に回れるよう、二つに分けてある。 */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "baseline",
+            justifyContent: "center",
+            columnGap: 8,
+            rowGap: 2,
+          }}
+        >
+          <span style={{ whiteSpace: "nowrap", fontSize: 26, lineHeight: 1.3, color: SUB }}>
+            {teaserDate.md}
+          </span>
+          <span style={{ whiteSpace: "nowrap", fontSize: 16, lineHeight: 1.6, color: DIM }}>
+            {teaserDate.week}
+          </span>
+        </div>
+
+        {/* 会の名前。この塊で唯一の濃い字で、唯一の字間を空けた行。 */}
+        <p
+          style={{
+            margin: 0,
+            marginRight: "-0.2em",
+            fontSize: 16,
+            fontWeight: 700,
+            lineHeight: 1.5,
+            letterSpacing: "0.2em",
+            color: INK,
+          }}
+        >
+          {teaser.title}
+        </p>
+
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: DIM }}>
+          <span style={{ whiteSpace: "nowrap" }}>時間と場所は、</span>
+          <span style={{ whiteSpace: "nowrap" }}>これから決めます。</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ── 準備の画面（日時確定 〜 開催前日）───────────
    出欠はLINEのオープンチャットで決まる。前日24時までの表明を、
    役員が名簿から登録する運用。だからこの画面では参加・不参加を
@@ -468,6 +567,7 @@ function BeforeScreen({
   attending,
   busyName,
   onToggleAttendance,
+  today,
 }: {
   draft: EventOverview;
   saving: boolean;
@@ -477,6 +577,8 @@ function BeforeScreen({
   attending: Set<string>;
   busyName: string;
   onToggleAttendance: (name: string, on: boolean) => void;
+  /** いまの日本時間の年月日。予告を出すかどうかの判定に使う。 */
+  today: Ymd;
 }) {
   /* 概要を書き換えているところかどうか。役員だけが使う。
      本番の会員の画面には、この「編集」は出さない。 */
@@ -493,6 +595,7 @@ function BeforeScreen({
     draft.rooms && `${draft.rooms}部屋`,
     draft.fee && `会費 ${comma(draft.fee)}円`,
   ].filter(Boolean).join(" ・ ");
+
 
   return (
     <>
@@ -574,6 +677,9 @@ function BeforeScreen({
           <TodoRow text="近況をひとこと書く" last />
         </div>
       </div>
+
+      {/* その次の回。読み終えたあとに気づけばよいので、いちばん下に置く。 */}
+      <Teaser currentIso={draft.date} today={today} />
     </>
   );
 }
@@ -1043,7 +1149,7 @@ function GalleryDialog({
 }
 
 /* ── ふりかえりの画面 ─────────────────────── */
-function AfterScreen() {
+function AfterScreen({ currentIso, today }: { currentIso: string; today: Ymd }) {
   // null は「まだ読んでいる」。読めたら配列（0件もありうる）。
   const [items, setItems] = useState<GalleryItem[] | null>(null);
   const [error, setError] = useState("");
@@ -1142,10 +1248,16 @@ function AfterScreen() {
         </div>
       </div>
 
-      <div style={{ marginTop: 42, display: "flex", flexDirection: "column", gap: 14 }}>
-        <Label>次回のオフ会</Label>
-        <Bar w="66%" h={16} />
-      </div>
+      {/* この回が終わってから、次の日時が決まるまでの間。
+          予告があればそれを出す。灰色の帯だけだと、次があること自体が伝わらない。 */}
+      {showTeaser(eventTeaser, currentIso, today) ? (
+        <Teaser currentIso={currentIso} today={today} />
+      ) : (
+        <div style={{ marginTop: 42, display: "flex", flexDirection: "column", gap: 14 }}>
+          <Label>次回のオフ会</Label>
+          <Bar w="66%" h={16} />
+        </div>
+      )}
 
       {showAll && items && <GalleryDialog items={items} onOpen={setView} onClose={closeAll} />}
       {view !== null && items && items[view] && (
@@ -1449,10 +1561,11 @@ export default function MemberDraft() {
               attending={attending}
               busyName={busyName}
               onToggleAttendance={toggleAttendance}
+              today={jstYmd(nowMs)}
             />
           )}
           {phase === "day"    && <DayScreen attendeeCount={attending.size} />}
-          {phase === "after"  && <AfterScreen />}
+          {phase === "after"  && <AfterScreen currentIso={draft.date} today={jstYmd(nowMs)} />}
         </div>
       </div>
 
