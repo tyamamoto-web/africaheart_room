@@ -23,8 +23,8 @@
      入れたものを Supabase Storage から読んで出している（lib/gallery.ts）。
      マスを押すと拡げて見られ、「すべて見る」で場面ごとの一覧が開く。
 
-     「当日」の部屋割（時間・企画名・A室とB室の顔ぶれ）も、役員が「編集」から手で入れる。
-     表の形は過去の回の部屋割り表（app/components/KaraokeRooms.tsx）と同じ。
+     「当日」の部屋割（時間｜部屋番号｜企画｜名前）も、役員が「編集」から手で入れる。
+     表の描き方は app/components/PlanTable.tsx（設定 ＞ アーカイブと共通）。
      保存先は共有の置き場所（lib/timetable.ts）なので、会員全員が同じものを見る。
 
    【入れた値がどこに残るか】
@@ -96,7 +96,7 @@ import {
   splitNames,
   type TimetableRow,
 } from "@/lib/timetable";
-import { EMPTY_ROOM_NUMBERS, getRoomNumbers, type RoomNumbers } from "@/lib/roomNumbers";
+import PlanTable from "@/app/components/PlanTable";
 
 /* ── 日付まわりの小道具 ───────────────────────
    場面の判定そのものは lib/eventOverview.ts（eventPhase）にある。
@@ -571,57 +571,30 @@ function BeforeScreen({
 
 /* ── 当日の画面 ───────────────────────────── */
 /* ── 部屋割（当日）────────────────────────────
-   表の形は、過去の回の部屋割り表（app/components/KaraokeRooms.tsx）と同じにしてある。
-     左が時間（開始・終了・企画名）、右がA室・B室（名前と人数）。
-     全員で集まる枠は、部屋の列をつないで1つにする。
-     A室・B室の見出しの下には、当日入れた実際の部屋番号が出る（lib/roomNumbers.ts）。
-   色だけは、この画面の白地に合わせて明るくしてある
-   （A室＝青、B室＝桃、全員で集まる枠＝琥珀、という色分けはあちらと同じ）。
+   列は 時間｜部屋番号｜企画｜名前 の4つ。
+   1行が「その時間に、その部屋で、何をして、誰がいるか」（lib/timetable.ts）。
+   コマを2部屋でやるときは、同じ時間の行を部屋のぶんだけ書く。
+   表の上では同じ時間の行がまとまり、企画も同じなら企画のマスもつながる。
+   名前が空の行は「全員」として出る（オープニングや合唱など）。
 
-   中身は役員が「編集」から手で入れる（時間・企画名・A室の名前・B室の名前）。
-   A室もB室も空の枠は「全員で集まる枠」として出る。
+   表そのものの描き方は app/components/PlanTable.tsx にあり、
+   設定 ＞ アーカイブの過去の回の表と同じ形（色だけ、この画面の白地に合わせてある）。
+
+   中身は役員が「編集」から手で入れる（時間・部屋番号・企画・名前）。
    保存先は共有の置き場所（lib/timetable.ts）。まだ何も無いときは空のマスを4行出す。
    この「編集」は役員だけのもので、本番の会員の画面には出さない。 */
-const ROOM_LIGHT = {
-  A: { bg: "rgba(90,150,230,0.10)", fg: "#2F6DB5" },
-  B: { bg: "rgba(255,120,180,0.10)", fg: "#B8336A" },
-} as const;
-const ALL_LIGHT = { bg: "rgba(245,197,66,0.14)", fg: "#8A6100" };
 const HAIR = `1px solid ${LINE}`;
-const ALL_ROOM = "A"; // 全員で集まるときに使う部屋（広いほう）。過去の回と同じ
 const EMPTY_PLAN_ROWS = 4;
 
-const thStyle: React.CSSProperties = {
-  padding: "7px 4px",
-  borderBottom: "1px solid #C9CBD0",
-  fontSize: 11,
-  fontWeight: 700,
-  textAlign: "center",
-  whiteSpace: "nowrap",
-  letterSpacing: "0.04em",
-};
-const tdStyle: React.CSSProperties = {
-  padding: "8px 4px",
-  borderTop: HAIR,
-  verticalAlign: "top",
-};
-
-/** 「13:20〜14:20」を開始と終了に分ける。区切りが無ければ全部を開始として出す。 */
-function splitTime(time: string): [string, string] {
-  const m = time.split(/〜|~|－|–|-/);
-  return [(m[0] ?? "").trim(), (m[1] ?? "").trim()];
-}
-
 /* 入力欄に出すための形。名前は「、」区切りの文字のまま持つ。 */
-type PlanDraft = { time: string; title: string; a: string; b: string };
-const toDraft = (r: TimetableRow): PlanDraft => ({ time: r.time, title: r.title, a: joinNames(r.a), b: joinNames(r.b) });
-const fromDraft = (d: PlanDraft): TimetableRow => ({ time: d.time, title: d.title, a: splitNames(d.a), b: splitNames(d.b) });
-const blankDraft = (): PlanDraft => ({ time: "", title: "", a: "", b: "" });
+type PlanDraft = { time: string; room: string; title: string; names: string };
+const toDraft = (r: TimetableRow): PlanDraft => ({ time: r.time, room: r.room, title: r.title, names: joinNames(r.names) });
+const fromDraft = (d: PlanDraft): TimetableRow => ({ time: d.time, room: d.room, title: d.title, names: splitNames(d.names) });
+const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "" });
 
 function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
-  // null は「まだ読んでいる」。読めたら配列（0枠もありうる）。
+  // null は「まだ読んでいる」。読めたら配列（0行もありうる）。
   const [rows, setRows] = useState<TimetableRow[] | null>(null);
-  const [nos, setNos] = useState<RoomNumbers>(EMPTY_ROOM_NUMBERS);
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<PlanDraft[]>([]);
   const [saving, setSaving] = useState(false);
@@ -636,12 +609,6 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
       .catch(() => {
         if (alive) setRows([]);
       });
-    // 当日の部屋番号。無ければ見出しは「A室」「B室」だけになる。
-    getRoomNumbers()
-      .then((n) => {
-        if (alive) setNos(n);
-      })
-      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -649,7 +616,7 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
 
   const startEdit = () => {
     const base = (rows ?? []).map(toDraft);
-    // 空なら空の枠を4つ。あれば末尾に空の枠を1つ足して、続きを打てるようにする。
+    // 空なら空の行を4つ。あれば末尾に空の行を1つ足して、続きを打てるようにする。
     setEdit(base.length ? [...base, blankDraft()] : Array.from({ length: EMPTY_PLAN_ROWS }, blankDraft));
     setError("");
     setEditing(true);
@@ -674,7 +641,7 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
 
   // 全員の人数。参加状況に入っていればそれ、無ければ表に出てくる名前の数。
   const seen = new Set<string>();
-  for (const r of rows ?? []) for (const n of [...r.a, ...r.b]) seen.add(n);
+  for (const r of rows ?? []) for (const n of r.names) seen.add(n);
   const total = attendeeCount > 0 ? attendeeCount : seen.size;
 
   const view: TimetableRow[] =
@@ -721,13 +688,13 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
       </div>
 
       {editing ? (
-        /* 打ち込む形。枠ごとに、時間・企画名・A室・B室。 */
+        /* 打ち込む形。1行ごとに、時間・部屋番号・企画・名前。 */
         <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
           {edit.map((d, i) => (
             <div key={i} style={{ padding: 14, border: HAIR, borderRadius: 12, display: "grid", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>{i + 1}つめの枠</span>
-                <button type="button" className="md-rowx" aria-label={`${i + 1}つめの枠を消す`} onClick={() => removeRow(i)}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>{i + 1}行目</span>
+                <button type="button" className="md-rowx" aria-label={`${i + 1}行目を消す`} onClick={() => removeRow(i)}>
                   <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
                   </svg>
@@ -738,32 +705,36 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
                   className="md-field"
                   value={d.time}
                   placeholder="12:00〜12:20"
-                  aria-label={`${i + 1}つめの枠の時間`}
+                  aria-label={`${i + 1}行目の時間`}
                   onChange={(e) => setField(i, "time", e.target.value)}
                 />
                 <input
                   className="md-field"
-                  value={d.title}
-                  placeholder="企画名"
-                  aria-label={`${i + 1}つめの枠の企画名`}
-                  onChange={(e) => setField(i, "title", e.target.value)}
+                  value={d.room}
+                  placeholder="部屋番号"
+                  aria-label={`${i + 1}行目の部屋番号`}
+                  onChange={(e) => setField(i, "room", e.target.value)}
                 />
               </div>
-              {(["a", "b"] as const).map((key) => (
-                <textarea
-                  key={key}
-                  className="md-field md-field--area"
-                  value={d[key]}
-                  rows={2}
-                  placeholder={`${key.toUpperCase()}室の名前（「、」で区切る）`}
-                  aria-label={`${i + 1}つめの枠の${key.toUpperCase()}室`}
-                  onChange={(e) => setField(i, key, e.target.value)}
-                />
-              ))}
+              <input
+                className="md-field"
+                value={d.title}
+                placeholder="企画"
+                aria-label={`${i + 1}行目の企画`}
+                onChange={(e) => setField(i, "title", e.target.value)}
+              />
+              <textarea
+                className="md-field md-field--area"
+                value={d.names}
+                rows={2}
+                placeholder="名前（「、」で区切る。空なら全員）"
+                aria-label={`${i + 1}行目の名前`}
+                onChange={(e) => setField(i, "names", e.target.value)}
+              />
             </div>
           ))}
           <button type="button" className="md-addrow" onClick={addRow}>
-            枠を追加
+            行を追加
           </button>
           <button type="button" className="md-save" disabled={saving} onClick={save}>
             {saving ? "保存しています" : "保存"}
@@ -772,115 +743,14 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
             <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>{error}</p>
           ) : (
             <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
-              A室もB室も空の枠は「全員で集まる枠」として出ます。何も入っていない枠は残りません。
-              保存すると、会員それぞれの端末から同じものが見られます。
+              名前が空の行は「全員」として出ます。同じ時間の行は、表では1つの時間にまとまります。
+              何も入っていない行は残りません。保存すると、会員それぞれの端末から同じものが見られます。
             </p>
           )}
         </div>
       ) : (
-        /* 表そのもの。狭い画面でも本文を横に押し出さないよう、この中だけで横に流す。 */
-        <div style={{ marginTop: 16, overflowX: "auto" }}>
-          <div style={{ border: HAIR, borderRadius: 10, overflow: "hidden", minWidth: 280 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-              <colgroup>
-                {/* 時間の列は「片付け・移動の準備」が1行で収まる幅にしてある */}
-                <col style={{ width: "36%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "32%" }} />
-              </colgroup>
-              <thead>
-                <tr style={{ background: FACE }}>
-                  <th style={{ ...thStyle, color: ACC_TEXT }}>時間</th>
-                  {(["A", "B"] as const).map((key) => (
-                    <th key={key} style={{ ...thStyle, color: ROOM_LIGHT[key].fg }}>
-                      <span style={{ display: "block" }}>{key}室</span>
-                      {/* 当日入れた実際の部屋番号。まだ無いあいだは何も出さない。 */}
-                      {nos[key] ? (
-                        <span
-                          style={{
-                            display: "block",
-                            margin: "3px auto 0",
-                            maxWidth: "100%",
-                            padding: "1px 6px",
-                            borderRadius: 6,
-                            background: WHITE,
-                            border: HAIR,
-                            color: INK,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            whiteSpace: "normal",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {nos[key]}
-                        </span>
-                      ) : null}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {view.map((r, i) => {
-                  const [startT, endT] = splitTime(r.time);
-                  const split = r.a.length > 0 || r.b.length > 0;
-                  const empty = !r.time && !r.title && !split; // まだ何も無いときの空のマス
-                  return (
-                    <tr key={i} style={split || empty ? undefined : { background: ALL_LIGHT.bg }}>
-                      <td style={{ ...tdStyle, textAlign: "center", height: empty ? 46 : undefined }}>
-                        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, lineHeight: 1.25, color: INK }}>{startT}</p>
-                        {endT && (
-                          <p style={{ margin: 0, fontSize: 11, lineHeight: 1.25, color: DIM }}>〜{endT}</p>
-                        )}
-                        {r.title && (
-                          <p
-                            style={{
-                              margin: "4px 0 0",
-                              fontSize: 10,
-                              fontWeight: 700,
-                              lineHeight: 1.35,
-                              color: split ? SUB : ALL_LIGHT.fg,
-                            }}
-                          >
-                            {r.title}
-                          </p>
-                        )}
-                      </td>
-
-                      {split ? (
-                        (["A", "B"] as const).map((key) => {
-                          const members = key === "A" ? r.a : r.b;
-                          return (
-                            <td key={key} style={{ ...tdStyle, borderLeft: HAIR, background: ROOM_LIGHT[key].bg }}>
-                              {members.map((m) => (
-                                <p
-                                  key={m}
-                                  style={{ margin: 0, fontSize: 12, fontWeight: 600, lineHeight: 1.4, textAlign: "center", color: INK }}
-                                >
-                                  {m}
-                                </p>
-                              ))}
-                              <p style={{ margin: "4px 0 0", fontSize: 10, fontWeight: 700, textAlign: "center", color: ROOM_LIGHT[key].fg }}>
-                                {members.length}名
-                              </p>
-                            </td>
-                          );
-                        })
-                      ) : empty ? (
-                        <td colSpan={2} style={{ ...tdStyle, borderLeft: HAIR }} />
-                      ) : (
-                        /* 全員で1部屋に集まる枠は、部屋の列をつないで1つにする */
-                        <td colSpan={2} style={{ ...tdStyle, borderLeft: HAIR, textAlign: "center", verticalAlign: "middle" }}>
-                          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: INK }}>
-                            全員{total > 0 ? `（${total}名）` : ""}で{ALL_ROOM}室
-                          </p>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div style={{ marginTop: 16 }}>
+          <PlanTable rows={view} total={total} variant="day" />
         </div>
       )}
     </div>
