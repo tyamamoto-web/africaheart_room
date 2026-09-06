@@ -39,6 +39,11 @@ import {
      赤紫（アプリの色）はこの表では使わない。60個ある記入欄のどこにでも出るため、
      いちばん目立つ色が「たまたま今さわっている欄」に付いてしまうので。
 
+   絞り込み（9/6 追加）：表の上で、4人それぞれについて4つの関わり方を押して選ぶ。
+     同じ人のなかで複数押せば「そのどれか」、人をまたいで押せば「そのどれにも当たる行」。
+     出す行を選ぶだけで、中身は何も変わらない。ほかの人の画面にも移らない（見方の話なので）。
+     行の番号は絞り込む前のままにしてある（同じ行がいつも同じ番号で呼べるように）。
+
    保存は lib/officerTable.ts（homework_result の id=6 を間借り）。
    文字は打ち終わってから少し待って自動保存。役割のプルダウンは押した時点で保存。
    ほかの人の変更は約6秒ごとに入ってくる。
@@ -95,6 +100,18 @@ const TABLE_CSS = `
 .rtbl select:focus { border-color:${T.cap} !important; box-shadow:0 0 0 3px rgba(51,48,42,0.10); }
 .rtbl .addbtn:hover:not(:disabled) { background:${T.cellHov}; border-color:${T.block}; }
 .rtbl .delbtn:hover { background:${T.cellHov}; color:${T.ink}; }
+.rtbl .fchip {
+  padding:5px 9px; border:1px solid ${T.rule}; border-radius:3px;
+  background:transparent; color:${T.cap};
+  font-size:10.5px; font-weight:500; letter-spacing:0.02em; line-height:1;
+  font-family:inherit; cursor:pointer; white-space:nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.rtbl .fchip:hover { background:${T.cellHov}; border-color:${T.block}; color:${T.ink}; }
+.rtbl .fchip:focus-visible, .rtbl .addbtn:focus-visible { outline:2px solid ${T.cap}; outline-offset:1px; }
+.rtbl .fgrid { display:grid; grid-template-columns:1fr; gap:14px 20px; }
+@media (min-width: 620px)  { .rtbl .fgrid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (min-width: 1420px) { .rtbl .fgrid { grid-template-columns:repeat(4, minmax(0,1fr)); } }
 `;
 
 /* 役割4種の見た目。言葉と意味は lib/raciDefs.ts のまま使い、色だけこの表で上書きする
@@ -234,6 +251,9 @@ export default function OfficerRoleTable() {
   const [err, setErr] = useState<string | null>(null);
   const [focusRow, setFocusRow] = useState<string | null>(null); // いま自分が書いている行
   const [more, setMore] = useState(false); // 右にまだ表が続くか
+  /* 絞り込み。人ごとに「この関わり方の行だけ出す」を持つ（何も入っていない人は絞らない）。
+     置き場所はこの画面のなかだけ。ほかの人の画面には影響しない（見方の話なので共有しない）。 */
+  const [filters, setFilters] = useState<Record<string, RaciRole[]>>({});
 
   const dataRef = useRef<OfficerTableData>({ columns: emptyColumns(), rows: [] }); // 保存はいつもこの手元の値を使う
   const pending = useRef(0); // 保存中の件数。0より大きいあいだは取り込みを止める
@@ -249,6 +269,18 @@ export default function OfficerRoleTable() {
     dataRef.current = next;
     setColumns(next.columns);
     setRows(next.rows);
+  }
+
+  /* 絞り込みの入り切り。同じ人のなかで押した分は「どれか」で足し合わせる。 */
+  function toggleFilter(personId: string, role: RaciRole) {
+    setFilters((prev) => {
+      const now = prev[personId] ?? [];
+      const next = now.includes(role) ? now.filter((r) => r !== role) : [...now, role];
+      const out = { ...prev };
+      if (next.length) out[personId] = next;
+      else delete out[personId];
+      return out;
+    });
   }
 
   async function run(key: string, work: () => Promise<unknown>) {
@@ -317,6 +349,8 @@ export default function OfficerRoleTable() {
   }
 
   function addRow() {
+    // 絞り込んだままだと、足した空の行はどの条件にも当たらず、その場で見えなくなる。
+    setFilters({});
     const row = emptyRow(newRowId());
     commit({ columns: dataRef.current.columns, rows: [...dataRef.current.rows, row] });
     void run(row.id, () => saveOfficerTableRow(row));
@@ -325,6 +359,7 @@ export default function OfficerRoleTable() {
   // 行と行のあいだに足す。どの行の「上」に入れるかで位置を決める。
   // どの行の＋を押しても上に入るので、いちばん上の行の前にも足せる（末尾は「行を追加」）。
   function insertRowBefore(beforeId: string) {
+    setFilters({}); // addRow と同じ理由（足した行が絞り込みで消えないように）
     const row = emptyRow(newRowId());
     const rows = dataRef.current.rows.slice();
     const at = rows.findIndex((r) => r.id === beforeId);
@@ -412,6 +447,23 @@ export default function OfficerRoleTable() {
     };
   }, [loaded, rows.length]);
 
+  /* 表に出す行。番号（No）は絞り込む前の並びのままにする。
+     絞り込むたびに1から振り直すと、同じ行が違う番号で呼ばれてしまうため。
+     ・同じ人のなかで複数選んだとき ＝ そのどれかに当たれば出す
+     ・人をまたいで選んだとき     ＝ そのどれにも当たる行だけ出す
+       （例：よしのすけが責任者で、なおかつ くるが担当者の行） */
+  const view = rows
+    .map((row, i) => ({ row, no: i + 1 }))
+    .filter(({ row }) =>
+      RACI_PEOPLE.every((p) => {
+        const want = filters[p.id];
+        if (!want || want.length === 0) return true;
+        const has = row.roles[p.id];
+        return has !== undefined && want.includes(has);
+      })
+    );
+  const filterOn = Object.keys(filters).length > 0;
+
   return (
     // 左5列＋RACI4人＋Noで横に長いので、広い画面では収まるところまで枠を広げる。
     <div className="rtbl px-4 pt-3 pb-8 mx-auto" style={{ maxWidth: 1240 }}>
@@ -439,6 +491,112 @@ export default function OfficerRoleTable() {
         {/* ふだんは何も出さない。保存に失敗したときだけ、その場で知らせる。 */}
         {err && <span style={{ fontSize: 11, letterSpacing: "0.02em", color: T.warn }}>{err}</span>}
       </div>
+
+      {/* ── 絞り込み ─────────────────────────────────
+          人ごとに、その人がどう関わる行だけを出す。
+          押していないあいだは何も絞らない（表はそのまま全部出る）。
+          色と太さは表の中の役割と同じにしてある。押している印を別の色で作ると、
+          「担当者の押しボタン」と「担当者の欄」が違うものに見えてしまうため。 */}
+      {loaded && rows.length > 0 && (
+        <div
+          style={{
+            border: `1px solid ${T.hair}`,
+            borderRadius: 4,
+            background: T.paper,
+            padding: "10px 12px 12px",
+            marginBottom: 10,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 9,
+            }}
+          >
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: T.cap }}>
+              絞り込み
+            </span>
+            {/* 絞っているあいだだけ、いま何行出ているかと、戻すところを出す。 */}
+            {filterOn && (
+              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: "0.02em",
+                    color: T.sub,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {view.length}行 / 全{rows.length}行
+                </span>
+                <button
+                  onClick={() => setFilters({})}
+                  className="addbtn"
+                  style={{
+                    background: T.paper,
+                    border: `1px solid ${T.rule}`,
+                    borderRadius: 3,
+                    padding: "5px 12px",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    color: T.ink,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  すべて表示
+                </button>
+              </span>
+            )}
+          </div>
+
+          {/* 4人の並び（列の数は上のCSS）。等しい幅の枠に入れて、押すところの
+              縦の線をそろえる。押し比べる表なので、人によって位置がずれないほうがよい。 */}
+          <div className="fgrid">
+            {RACI_PEOPLE.map((p) => {
+              const want = filters[p.id] ?? [];
+              return (
+                <div key={p.id}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.02em", color: T.ink }}>
+                    {p.name}
+                    <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: T.cap }}>
+                      {raciPersonSubLabel(p.role)}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                    {raciDefs.map((d) => {
+                      const on = want.includes(d.key);
+                      const ui = ROLE_UI[d.key];
+                      return (
+                        <button
+                          key={d.key}
+                          type="button"
+                          className="fchip"
+                          aria-pressed={on}
+                          title={`${p.name}が${d.label}の行だけを出す`}
+                          onClick={() => toggleFilter(p.id, d.key)}
+                          /* 押しているときだけ、表の中と同じ見た目にする（インラインが上のCSSに勝つ）。 */
+                          style={
+                            on
+                              ? { background: ui.bg, color: ui.fg, borderColor: ui.bd, fontWeight: ui.weight }
+                              : undefined
+                          }
+                        >
+                          {d.short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={{ position: "relative" }}>
         <div
@@ -555,7 +713,7 @@ export default function OfficerRoleTable() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => {
+              {view.map(({ row, no }) => {
                 const written = row.cells.some((c) => c.trim());
                 const aCount = Object.values(row.roles).filter((v) => v === "a").length;
                 const needsOwner = written && aCount !== 1;
@@ -583,7 +741,7 @@ export default function OfficerRoleTable() {
                           fontWeight: on ? 700 : 400,
                         }}
                       >
-                        {i + 1}
+                        {no}
                       </div>
                       {needsOwner && (
                         <div
@@ -610,7 +768,7 @@ export default function OfficerRoleTable() {
                           }
                           onFocus={() => startEdit(row.id)}
                           onBlur={() => flush(row.id)}
-                          label={`${i + 1}行目の${columns[ci] || `${ci + 1}つめの列`}`}
+                          label={`${no}行目の${columns[ci] || `${ci + 1}つめの列`}`}
                         />
                       </td>
                     ))}
@@ -638,7 +796,7 @@ export default function OfficerRoleTable() {
                               else delete next[p.id];
                               patchRow(row.id, { roles: next }, true);
                             }}
-                            aria-label={`${i + 1}行目の${p.name}さんの役割`}
+                            aria-label={`${no}行目の${p.name}さんの役割`}
                             style={{
                               width: "100%",
                               // 既定の見た目を切らないと、Safariが背景と枠をまとめて無視する
@@ -689,7 +847,7 @@ export default function OfficerRoleTable() {
                           onClick={() => insertRowBefore(row.id)}
                           disabled={!loaded}
                           className="delbtn"
-                          aria-label={`${i + 1}行目の上に行を足す`}
+                          aria-label={`${no}行目の上に行を足す`}
                           title="この行の上に行を足す"
                           style={{ ...rowIconBtn, fontSize: 12, cursor: loaded ? "pointer" : "default" }}
                         >
@@ -698,7 +856,7 @@ export default function OfficerRoleTable() {
                         <button
                           onClick={() => removeRow(row)}
                           className="delbtn"
-                          aria-label={`${i + 1}行目を消す`}
+                          aria-label={`${no}行目を消す`}
                           title="この行を消す"
                           style={{ ...rowIconBtn, fontSize: 13 }}
                         >
@@ -709,6 +867,28 @@ export default function OfficerRoleTable() {
                   </tr>
                 );
               })}
+
+              {/* 絞り込みで1行も残らなかったとき。空の表だけを出すと、
+                  読み込みに失敗したのか、当たる行が無いのかが分からないため。 */}
+              {view.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={columns.length + RACI_PEOPLE.length + 2}
+                    style={{
+                      ...tblTd,
+                      padding: "26px 12px",
+                      textAlign: "center",
+                      fontSize: 12,
+                      letterSpacing: "0.02em",
+                      color: T.cap,
+                    }}
+                  >
+                    {loaded
+                      ? "あてはまる行がありません。上の「すべて表示」で戻せます。"
+                      : "読み込んでいます"}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
