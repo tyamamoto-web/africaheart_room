@@ -8,7 +8,7 @@
 
    【いまのスコープ】左のメニューと、「会員ページ」（会員がスマホで見る画面）と
      「設定 ＞ 会員名簿・アーカイブ・会員メニューの5機能（デュエット／宿題ルーレット／
-     歌唱順ルーレット／プロフィール／ギャラリー）・アンケート」。
+     歌唱順ルーレット／プロフィール／ギャラリー）・アンケート・役員専用・役員専用2」。
      MENU の label を書き換えれば名前は差し替わる。
      足すときは MENU に一行足すだけでよい（id は空いている番号を使う）。
      ただし設定の下の5機能だけは app/components/memberFeatures.tsx の一覧から作っているので、
@@ -35,6 +35,10 @@ import MemberDraft from "@/app/components/MemberDraft";
 import PresidentArchive from "@/app/components/PresidentArchive";
 import PresidentFeature from "@/app/components/PresidentFeature";
 import PresidentSurvey from "@/app/components/PresidentSurvey";
+// 役員だけが使う2つ。9/6 に 管理画面 ＞ 役員専用・役員専用2 から場所を広げた（管理画面にも残してある）。
+import OfficerGate from "@/app/components/OfficerGate";
+import OfficerPlan from "@/app/components/OfficerPlan";
+import OfficerRoleTable from "@/app/components/OfficerRoleTable";
 import { features } from "@/app/components/memberFeatures";
 
 /* すべて色味を持たない中間色のグレー。
@@ -83,6 +87,13 @@ const MENU: MenuNode[] = [
       // 参加者アンケート。/survey と同じものを出す（app/components/PresidentSurvey.tsx）。
       // 9/6 に足した。TOPから /survey へのリンクが無くなったので、ここから開く。
       { id: "m10-survey", label: "アンケート" },
+      // 役員だけが使う2つ。9/6 に 管理画面 ＞ 役員専用・役員専用2 から、中身も見た目も
+      // 変えずにここへ広げた（管理画面のタブもそのまま残してある。どちらから開いても
+      // 書いたものは同じ置き場所に入る）。
+      // このTOPには鍵が無いので、ここから先を役員だけのものにしているのは、
+      // 中身の前に立つ合言葉（app/components/OfficerGate.tsx）ひとつだけ。
+      { id: "m10-officer",  label: "役員専用" },
+      { id: "m10-officer2", label: "役員専用2" },
     ],
   },
 ];
@@ -288,6 +299,8 @@ export default function PresidentRoom() {
         {current === "m10-archive" && <PresidentArchive />}
         {featureId !== "" && <PresidentFeature key={featureId} id={featureId} />}
         {current === "m10-survey" && <PresidentSurvey />}
+        {current === "m10-officer" && <OfficerGate><OfficerPlan /></OfficerGate>}
+        {current === "m10-officer2" && <OfficerGate><OfficerRoleTable /></OfficerGate>}
 
       </div>
     </div>
