@@ -8,7 +8,7 @@
 
    【いまのスコープ】左のメニューと、「Member Screen UI/UX」（会員画面の試作）と
      「設定 ＞ 会員名簿・アーカイブ・会員メニューの5機能（デュエット／宿題ルーレット／
-     歌唱順ルーレット／プロフィール／ギャラリー）」。
+     歌唱順ルーレット／プロフィール／ギャラリー）・アンケート」。
      MENU の label を書き換えれば名前は差し替わる。
      足すときは MENU に一行足すだけでよい（id は空いている番号を使う）。
      ただし設定の下の5機能だけは app/components/memberFeatures.tsx の一覧から作っているので、
@@ -32,6 +32,7 @@ import PresidentTable from "@/app/components/PresidentTable";
 import MemberDraft from "@/app/components/MemberDraft";
 import PresidentArchive from "@/app/components/PresidentArchive";
 import PresidentFeature from "@/app/components/PresidentFeature";
+import PresidentSurvey from "@/app/components/PresidentSurvey";
 import { features } from "@/app/components/memberFeatures";
 
 /* すべて色味を持たない中間色のグレー。
@@ -76,6 +77,9 @@ const MENU: MenuNode[] = [
       // 9/6 に会員メニューから場所を移した。並びと名前は app/components/memberFeatures.tsx のまま。
       // 中身は app/components/PresidentFeature.tsx（会員メニューと同じ部品を出すだけ）。
       ...features.map((f) => ({ id: `m10-${f.id}`, label: f.tab })),
+      // 参加者アンケート。/survey と同じものを出す（app/components/PresidentSurvey.tsx）。
+      // 9/6 に足した。TOPから /survey へのリンクが無くなったので、ここから開く。
+      { id: "m10-survey", label: "アンケート" },
     ],
   },
 ];
@@ -258,11 +262,13 @@ export default function PresidentRoom() {
           />
         </div>
 
-        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と、設定の会員名簿・アーカイブ・会員メニューの5機能。 */}
+        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と、
+            設定の会員名簿・アーカイブ・会員メニューの5機能・アンケート。 */}
         {current === "m17" && <MemberDraft />}
         {current === "m10-roster" && <PresidentTable />}
         {current === "m10-archive" && <PresidentArchive />}
         {featureId !== "" && <PresidentFeature key={featureId} id={featureId} />}
+        {current === "m10-survey" && <PresidentSurvey />}
 
       </div>
     </div>
