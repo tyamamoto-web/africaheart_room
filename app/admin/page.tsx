@@ -14,7 +14,6 @@ import {
 } from "@/lib/officerRaci";
 import { raciDefs, raciPersonSubLabel } from "@/lib/raciDefs";
 import { OFFICER_PASSCODE, OFFICER_UNLOCK_KEY } from "@/lib/officerGate";
-import PresidentGate from "@/app/components/PresidentGate";
 import PresidentRoom from "@/app/components/PresidentRoom";
 import {
   getOfficerTable, saveOfficerTableRow, saveOfficerTableColumns, deleteOfficerTableRow,
@@ -978,7 +977,7 @@ export default function AdminPage() {
   const [roomSaving,   setRoomSaving]   = useState(false);
   const [roomMsg,      setRoomMsg]      = useState<{ kind: "ok" | "err" | "setup"; text: string } | null>(null);
   // 管理画面のタブ（部屋割り・メンバー / 役員専用 / 役員専用2 / 社長室）。既定はいちばん左。
-  // 役員専用と役員専用2は合言葉を入れないと中身を出さない。役員専用2と社長室は中身がこれから決まる空のタブ。
+  // 役員専用と役員専用2は合言葉を入れないと中身を出さない。社長室はTOPページと同じ中身で、暗証番号は無い（9/6 に外した）。
   const [tab, setTab] = useState<"officer" | "officer2" | "president" | "admin">("admin");
   // 役員専用タブの解錠状態と、合言葉の入力欄。解錠はタブを閉じるまで保持する。
   const [unlocked, setUnlocked] = useState(false);
@@ -1620,13 +1619,9 @@ export default function AdminPage() {
       {tab === "officer2" && unlocked && <OfficerRoleTable />}
 
       {/* ── 社長室タブ ── */}
-      {/* パスワードを入れるまで中身は描かない。番号は役員専用の合言葉とは別。 */}
-      {/* 中身は「これからのTOPページの下書き」。ここで作り込んでから既存ページへ移す。 */}
-      {tab === "president" && (
-        <PresidentGate>
-          <PresidentRoom />
-        </PresidentGate>
-      )}
+      {/* 中身はTOPページ（app/page.tsx）と同じ。9/6 にここで作っていたものをTOPへ移し、
+          このタブにあった暗証番号（000）の画面は外した。 */}
+      {tab === "president" && <PresidentRoom />}
 
       {tab === "admin" && (
       <div className="px-4 pt-3 max-w-lg mx-auto flex flex-col gap-4">

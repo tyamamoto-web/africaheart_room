@@ -18,7 +18,7 @@ import {
    機能の中身は app/components/ の各ファイル
    （DuetFeature / HomeworkRoulette / SingingOrderRoulette / ProfileFeature / GalleryFeature）で、
    一覧は app/components/memberFeatures.tsx。9/6 までここに直接書いてあったものを
-   切り出しただけで、動きは変えていない。同じ5つを 管理画面 ＞ 社長室 ＞ 設定 からも出す。
+   切り出しただけで、動きは変えていない。同じ5つを TOP ＞ 設定 からも出す。
    機能を足すときは memberFeatures.tsx の features に1件足す（両方に出る）。
    ============================================================ */
 
