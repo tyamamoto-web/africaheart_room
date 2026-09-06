@@ -7,9 +7,13 @@
    作り直すための試作場所として使う。納得できる形になったら、
    ここの中身を既存のページへ移していく。
 
-   【いまのスコープ】左のメニューと、「Member Screen UI/UX」（会員画面の試作）と「設定 ＞ 会員名簿・アーカイブ」だけ。
+   【いまのスコープ】左のメニューと、「Member Screen UI/UX」（会員画面の試作）と
+     「設定 ＞ 会員名簿・アーカイブ・会員メニューの5機能（デュエット／宿題ルーレット／
+     歌唱順ルーレット／プロフィール／ギャラリー）」。
      MENU の label を書き換えれば名前は差し替わる。
      足すときは MENU に一行足すだけでよい（id は空いている番号を使う）。
+     ただし設定の下の5機能だけは app/components/memberFeatures.tsx の一覧から作っているので、
+     名前を変える・機能を足すのはそちらで（会員メニューにも同時に反映される）。
 
    【色の方針】
    メニューはグレーだけで組む。オレンジはロゴが持っているので、
@@ -28,6 +32,8 @@ import { useEffect, useState } from "react";
 import PresidentTable from "@/app/components/PresidentTable";
 import MemberDraft from "@/app/components/MemberDraft";
 import PresidentArchive from "@/app/components/PresidentArchive";
+import PresidentFeature from "@/app/components/PresidentFeature";
+import { features } from "@/app/components/memberFeatures";
 
 /* すべて色味を持たない中間色のグレー。
    以前は暖色寄りのグレーにしていたが、画面ではベージュに見えてしまうため、
@@ -67,6 +73,10 @@ const MENU: MenuNode[] = [
       { id: "m10-roster", label: "会員名簿" },
       // これまでのオフ会（タイムテーブルと参加者）。中身は app/components/PresidentArchive.tsx。
       { id: "m10-archive", label: "アーカイブ" },
+      // 会員メニューの5つの機能（デュエット／宿題ルーレット／歌唱順ルーレット／プロフィール／ギャラリー）。
+      // 9/6 に会員メニューから場所を移した。並びと名前は app/components/memberFeatures.tsx のまま。
+      // 中身は app/components/PresidentFeature.tsx（会員メニューと同じ部品を出すだけ）。
+      ...features.map((f) => ({ id: `m10-${f.id}`, label: f.tab })),
     ],
   },
 ];
@@ -75,6 +85,8 @@ export default function PresidentRoom() {
   const [current, setCurrent] = useState(MENU[0].id);
   const [opened,  setOpened]  = useState<string[]>([]); // 下の階層を開いている項目
   const [drawer,  setDrawer]  = useState(false);        // スマホでメニューを引き出しているか
+  // 設定の下の会員メニューの機能を選んでいるとき、その機能の id（"duet" など）。それ以外は空
+  const featureId = features.some((f) => `m10-${f.id}` === current) ? current.slice("m10-".length) : "";
 
   // 引き出している間は、後ろの画面が動かないようにする
   useEffect(() => {
@@ -247,10 +259,11 @@ export default function PresidentRoom() {
           />
         </div>
 
-        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と、設定の会員名簿・アーカイブ。 */}
+        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と、設定の会員名簿・アーカイブ・会員メニューの5機能。 */}
         {current === "m17" && <MemberDraft />}
         {current === "m10-roster" && <PresidentTable />}
         {current === "m10-archive" && <PresidentArchive />}
+        {featureId !== "" && <PresidentFeature key={featureId} id={featureId} />}
 
       </div>
     </div>
