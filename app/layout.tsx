@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Michroma } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -7,14 +7,8 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-/* 会員画面の「D-23」のような日数の読み上げにだけ使う、横に広い近未来的な書体。
-   本文には使わない（本文は Inter のまま）。ビルド時に取り込むので通信は増えない。 */
-const michroma = Michroma({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-readout",
-  display: "swap",
-});
+/* ここには以前 Michroma（--font-readout）があった。会員画面の「D-20」という
+   日数の読み上げだけに使っていた書体で、9/6 にその表示をやめたので外した。 */
 
 export const metadata: Metadata = {
   title: "アフリカハート",
@@ -46,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className={`${inter.variable} ${michroma.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>

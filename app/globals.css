@@ -731,30 +731,20 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 }
 .md-step.is-now .md-step-label { color: #1B1C1E; font-weight: 700; }
 
-/* 日数の読み上げ。「D-23」を横に広い書体で大きく、その横に日本語で意味を添える。 */
+/* 日数を添える一行（「開催まで 20日」）。
+   9/6 まではこの左に「D-20」を横に広い書体で大きく出していたが、
+   すぐ横の日本語が同じことを言っていたので数字のほうを外した。
+   それに使っていた .md-readout-num と、Michroma（--font-readout）も合わせて外している。
+   大きさと濃さは、以前「数字が無いとき」に使っていたもの（14px・#63666C）をそのまま使う。 */
 .md-readout {
   display: flex;
   align-items: baseline;
   gap: 12px;
   margin-top: 22px;
 }
-.md-readout-num {
-  font-family: var(--font-readout), var(--font-inter), sans-serif;
-  font-size: 26px;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  color: #1B1C1E;
-  font-variant-numeric: tabular-nums;
-}
 .md-readout-cap {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: #8B8E94;
-}
-/* 数字が無いとき（告知前）は、説明だけが残るので少し大きく、少し濃く。 */
-.md-readout-cap:only-child {
   font-size: 14px;
+  font-weight: 500;
   letter-spacing: 0.04em;
   color: #63666C;
 }

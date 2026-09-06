@@ -58,8 +58,10 @@
 
      開いた瞬間にどこにいるかが分かるよう、枠の中のいちばん上に帯を置いた。
      三つの場面を1本の線でつなぎ、いまの場面の点だけをオレンジに灯して、
-     その下に「D-23」のように開催日までの日数を大きく出す（当日は D-DAY、
-     過ぎたら D+〇）。「今日」のような札を貼らなくても、光っている点と数字で伝わる。
+     その下に「開催まで 20日」と日数を添える。「今日」のような札を貼らなくても、
+     光っている点とこの一行で伝わる。
+     （9/6 まではここに「D-20」を大きく出していたが、すぐ横の日本語が同じことを
+      言っていたので、数字のほうを外した）
      本番でもこの帯はそのまま使う。
 
      下に付いている切り替えは、下書きを見てもらうための寄り道。
@@ -420,20 +422,23 @@ function AttendanceDialog({
 /* ── いまの位置を示す帯（枠の中のいちばん上）───────────
    三つの場面を1本の線でつなぎ、いまの場面の点だけをオレンジに灯す。
    済んだ場面の点は薄く塗り、まだの場面の点は輪だけ。線も、いまの点までをオレンジで引く。
-   その下に「D-23」のように開催日までの日数を大きく出す。
+   その下に「開催まで 20日」と、日数を一行添える。
    「今日」のような札を貼らなくても、開いた瞬間にどこにいるかが分かるようにするため。
-   見た目は globals.css の .md-rail 〜 .md-readout。 */
-type Readout = { big: string; caption: string };
+   見た目は globals.css の .md-rail 〜 .md-readout。
 
-/** 帯に出す日数。開催日までなら D-〇、当日は D-DAY、過ぎていれば D+〇。
-    告知前（日にちか開始時刻が無い）は数を出さず、待っている旨だけ。 */
+   9/6 まではこの一行の左に「D-20」を大きく出していたが、すぐ横の日本語が
+   同じことを言っていたので数字のほうを外した（読むところが2つあると目が迷う）。 */
+type Readout = { caption: string };
+
+/** 帯に添える一行。開催日までの日数・当日・過ぎてからの日数。
+    告知前（日にちか開始時刻が無い）は、待っている旨だけ。 */
 function readoutFor(v: EventOverview, today: Ymd): Readout {
   const event = isoYmd(v.date);
-  if (!event || !isAnnounced(v)) return { big: "", caption: "次回の告知を待っています" };
+  if (!event || !isAnnounced(v)) return { caption: "次回の告知を待っています" };
   const n = daysBetween(today, event);
-  if (n > 0) return { big: `D-${n}`, caption: `開催まで ${n}日` };
-  if (n === 0) return { big: "D-DAY", caption: "きょうが開催日" };
-  return { big: `D+${-n}`, caption: `開催から ${-n}日` };
+  if (n > 0) return { caption: `開催まで ${n}日` };
+  if (n === 0) return { caption: "きょうが開催日" };
+  return { caption: `開催から ${-n}日` };
 }
 
 function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null }) {
@@ -457,7 +462,6 @@ function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null 
       </ol>
       {readout && (
         <div className="md-readout">
-          {readout.big && <span className="md-readout-num">{readout.big}</span>}
           <span className="md-readout-cap">{readout.caption}</span>
         </div>
       )}
@@ -486,8 +490,7 @@ function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null 
       予告は会員のすることではないので、列から外して真ん中に置く。
       枠も地も線も足さずに「これは別の種類のもの」と言える、いちばん軽いやり方。
 
-      大きさと濃さは、別々の行に預ける。日付は26px＝いちばん上の「D-23」と同じ
-      大きさで、上が「この回まであと何日」、下が「そのつぎはこの日」と同じ声で言う。
+      大きさと濃さは、別々の行に預ける。日付は26pxで、この画面でいちばん大きな和文。
       ただし色は SUB なので、今回の 22px・太字・INK より軽い。大きいが、上には立たない。
       会の名前は16pxのまま、この塊で唯一の濃い字にする。
 
