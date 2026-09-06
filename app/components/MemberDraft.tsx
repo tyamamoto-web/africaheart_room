@@ -153,10 +153,12 @@ const WHITE = "#FFFFFF";
                 「今日」の印）。そのままの色を使う。
      ACC_TEXT … 白地に字として置くとき。同じ色みのまま暗さだけ足したもの
                 （色相はどちらも22度でそろえてある）。
-     ACC_TINT … ごく薄く敷くとき。 */
+
+   ごく薄く敷くための ACC_TINT（rgba(243,112,33,0.09)）も持っていたが、
+   9/6 に当日の「あなたの部屋」の枠を外して、敷く場所が無くなったので外した。
+   また薄く敷きたくなったら、この値を戻すこと。 */
 const ACC      = "#F37021"; // エルメスオレンジそのもの（面に塗る用）
 const ACC_TEXT = "#B24809"; // 同じ色みの、白地でも薄いオレンジの上でも読める濃さ（字に使う用）
-const ACC_TINT = "rgba(243,112,33,0.09)";
 
 /* ── 開催の概要（手入力）───────────────────
    これまで開催日や場所は lib/data.ts に書いてあり、書き換えられるのは
@@ -784,26 +786,8 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
         </button>
       </div>
 
-      {/* 当日いちばん知りたいのは「自分がどの部屋か」。ここだけ大きく取る。 */}
-      <div
-        style={{
-          marginTop: 16,
-          padding: "34px 26px",
-          borderRadius: 16,
-          background: ACC_TINT,
-          display: "flex",
-          flexDirection: "column",
-          gap: 18,
-        }}
-      >
-        <span style={{ fontSize: 13, fontWeight: 700, color: ACC_TEXT, letterSpacing: "0.06em" }}>
-          あなたの部屋
-        </span>
-        {/* 部屋の記号が入る場所 */}
-        <Bar w={128} h={44} />
-        {/* 部屋番号が入る場所 */}
-        <Bar w={92} h={16} />
-      </div>
+      {/* ここには 9/6 まで、薄いオレンジの枠に「あなたの部屋」を大きく出していた。
+          誰がどの部屋かは下の表に出ているので外した（同じことを二度言わない）。 */}
 
       {editing ? (
         /* 打ち込む形。1行ごとに、時間・部屋番号・企画・名前。 */
