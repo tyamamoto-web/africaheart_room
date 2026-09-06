@@ -6,7 +6,7 @@
    管理画面 ＞ 社長室 で試作していた画面を、9/6 にそのままTOP（app/page.tsx）へ移した。
    管理画面の社長室タブにも同じものが出る（暗証番号は移したときに外した）。
 
-   【いまのスコープ】左のメニューと、「Member Screen UI/UX」（会員画面の試作）と
+   【いまのスコープ】左のメニューと、「TOPページ」（会員がスマホで見る画面）と
      「設定 ＞ 会員名簿・アーカイブ・会員メニューの5機能（デュエット／宿題ルーレット／
      歌唱順ルーレット／プロフィール／ギャラリー）・アンケート」。
      MENU の label を書き換えれば名前は差し替わる。
@@ -60,13 +60,14 @@ const SURFACE  = "#FFFFFF"; // 本文の面
 type MenuNode = { id: string; label: string; children?: { id: string; label: string }[] };
 
 const MENU: MenuNode[] = [
-  // 会員がスマホで見る画面の下書き（見た目だけ）。中身は app/components/MemberDraft.tsx。
-  // メニューの名前は英語表記（会員画面UIUX → Member Screen UI/UX）。
-  { id: "m17", label: "Member Screen UI/UX" },
+  // 会員がスマホで見る画面。中身は app/components/MemberDraft.tsx。
+  // 名前は 会員画面UIUX → Member Screen UI/UX → TOPページ（9/6）と変えてきた。
+  // 名前だけを変えていて、id の "m17" はそのまま（id は変えないこと）。
+  { id: "m17", label: "TOPページ" },
   // 以前ここに「1〜15」という名前も中身も無い枠が並んでいたが、
   // 何も入っていない行がメニューを長くするだけだったので外した。
   // 項目を足すときは、ここに一行足す。id は "m1"〜"m9"・"m11"〜"m16" が空いている
-  // （"m10" は設定、"m17" は Member Screen UI/UX が使っている）。
+  // （"m10" は設定、"m17" は TOPページ が使っている）。
   {
     id: "m10", label: "設定",
     children: [
@@ -262,7 +263,7 @@ export default function PresidentRoom() {
           />
         </div>
 
-        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と、
+        {/* 本文。中身があるのは TOPページ（会員がスマホで見る画面）と、
             設定の会員名簿・アーカイブ・会員メニューの5機能・アンケート。 */}
         {current === "m17" && <MemberDraft />}
         {current === "m10-roster" && <PresidentTable />}
