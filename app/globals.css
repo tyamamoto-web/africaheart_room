@@ -935,3 +935,51 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 }
 .pr-addbtn:hover { border-color: #9A9DA4; }
 .pr-addbtn:focus-visible { outline: 2px solid #35373C; outline-offset: 2px; }
+
+/* =========================================================
+   社長室：アーカイブ（PresidentArchive）
+   ---------------------------------------------------------
+   白を地に、グレーだけで組む。回ごとの見出しはボタンで、
+   押すと下に中身（タイムテーブルと参加者）が開く。
+   広い画面では表の右に参加者を置き、狭い画面では下に回す
+   （幅による切り替えはインラインに書くと効かないので、ここに置く）。
+   ========================================================= */
+.ar-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .14s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ar-head:hover { background: #F4F5F6; }
+}
+.ar-head:focus-visible { outline: 2px solid #35373C; outline-offset: -2px; }
+.ar-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  padding: 2px 18px 20px;
+  border-top: 1px solid #DFE1E4;
+  padding-top: 16px;
+}
+@media (min-width: 960px) {
+  .ar-body { grid-template-columns: minmax(0, 1fr) 224px; gap: 28px; }
+}
+.ar-name {
+  display: inline-block;
+  padding: 4px 11px;
+  border: 1px solid #DFE1E4;
+  border-radius: 999px;
+  background: #FFFFFF;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #1B1C1E;
+}
+@media (prefers-reduced-motion: reduce) { .ar-head { transition: none; } }

@@ -7,7 +7,7 @@
    作り直すための試作場所として使う。納得できる形になったら、
    ここの中身を既存のページへ移していく。
 
-   【いまのスコープ】左のメニューと、「Member Screen UI/UX」（会員画面の試作）と「設定 ＞ 会員名簿」だけ。
+   【いまのスコープ】左のメニューと、「Member Screen UI/UX」（会員画面の試作）と「設定 ＞ 会員名簿・アーカイブ」だけ。
      MENU の label を書き換えれば名前は差し替わる。
      足すときは MENU に一行足すだけでよい（id は空いている番号を使う）。
 
@@ -27,6 +27,7 @@
 import { useEffect, useState } from "react";
 import PresidentTable from "@/app/components/PresidentTable";
 import MemberDraft from "@/app/components/MemberDraft";
+import PresidentArchive from "@/app/components/PresidentArchive";
 
 /* すべて色味を持たない中間色のグレー。
    以前は暖色寄りのグレーにしていたが、画面ではベージュに見えてしまうため、
@@ -64,6 +65,8 @@ const MENU: MenuNode[] = [
     id: "m10", label: "設定",
     children: [
       { id: "m10-roster", label: "会員名簿" },
+      // これまでのオフ会（タイムテーブルと参加者）。中身は app/components/PresidentArchive.tsx。
+      { id: "m10-archive", label: "アーカイブ" },
     ],
   },
 ];
@@ -244,9 +247,10 @@ export default function PresidentRoom() {
           />
         </div>
 
-        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と会員名簿だけ。 */}
+        {/* 本文。中身があるのは Member Screen UI/UX（会員画面の試作）と、設定の会員名簿・アーカイブ。 */}
         {current === "m17" && <MemberDraft />}
         {current === "m10-roster" && <PresidentTable />}
+        {current === "m10-archive" && <PresidentArchive />}
 
       </div>
     </div>
