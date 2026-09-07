@@ -527,15 +527,21 @@ function AttendanceDialog({
                   ))}
                 </div>
 
+                {/* 締め切ったあとは、閉じたことを伝えるだけで終わらせない。
+                    都合が変わった人がどうすればよいのかまで書く。 */}
                 <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
-                  {closed
-                    ? "出欠の受付は終わりました。"
-                    : !me
-                      ? "上でお名前を選ぶと、出欠を出せます。"
-                      : mine
-                        ? "同じところをもう一度押すと、未回答に戻ります。"
-                        : "いまのところで構いません。"}
-                  {deadline && (closed ? `〆切は${deadline.text}でした。` : `${deadline.text}まで、何度でも変えられます。`)}
+                  {deadline && !deadline.open ? (
+                    `出欠の受付は、${deadline.text}で締め切りました。ご都合が変わったときは、役員までお知らせください。`
+                  ) : (
+                    <>
+                      {!me
+                        ? "上でお名前を選ぶと、出欠を出せます。"
+                        : mine
+                          ? "同じところをもう一度押すと、未回答に戻ります。"
+                          : "いまのところで構いません。"}
+                      {deadline && `${deadline.text}まで、何度でも変えられます。`}
+                    </>
+                  )}
                 </p>
 
                 {/* 押したのに保存できていないことに、気づけないままにしない。 */}
@@ -902,7 +908,7 @@ function BeforeScreen({
             </p>
             {deadline && (
               <p style={{ margin: "3px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
-                {deadline.open ? `${deadline.text}まで` : "出欠の受付は終わりました"}
+                {deadline.open ? `${deadline.text}まで` : "出欠の受付は締め切りました"}
               </p>
             )}
           </div>
