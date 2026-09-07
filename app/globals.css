@@ -515,6 +515,90 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 }
 .md-row:focus-visible { outline: 2px solid #B24809; outline-offset: -2px; border-radius: 6px; }
 
+/* ── 出欠席（9/7 から）──────────────────────
+   出欠は会員がそれぞれ自分で出す。出せるものは 参加・不参加・未定 の3つ。
+   3つは横に並べて、いま選んでいるものだけを塗る。選んでいないものは
+   地も枠も持たせない（押すところが3つ光って見えると、どれが自分の答えか
+   分からなくなるため）。
+
+   塗り分けは、色だけに頼らず、塗り方そのものを変えてある。
+     参加  … オレンジで塗りつぶす（この画面でいちばん出してほしい答え）
+     不参加… 濃い墨で塗りつぶす
+     未定  … 塗らずに、細い枠を二重にする（まだ決まっていない、を形で出す）
+   どれも中の文字は「参加」「不参加」「未定」と書いてあるので、
+   色が見えにくい人でも読み分けられる。 */
+.md-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.md-seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  border: 1px solid #E4E5E8;
+  border-radius: 10px;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: #8B8E94;
+  cursor: pointer;
+  transition: background-color .14s ease, border-color .14s ease, color .14s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .md-seg-btn[aria-pressed="false"]:hover:not(:disabled) { background: #F6F7F8; color: #1B1C1E; }
+}
+.md-seg-btn:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
+.md-seg-btn:disabled { cursor: default; opacity: .5; }
+.md-seg-btn.is-going[aria-pressed="true"]     { background: #F37021; border-color: #F37021; color: #FFFFFF; }
+.md-seg-btn.is-absent[aria-pressed="true"]    { background: #33363C; border-color: #33363C; color: #FFFFFF; }
+.md-seg-btn.is-undecided[aria-pressed="true"] { background: #FFFFFF; border-color: #1B1C1E; color: #1B1C1E; box-shadow: inset 0 0 0 1px #1B1C1E; }
+
+/* 一覧の中で、ほかの人のぶんを代わりに入れるときの小さいほう。 */
+.md-seg.is-mini { display: flex; gap: 4px; }
+.md-seg.is-mini .md-seg-btn { height: 32px; min-width: 46px; padding: 0 8px; border-radius: 8px; font-size: 12px; }
+
+/* 名簿から自分の名前を選ぶときの、名前ひとつ。 */
+.md-name {
+  padding: 9px 15px;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1B1C1E;
+  cursor: pointer;
+  transition: background-color .14s ease, border-color .14s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .md-name:hover { background: #F6F7F8; border-color: #8B8E94; }
+}
+.md-name:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
+
+/* みんなの一覧で、その人が出したものを示す小さな札。
+   押すところではないので、ボタンには見せない。 */
+.md-st {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  white-space: nowrap;
+}
+.md-st.is-going     { background: #FDF1E8; color: #B24809; }
+.md-st.is-absent    { background: #EDEEF0; color: #43464C; }
+.md-st.is-undecided { background: #FFFFFF; color: #63666C; box-shadow: inset 0 0 0 1px #E4E5E8; }
+
+/* 全体の内わけを、細い帯1本で出す。数字だけだと、いま何割そろったのかが
+   ひと目では分からないため。左から 参加・不参加・未定・未回答 の順。 */
+.md-bar { display: flex; width: 100%; height: 6px; border-radius: 999px; overflow: hidden; background: #ECEDEF; }
+.md-bar > span { display: block; height: 100%; transition: width .2s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .md-seg-btn, .md-name, .md-bar > span { transition: none; }
+}
+
 /* 会員画面「このあとの準備」の1行。押すと 設定 の該当する項目が開く。
    寸法と間の取り方は出欠席の行（.md-row）と同じ。下の線だけは、最後の行で
    消したいので MemberDraft.tsx の TodoRow がインラインで持つ（border: none を

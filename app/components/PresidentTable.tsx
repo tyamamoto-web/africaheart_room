@@ -7,7 +7,8 @@
    列の見出しも、中身のマスも、そのまま手で打ち込んで直せる。
 
    【1列目は名前】
-     1列目に入れた名前を、出欠席のチェックに使う（lib/attendance.ts）。
+     1列目に入れた名前が、そのまま出欠席の名前になる（lib/attendance.ts）。
+     会員は、この中から自分の名前を選んで出欠を出す。
      2列目から先は自由に増やしてよい（ふりがな・誕生月など）。
 
    【名前の元】
@@ -325,7 +326,7 @@ export default function PresidentTable() {
       </div>
 
       <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.9, color: "#8B8E94" }}>
-        1列目に入れた名前を、出欠席のチェックに使います（いま{nameCount}名）。
+        1列目に入れた名前が、出欠席の名前になります（いま{nameCount}名）。
       </p>
       <p
         aria-live="polite"

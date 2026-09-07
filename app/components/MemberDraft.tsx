@@ -101,7 +101,16 @@ import {
   type OverviewField,
   type Ymd,
 } from "@/lib/eventOverview";
-import { readAttendance, setAttendance } from "@/lib/attendance";
+import {
+  ATTENDANCE_LABEL,
+  ATTENDANCE_ORDER,
+  countAttendance,
+  readAttendance,
+  setAttendance as writeAttendance,
+  type AttendanceMap,
+  type AttendanceStatus,
+} from "@/lib/attendance";
+import { resolveMe, saveMe } from "@/lib/me";
 import { readRoster, rosterNames } from "@/lib/roster";
 import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
 import {
@@ -347,28 +356,49 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
 
 /* ── 出欠席（ポップアップ）─────────────────
    「出欠席」を押すと、画面の手前にこれが開く。
-   名前は会員名簿（設定 ＞ 会員名簿）の1列目から引いてくる。ここでは名前を
-   打ち込ませない。名簿と食い違うと、部屋割りにも会費にも響くため。
 
-   丸を押すと参加・不参加が入れ替わる。これは役員の操作で、
-   本番の会員の画面では押せないようにする（見るだけにする）。
+   【9/7：出すのは会員それぞれになった】
+     それまでは、LINEで決まった出欠を役員が名簿を見ながら入れていた。
+     いまは会員が自分のぶんを自分で出す。出せるものは3つ、参加・不参加・未定。
+     まだ出していない人は「未回答」（何も書かないことがその印）。
+
+   このアプリにログインは無いので、まず「自分がどの名前か」を名簿から
+   一度選んでもらい、その端末に覚えておく（lib/me.ts）。名前を打たせないのは
+   9/6 までと同じ理由で、名簿と食い違うと部屋割りにも会費にも響くため。
+
+   下の一覧は、みんなが出したものを見るところ。押すところではない。
+   ただし、LINEでしか出さない人のぶんを役員が入れられるよう、
+   「代わりに入れる」を押している間だけ、一覧の行からも出せるようにしてある。
 
    置き場所は画面のいちばん外（document.body）。スマホの枠の中に入れると
    枠に切られてしまうので、外に出して手前に重ねている。 */
 function AttendanceDialog({
   names,
-  attending,
+  attendance,
+  me,
   busy,
-  onToggle,
+  whenText,
+  onPickMe,
+  onSet,
   onClose,
 }: {
   names: string[];
-  attending: Set<string>;
+  attendance: AttendanceMap;
+  /** この端末の人の名前。まだ選んでいなければ空。 */
+  me: string;
   busy: string;
-  onToggle: (name: string, on: boolean) => void;
+  /** 見出しの下に出す、どの回のぶんかの一行。 */
+  whenText: string;
+  onPickMe: (name: string) => void;
+  onSet: (name: string, status: AttendanceStatus | null) => void;
   onClose: () => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
+
+  /* 名前を選び直しているところかどうか。まだ選んでいない人には最初から出す。 */
+  const [picking, setPicking] = useState(false);
+  /* ほかの人のぶんも入れられるようにしているところかどうか（役員が使う）。 */
+  const [proxy, setProxy] = useState(false);
 
   useEffect(() => {
     // Esc で閉じる。開いている間は、後ろの画面を動かさない。
@@ -385,6 +415,12 @@ function AttendanceDialog({
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
+
+  const total = names.length;
+  const count = countAttendance(attendance, names);
+  const mine = me ? attendance[me] ?? null : null;
+  const needPick = !me || picking;
+  const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
 
   return createPortal(
     // 外の暗いところを押しても閉じる。
@@ -407,48 +443,195 @@ function AttendanceDialog({
               閉じる
             </button>
           </div>
-          {names.length > 0 && (
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: DIM }}>
-              参加 {attending.size}名 / 全{names.length}名
-            </p>
+          {whenText && (
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: DIM }}>{whenText}</p>
           )}
         </div>
 
         <div className="md-dialog-body">
-          {names.length === 0 ? (
-            <p style={{ margin: "4px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
+          {total === 0 ? (
+            <p style={{ margin: "16px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
               会員名簿にまだ名前がありません。設定 ＞ 会員名簿 の1列目に入れてください。
             </p>
           ) : (
-            names.map((name, i) => {
-              const on = attending.has(name);
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  className="md-row"
-                  aria-pressed={on}
-                  disabled={busy === name}
-                  onClick={() => onToggle(name, !on)}
-                  style={{ borderBottom: i === names.length - 1 ? "none" : `1px solid ${LINE}` }}
+            <>
+              {/* ── 自分のぶん。この画面でいちばん先にすること ── */}
+              <div style={{ marginTop: 18 }}>
+                {needPick ? (
+                  <>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: INK }}>
+                      名簿から自分の名前を選んでください
+                    </p>
+                    <p style={{ margin: "5px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                      この端末に覚えておきます。ほかの人の画面には出ません。
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+                      {names.map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className="md-name"
+                          onClick={() => {
+                            onPickMe(n);
+                            setPicking(false);
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    {me && (
+                      <div style={{ marginTop: 14 }}>
+                        <button type="button" className="md-edit" onClick={() => setPicking(false)}>
+                          やめる
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+                      <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: INK, lineHeight: 1.4 }}>
+                        {me}
+                        <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: DIM }}>あなた</span>
+                      </p>
+                      <button type="button" className="md-edit" onClick={() => setPicking(true)}>
+                        名前を変える
+                      </button>
+                    </div>
+
+                    <div className="md-seg" style={{ marginTop: 12 }} role="group" aria-label="あなたの出欠">
+                      {ATTENDANCE_ORDER.map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          className={`md-seg-btn is-${st}`}
+                          aria-pressed={mine === st}
+                          disabled={busy === me}
+                          onClick={() => onSet(me, mine === st ? null : st)}
+                        >
+                          {ATTENDANCE_LABEL[st]}
+                        </button>
+                      ))}
+                    </div>
+
+                    <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                      {mine
+                        ? "あとから何度でも変えられます。同じところをもう一度押すと、未回答に戻ります。"
+                        : "いまのところで構いません。あとから何度でも変えられます。"}
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* ── みんなのぶん。見るところ ── */}
+              <div style={{ marginTop: 30, paddingTop: 22, borderTop: `1px solid ${LINE}` }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: "0.02em", color: INK }}>
+                    みんなの出欠
+                  </p>
+                  <button
+                    type="button"
+                    className="md-edit"
+                    aria-pressed={proxy}
+                    onClick={() => setProxy((v) => !v)}
+                  >
+                    {proxy ? "代わりに入れるのをやめる" : "代わりに入れる"}
+                  </button>
+                </div>
+
+                {/* 数字だけだと、どれくらいそろったのかがひと目で分からない。
+                    帯の残りの地の色が、そのまま未回答のぶんになる。 */}
+                <div
+                  className="md-bar"
+                  style={{ marginTop: 12 }}
+                  role="img"
+                  aria-label={`参加${count.going}名、不参加${count.absent}名、未定${count.undecided}名、未回答${count.unanswered}名`}
                 >
-                  {/* 参加している人は、丸をオレンジで塗る。
-                      色だけに頼らないよう、名前も濃さを変える。 */}
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      flexShrink: 0,
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      border: `1.5px solid ${on ? ACC : LINE}`,
-                      background: on ? ACC : WHITE,
-                    }}
-                  />
-                  <span style={{ fontSize: 16, lineHeight: 1.6, color: on ? INK : DIM }}>{name}</span>
-                </button>
-              );
-            })
+                  <span style={{ width: `${pct(count.going)}%`, background: ACC }} />
+                  <span style={{ width: `${pct(count.absent)}%`, background: "#43464C" }} />
+                  <span style={{ width: `${pct(count.undecided)}%`, background: "#B9BCC2" }} />
+                </div>
+                <p style={{ margin: "9px 0 0", fontSize: 12, lineHeight: 1.8, color: SUB }}>
+                  参加 {count.going}　不参加 {count.absent}　未定 {count.undecided}　未回答 {count.unanswered}
+                  <span style={{ color: DIM }}>　（全{total}名）</span>
+                </p>
+
+                {proxy && (
+                  <p style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                    LINEでしか出していない人のぶんを、代わりに入れられます。
+                    入れたものは、その人の画面にもそのまま出ます。
+                  </p>
+                )}
+
+                <div style={{ marginTop: 14 }}>
+                  {names.map((n, i) => {
+                    const st = attendance[n] ?? null;
+                    const isMe = n === me;
+                    return (
+                      <div
+                        key={n}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          padding: proxy ? "8px 0" : "11px 0",
+                          borderBottom: i === names.length - 1 ? "none" : `1px solid ${LINE}`,
+                        }}
+                      >
+                        {/* 名前が長いときに切るのは名前のほうだけ。
+                            「あなた」の印は切らない（切れると自分の行が分からなくなる）。 */}
+                        <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+                          <span
+                            style={{
+                              minWidth: 0,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              fontSize: 15,
+                              lineHeight: 1.5,
+                              fontWeight: isMe ? 700 : 400,
+                              color: st ? INK : DIM,
+                            }}
+                          >
+                            {n}
+                          </span>
+                          {isMe && (
+                            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, color: DIM }}>あなた</span>
+                          )}
+                        </span>
+
+                        {proxy ? (
+                          <div className="md-seg is-mini" style={{ flexShrink: 0 }} role="group" aria-label={`${n}の出欠`}>
+                            {ATTENDANCE_ORDER.map((s2) => (
+                              <button
+                                key={s2}
+                                type="button"
+                                className={`md-seg-btn is-${s2}`}
+                                aria-pressed={st === s2}
+                                disabled={busy === n}
+                                onClick={() => onSet(n, st === s2 ? null : s2)}
+                              >
+                                {ATTENDANCE_LABEL[s2]}
+                              </button>
+                            ))}
+                          </div>
+                        ) : st ? (
+                          <span className={`md-st is-${st}`} style={{ flexShrink: 0 }}>
+                            {ATTENDANCE_LABEL[st]}
+                          </span>
+                        ) : (
+                          <span style={{ flexShrink: 0, fontSize: 12, letterSpacing: "0.03em", color: DIM }}>
+                            未回答
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -595,19 +778,22 @@ function Teaser({ currentIso, today }: { currentIso: string; today: Ymd }) {
 }
 
 /* ── 準備の画面（日時確定 〜 開催前日）───────────
-   出欠はLINEのオープンチャットで決まる。前日24時までの表明を、
-   役員が名簿から登録する運用。だからこの画面では参加・不参加を
-   選ばせない。会員にとってここは「押すところ」ではなく、
-   「自分がどうなっているかを見て安心するところ」。 */
+   9/7 から、出欠はこの画面で会員それぞれが出す（参加・不参加・未定）。
+   だからこの画面でいちばんしてほしいことは「出欠席」を押すこと。
+   オレンジをここひとつに取ってあるのは、そのため。
+   押した結果は、ボタンのすぐ下に一行で返す（押したのに何も変わらないと、
+   出せたのかどうかが分からなくなるため）。 */
 function BeforeScreen({
   draft,
   saving,
   error,
   onSave,
   names,
-  attending,
+  attendance,
+  me,
   busyName,
-  onToggleAttendance,
+  onPickMe,
+  onSetAttendance,
   onOpenFeature,
   today,
 }: {
@@ -616,9 +802,12 @@ function BeforeScreen({
   error: string;
   onSave: (next: EventOverview) => Promise<boolean>;
   names: string[];
-  attending: Set<string>;
+  attendance: AttendanceMap;
+  /** この端末の人の名前（会員名簿の中の自分）。まだ選んでいなければ空。 */
+  me: string;
   busyName: string;
-  onToggleAttendance: (name: string, on: boolean) => void;
+  onPickMe: (name: string) => void;
+  onSetAttendance: (name: string, status: AttendanceStatus | null) => void;
   /** 「このあとの準備」の行から、設定の下のその機能を開く。 */
   onOpenFeature: (featureId: string) => void;
   /** いまの日本時間の年月日。予告を出すかどうかの判定に使う。 */
@@ -629,12 +818,15 @@ function BeforeScreen({
   const [editing, setEditing] = useState(false);
 
   /* 出欠席のポップアップを開いているかどうか。
-     （準備の画面でまず知りたいのは日にちと自分のすることなので、
-       名前の一覧は押したときだけ手前に出す） */
+     （準備の画面でまず知りたいのは日にちなので、出欠のやりとりは
+       押したときだけ手前に出す） */
   const [showList, setShowList] = useState(false);
 
   const dateText = formatDate(draft.date);
   const timeText = draft.start && draft.end ? `${draft.start} 〜 ${draft.end}` : draft.start || draft.end;
+  /* ボタンの下の一行に使う。自分が出したものと、いまの参加の人数。 */
+  const myStatus = me ? attendance[me] ?? null : null;
+  const goingCount = countAttendance(attendance, names).going;
   const footText = [
     draft.rooms && `${draft.rooms}部屋`,
     draft.fee && `会費 ${comma(draft.fee)}円`,
@@ -687,8 +879,7 @@ function BeforeScreen({
           : <Bar w={96} h={14} />}
       </div>
 
-      {/* 出欠そのものはLINEで決まるので、この画面に残る操作は
-          「誰が来るのか見る」だけ。準備の間はこれが一番知りたいこと。 */}
+      {/* この画面でしてほしいことは、これひとつ。 */}
       <div style={{ marginTop: 36 }}>
         <button
           type="button"
@@ -698,12 +889,32 @@ function BeforeScreen({
         >
           出欠席
         </button>
+
+        {/* 押す前でも、いま自分が何を出しているかが分かるようにしておく。
+            名簿がまだ空のときは出さない（数える相手がいないため）。 */}
+        {names.length > 0 && (
+          <p style={{ margin: "10px 2px 0", fontSize: 13, lineHeight: 1.7, color: DIM }}>
+            {myStatus ? (
+              <>
+                あなたは <span style={{ fontWeight: 700, color: ACC_TEXT }}>{ATTENDANCE_LABEL[myStatus]}</span>
+              </>
+            ) : (
+              "まだ出欠を出していません"
+            )}
+            <span style={{ margin: "0 6px" }}>・</span>
+            参加 {goingCount}名
+          </p>
+        )}
+
         {showList && (
           <AttendanceDialog
             names={names}
-            attending={attending}
+            attendance={attendance}
+            me={me}
             busy={busyName}
-            onToggle={onToggleAttendance}
+            whenText={dateText ? `${dateText}のオフ会` : ""}
+            onPickMe={onPickMe}
+            onSet={onSetAttendance}
             onClose={() => setShowList(false)}
           />
         )}
@@ -1430,14 +1641,21 @@ export default function MemberDraft({
   /* 会員名簿の名前と、今回の回の出欠席。
      どちらも画面に出てから読みにいく（描く前に読むと食い違いが出る）。 */
   const [names, setNames] = useState<string[]>([]);
-  const [attending, setAttending] = useState<Set<string>>(() => new Set());
+  const [attendance, setAttendance] = useState<AttendanceMap>({});
   const [busyName, setBusyName] = useState("");
+
+  /* この端末の人の名前（会員名簿の中の自分）。まだ選んでいなければ空。
+     覚えてあっても名簿から消えていれば空に戻す（lib/me.ts）。 */
+  const [me, setMe] = useState("");
 
   useEffect(() => {
     let alive = true;
     readRoster()
       .then((r) => {
-        if (alive) setNames(rosterNames(r));
+        if (!alive) return;
+        const list = rosterNames(r);
+        setNames(list);
+        setMe(resolveMe(list));
       })
       .catch(() => {
         // 読めなくても画面は止めない（名簿が空のときと同じ出し方になる）
@@ -1446,6 +1664,12 @@ export default function MemberDraft({
       alive = false;
     };
   }, []);
+
+  /* 名簿から自分の名前を選んだとき。この端末にだけ覚える。 */
+  const pickMe = (name: string) => {
+    saveMe(name);
+    setMe(name);
+  };
 
   /* どの回のぶんかは開催日で決める。まだ入れていなければ lib/data.ts のもの。 */
   const eventKey = useMemo(() => {
@@ -1459,35 +1683,36 @@ export default function MemberDraft({
     if (!eventKey) return;
     let alive = true;
     readAttendance(eventKey)
-      .then((list) => {
-        if (alive) setAttending(new Set(list));
+      .then((map) => {
+        if (alive) setAttendance(map);
       })
       .catch(() => {
-        // 読めなければ、誰もチェックされていない状態で出す
+        // 読めなければ、誰も出していない状態で出す
       });
     return () => {
       alive = false;
     };
   }, [eventKey]);
 
-  /* 丸を押したとき。押した1人ぶんだけを足し引きするので、
-     同じ回を別の役員がさわっていても、相手のチェックを消さない。 */
-  const toggleAttendance = async (name: string, on: boolean) => {
-    if (!eventKey) return;
+  /* 参加・不参加・未定 を押したとき（null は「未回答に戻す」）。
+     書くのは押した1人ぶんだけなので、同じ回に何人が同時に出しても、
+     ほかの人の出したものを消さない。 */
+  const changeAttendance = async (name: string, status: AttendanceStatus | null) => {
+    if (!eventKey || !name) return;
     setBusyName(name);
     // 先に画面だけ変えて、押した手ごたえを待たせない
-    setAttending((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(name);
-      else next.delete(name);
+    setAttendance((prev) => {
+      const next = { ...prev };
+      if (status) next[name] = status;
+      else delete next[name];
       return next;
     });
     try {
-      setAttending(new Set(await setAttendance(eventKey, name, on)));
+      setAttendance(await writeAttendance(eventKey, name, status));
     } catch {
       // 書けなかったときは、保存されているほうに戻す
       try {
-        setAttending(new Set(await readAttendance(eventKey)));
+        setAttendance(await readAttendance(eventKey));
       } catch {
         /* 取り直しにも失敗したら、そのままにしておく */
       }
@@ -1592,14 +1817,17 @@ export default function MemberDraft({
               error={saveError}
               onSave={saveDraft}
               names={names}
-              attending={attending}
+              attendance={attendance}
+              me={me}
               busyName={busyName}
-              onToggleAttendance={toggleAttendance}
+              onPickMe={pickMe}
+              onSetAttendance={changeAttendance}
               onOpenFeature={onOpenFeature}
               today={jstYmd(nowMs)}
             />
           )}
-          {phase === "day"    && <DayScreen attendeeCount={attending.size} />}
+          {/* 当日の部屋割の人数は、参加と出した人だけを数える。 */}
+          {phase === "day"    && <DayScreen attendeeCount={countAttendance(attendance, names).going} />}
           {phase === "after"  && <AfterScreen currentIso={draft.date} today={jstYmd(nowMs)} />}
         </div>
       </div>
