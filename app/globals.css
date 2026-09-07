@@ -553,10 +553,6 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 .md-seg-btn.is-absent[aria-pressed="true"]    { background: #33363C; border-color: #33363C; color: #FFFFFF; }
 .md-seg-btn.is-undecided[aria-pressed="true"] { background: #FFFFFF; border-color: #1B1C1E; color: #1B1C1E; box-shadow: inset 0 0 0 1px #1B1C1E; }
 
-/* 一覧の中で、ほかの人のぶんを代わりに入れるときの小さいほう。 */
-.md-seg.is-mini { display: flex; gap: 4px; }
-.md-seg.is-mini .md-seg-btn { height: 32px; min-width: 46px; padding: 0 8px; border-radius: 8px; font-size: 12px; }
-
 /* 名簿から自分の名前を選ぶときの、名前ひとつ。 */
 .md-name {
   padding: 9px 15px;

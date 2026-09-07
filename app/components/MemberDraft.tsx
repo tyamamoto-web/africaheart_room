@@ -367,8 +367,7 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
    9/6 までと同じ理由で、名簿と食い違うと部屋割りにも会費にも響くため。
 
    下の一覧は、みんなが出したものを見るところ。押すところではない。
-   ただし、LINEでしか出さない人のぶんを役員が入れられるよう、
-   「代わりに入れる」を押している間だけ、一覧の行からも出せるようにしてある。
+   自分のぶんを書き換えられるのは自分だけ（ほかの人の欄は触れない）。
 
    置き場所は画面のいちばん外（document.body）。スマホの枠の中に入れると
    枠に切られてしまうので、外に出して手前に重ねている。 */
@@ -397,8 +396,6 @@ function AttendanceDialog({
 
   /* 名前を選び直しているところかどうか。まだ選んでいない人には最初から出す。 */
   const [picking, setPicking] = useState(false);
-  /* ほかの人のぶんも入れられるようにしているところかどうか（役員が使う）。 */
-  const [proxy, setProxy] = useState(false);
 
   useEffect(() => {
     // Esc で閉じる。開いている間は、後ろの画面を動かさない。
@@ -526,19 +523,9 @@ function AttendanceDialog({
 
               {/* ── みんなのぶん。見るところ ── */}
               <div style={{ marginTop: 30, paddingTop: 22, borderTop: `1px solid ${LINE}` }}>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: "0.02em", color: INK }}>
-                    みんなの出欠
-                  </p>
-                  <button
-                    type="button"
-                    className="md-edit"
-                    aria-pressed={proxy}
-                    onClick={() => setProxy((v) => !v)}
-                  >
-                    {proxy ? "代わりに入れるのをやめる" : "代わりに入れる"}
-                  </button>
-                </div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: "0.02em", color: INK }}>
+                  みんなの出欠
+                </p>
 
                 {/* 数字だけだと、どれくらいそろったのかがひと目で分からない。
                     帯の残りの地の色が、そのまま未回答のぶんになる。 */}
@@ -557,13 +544,6 @@ function AttendanceDialog({
                   <span style={{ color: DIM }}>　（全{total}名）</span>
                 </p>
 
-                {proxy && (
-                  <p style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
-                    LINEでしか出していない人のぶんを、代わりに入れられます。
-                    入れたものは、その人の画面にもそのまま出ます。
-                  </p>
-                )}
-
                 <div style={{ marginTop: 14 }}>
                   {names.map((n, i) => {
                     const st = attendance[n] ?? null;
@@ -576,7 +556,7 @@ function AttendanceDialog({
                           alignItems: "center",
                           justifyContent: "space-between",
                           gap: 12,
-                          padding: proxy ? "8px 0" : "11px 0",
+                          padding: "11px 0",
                           borderBottom: i === names.length - 1 ? "none" : `1px solid ${LINE}`,
                         }}
                       >
@@ -602,22 +582,7 @@ function AttendanceDialog({
                           )}
                         </span>
 
-                        {proxy ? (
-                          <div className="md-seg is-mini" style={{ flexShrink: 0 }} role="group" aria-label={`${n}の出欠`}>
-                            {ATTENDANCE_ORDER.map((s2) => (
-                              <button
-                                key={s2}
-                                type="button"
-                                className={`md-seg-btn is-${s2}`}
-                                aria-pressed={st === s2}
-                                disabled={busy === n}
-                                onClick={() => onSet(n, st === s2 ? null : s2)}
-                              >
-                                {ATTENDANCE_LABEL[s2]}
-                              </button>
-                            ))}
-                          </div>
-                        ) : st ? (
+                        {st ? (
                           <span className={`md-st is-${st}`} style={{ flexShrink: 0 }}>
                             {ATTENDANCE_LABEL[st]}
                           </span>
