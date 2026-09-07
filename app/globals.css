@@ -549,6 +549,8 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 }
 .md-seg-btn:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
 .md-seg-btn:disabled { cursor: default; opacity: .5; }
+/* 〆切のあと。押せなくはするが、自分が出したものは同じ濃さのまま読めるようにしておく。 */
+.md-seg-btn:disabled[aria-pressed="true"] { opacity: 1; }
 .md-seg-btn.is-going[aria-pressed="true"]     { background: #F37021; border-color: #F37021; color: #FFFFFF; }
 .md-seg-btn.is-absent[aria-pressed="true"]    { background: #33363C; border-color: #33363C; color: #FFFFFF; }
 .md-seg-btn.is-undecided[aria-pressed="true"] { background: #FFFFFF; border-color: #1B1C1E; color: #1B1C1E; box-shadow: inset 0 0 0 1px #1B1C1E; }

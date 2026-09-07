@@ -207,6 +207,30 @@ function formatDate(iso: string): string | null {
   return `${d.y}年${d.m}月${d.d}日（${w}）`;
 }
 
+/** 年月日を n 日ずらす。時刻を持たないので、時差でも夏時間でもずれない。 */
+function addDays(v: Ymd, n: number): Ymd {
+  const t = new Date(Date.UTC(v.y, v.m - 1, v.d) + n * 86_400_000);
+  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
+}
+
+/* ── 出欠席の〆切 ─────────────────────────────
+   毎回きまって「オフ会の前の日の23:59まで」。回ごとに決め直さない
+   （毎回同じなら、覚えなくてよくなる）。
+   数えるのは年月日だけ。今日が開催日より前なら受け付けていて、
+   開催日になった時点で閉じている ── これが「前日の24時で切れる」と同じことになる。
+   日にちがまだ決まっていないうちは、〆切も無い（null）。 */
+type Deadline = { open: boolean; text: string };
+function attendanceDeadline(iso: string, today: Ymd): Deadline | null {
+  const event = isoYmd(iso);
+  if (!event) return null;
+  const prev = addDays(event, -1);
+  const w = WEEK[new Date(Date.UTC(prev.y, prev.m - 1, prev.d)).getUTCDay()];
+  return {
+    open: daysBetween(today, event) > 0,
+    text: `${prev.m}月${prev.d}日（${w}）23:59`,
+  };
+}
+
 /** 「10月31日」と「（土）」に分ける。予告に使う。
     年は付けない（そのすぐ上に、今回の「2026年」が大きく出ているため）。
     曜日は日付から数えるので、手で書いて間違えることがない（formatDate と同じ数え方）。 */
@@ -372,6 +396,10 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
    下の一覧は、みんなが出したものを見るところ。押すところではない。
    自分のぶんを書き換えられるのは自分だけ（ほかの人の欄は触れない）。
 
+   出せるのは前の日の23:59まで（attendanceDeadline）。過ぎたら3つは押せなくする。
+   ただし、出したものと、みんなの出欠は、そのまま見られるようにしておく
+   （当日にいちばん見たいのは「誰が来るのか」なので、画面ごと閉じない）。
+
    置き場所は画面のいちばん外（document.body）。スマホの枠の中に入れると
    枠に切られてしまうので、外に出して手前に重ねている。 */
 function AttendanceDialog({
@@ -381,6 +409,7 @@ function AttendanceDialog({
   busy,
   error,
   whenText,
+  deadline,
   onPickMe,
   onSet,
   onClose,
@@ -394,6 +423,8 @@ function AttendanceDialog({
   error: string;
   /** 見出しの下に出す、どの回のぶんかの一行。 */
   whenText: string;
+  /** 出欠の〆切。日にちがまだ決まっていなければ null（そのときは締め切らない）。 */
+  deadline: Deadline | null;
   onPickMe: (name: string) => void;
   onSet: (name: string, status: AttendanceStatus | null) => void;
   onClose: () => void;
@@ -419,6 +450,7 @@ function AttendanceDialog({
   const total = names.length;
   const count = countAttendance(attendance, names);
   const mine = me ? attendance[me] ?? null : null;
+  const closed = deadline !== null && !deadline.open;
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
 
   return createPortal(
@@ -487,7 +519,7 @@ function AttendanceDialog({
                       type="button"
                       className={`md-seg-btn is-${st}`}
                       aria-pressed={mine === st}
-                      disabled={!me || busy === me}
+                      disabled={!me || closed || busy === me}
                       onClick={() => onSet(me, mine === st ? null : st)}
                     >
                       {ATTENDANCE_LABEL[st]}
@@ -496,11 +528,14 @@ function AttendanceDialog({
                 </div>
 
                 <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
-                  {!me
-                    ? "上でお名前を選ぶと、出欠を出せます。"
-                    : mine
-                      ? "あとから何度でも変えられます。同じところをもう一度押すと、未回答に戻ります。"
-                      : "いまのところで構いません。あとから何度でも変えられます。"}
+                  {closed
+                    ? "出欠の受付は終わりました。"
+                    : !me
+                      ? "上でお名前を選ぶと、出欠を出せます。"
+                      : mine
+                        ? "同じところをもう一度押すと、未回答に戻ります。"
+                        : "いまのところで構いません。"}
+                  {deadline && (closed ? `〆切は${deadline.text}でした。` : `${deadline.text}まで、何度でも変えられます。`)}
                 </p>
 
                 {/* 押したのに保存できていないことに、気づけないままにしない。 */}
@@ -785,6 +820,8 @@ function BeforeScreen({
   /* ボタンの下の一行に使う。自分が出したものと、いまの参加の人数。 */
   const myStatus = me ? attendance[me] ?? null : null;
   const goingCount = countAttendance(attendance, names).going;
+  /* 出欠の〆切。毎回きまって、前の日の23:59まで。 */
+  const deadline = attendanceDeadline(draft.date, today);
   const footText = [
     draft.rooms && `${draft.rooms}部屋`,
     draft.fee && `会費 ${comma(draft.fee)}円`,
@@ -848,20 +885,27 @@ function BeforeScreen({
           出欠席
         </button>
 
-        {/* 押す前でも、いま自分が何を出しているかが分かるようにしておく。
+        {/* 押す前でも、いま自分が何を出しているかと、いつまでに出すのかが分かるようにしておく。
             名簿がまだ空のときは出さない（数える相手がいないため）。 */}
         {names.length > 0 && (
-          <p style={{ margin: "10px 2px 0", fontSize: 13, lineHeight: 1.7, color: DIM }}>
-            {myStatus ? (
-              <>
-                あなたは <span style={{ fontWeight: 700, color: ACC_TEXT }}>{ATTENDANCE_LABEL[myStatus]}</span>
-              </>
-            ) : (
-              "まだ出欠を出していません"
+          <div style={{ marginTop: 10 }}>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: DIM }}>
+              {myStatus ? (
+                <>
+                  あなたは <span style={{ fontWeight: 700, color: ACC_TEXT }}>{ATTENDANCE_LABEL[myStatus]}</span>
+                </>
+              ) : (
+                "まだ出欠を出していません"
+              )}
+              <span style={{ margin: "0 6px" }}>・</span>
+              参加 {goingCount}名
+            </p>
+            {deadline && (
+              <p style={{ margin: "3px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                {deadline.open ? `${deadline.text}まで` : "出欠の受付は終わりました"}
+              </p>
             )}
-            <span style={{ margin: "0 6px" }}>・</span>
-            参加 {goingCount}名
-          </p>
+          </div>
         )}
 
         {showList && (
@@ -872,6 +916,7 @@ function BeforeScreen({
             busy={busyName}
             error={attendanceError}
             whenText={dateText ? `${dateText}のオフ会` : ""}
+            deadline={deadline}
             onPickMe={onPickMe}
             onSet={onSetAttendance}
             onClose={() => setShowList(false)}
@@ -1660,6 +1705,13 @@ export default function MemberDraft({
      ほかの人の出したものを消さない。 */
   const changeAttendance = async (name: string, status: AttendanceStatus | null) => {
     if (!eventKey || !name) return;
+    /* 〆切のあとは書かない。上の3つは押せなくしてあるが、時計は画面を開いたときの
+       ものなので、開きっぱなしで日付をまたいだ場合の用心にここでも数え直す。 */
+    const gate = attendanceDeadline(draft.date, jstYmd(Date.now()));
+    if (gate && !gate.open) {
+      setAttendanceError("出欠の受付は終わりました。");
+      return;
+    }
     setBusyName(name);
     setAttendanceError("");
     // 先に画面だけ変えて、押した手ごたえを待たせない
