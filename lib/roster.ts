@@ -17,7 +17,7 @@
      raw[1..] … 1行ぶんを JSON にしたもの      例 ["くる",""]
 
    名簿は「名前の並び」としても使う。1列目を名前とみなす（rosterNames）。
-   参加状況（lib/attendance.ts）はここから名前を引く。
+   出欠席（lib/attendance.ts）はここから名前を引く。
    ============================================================ */
 
 import { SHARED_ROW, readSharedLenient, writeSharedRow } from "./sharedRow";

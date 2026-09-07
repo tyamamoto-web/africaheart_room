@@ -41,7 +41,7 @@ export const SHARED_ROW = {
   legacyManualCheck: 8, // 旧イベント運営マニュアルのチェック（今は未使用・中身は空）
   survey: 9, // 参加者アンケートの回答
   roster: 10, // 社長室：会員名簿（設定）
-  attendance: 11, // 社長室：参加状況（今回の回に来る人）
+  attendance: 11, // 社長室：出欠席（今回の回に来る人）
   timetable: 12, // 社長室：当日のタイムテーブル（時間・企画名）
 } as const;
 

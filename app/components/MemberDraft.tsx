@@ -16,7 +16,7 @@
 
    【中身がつながっているところ、まだのところ】
      はじめは外見だけの下書きだったが、いまは開催の概要（lib/eventOverview.ts）・
-     参加状況（lib/attendance.ts）・当日の部屋割（lib/timetable.ts）・
+     出欠席（lib/attendance.ts）・当日の部屋割（lib/timetable.ts）・
      ふりかえりの写真と動画（lib/gallery.ts）が本物の置き場所につながっていて、
      読むだけでなく「編集」から書き込みもする。
      まだ決めていない値のところには、灰色の帯を置いたままにしてある。
@@ -117,10 +117,10 @@ import PlanTable from "@/app/components/PlanTable";
 
 /* ── 日付まわりの小道具 ───────────────────────
    場面の判定そのものは lib/eventOverview.ts（eventPhase）にある。
-   ここにあるのは「今日は何日か」を出すものと、参加状況の置き場所の鍵に使う
+   ここにあるのは「今日は何日か」を出すものと、出欠席の置き場所の鍵に使う
    lib/data.ts の日付の読み取りだけ。 */
 
-/** 参加状況の鍵に使う、lib/data.ts の開催日（概要に開催日が無いときの控え）。 */
+/** 出欠席の鍵に使う、lib/data.ts の開催日（概要に開催日が無いときの控え）。 */
 const BASE_DATE_TEXT = eventStatus === "announced" ? nextEvent.date : eventInfo.date;
 
 /** 「2026年8月22日（土）」のような書き方から年月日を取り出す。読めなければ null。 */
@@ -277,10 +277,10 @@ function Circle() {
 
    丸は「まだ済んでいない」の印で、押すところではない（印は付かない）。
    押すのは行のぜんぶ。右の山形が「ここから先がある」と言う。
-   色はグレーのまま。この画面のオレンジは「いま押すところ」＝参加状況ひとつの
+   色はグレーのまま。この画面のオレンジは「いま押すところ」＝出欠席ひとつの
    ためのもので、3行にも差すとそちらが目に入らなくなる。
 
-   間の取り方と大きさは前と同じ（.md-todo は参加状況の行 .md-row とそろえてある）。
+   間の取り方と大きさは前と同じ（.md-todo は出欠席の行 .md-row とそろえてある）。
    下の線だけは、最後の行で消したいのでここでインラインに持たせている。 */
 function TodoRow({
   text,
@@ -345,8 +345,8 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
   );
 }
 
-/* ── 参加状況（ポップアップ）─────────────────
-   「参加状況」を押すと、画面の手前にこれが開く。
+/* ── 出欠席（ポップアップ）─────────────────
+   「出欠席」を押すと、画面の手前にこれが開く。
    名前は会員名簿（設定 ＞ 会員名簿）の1列目から引いてくる。ここでは名前を
    打ち込ませない。名簿と食い違うと、部屋割りにも会費にも響くため。
 
@@ -401,7 +401,7 @@ function AttendanceDialog({
         <div className="md-dialog-head">
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
             <p id="md-dialog-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: INK }}>
-              参加状況
+              出欠席
             </p>
             <button type="button" className="md-edit" onClick={onClose}>
               閉じる
@@ -513,7 +513,7 @@ function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null 
    まだ来ていない日）は lib/eventTeaser.ts の showTeaser が持っていて、
    出さないときは何も描かない。
 
-      いちばん下に置く。上の3つ（次回のオフ会 → 参加状況 → このあとの準備）は
+      いちばん下に置く。上の3つ（次回のオフ会 → 出欠席 → このあとの準備）は
       「何の会か」「誰が来るのか」「自分は何をするのか」で1本につながっていて、
       その途中に別の日付を入れると、今回の話を読んでいる間に次回を抱えることになる。
       手紙を書き終えてから足す追伸と同じで、読み終えたあとに気づけばよい。
@@ -534,7 +534,7 @@ function TimingRail({ phase, readout }: { phase: Phase; readout: Readout | null 
 
       オレンジは使わない。この画面のオレンジは「いま押すところ」「いまの場面」の
       ためのもので、2か月先の会はそのどちらでもない。3か所目に差すと、
-      いま押してほしいところ（参加状況）が目に入りにくくなる。
+      いま押してほしいところ（出欠席）が目に入りにくくなる。
       ハロウィンらしさは、名前の字間を空けた組み方だけで出す（貼り紙の見出しのように）。
       最後の1字のうしろにも字間が付くので、marginRight を同じぶん負にして
       見た目の中心をそろえる。
@@ -628,7 +628,7 @@ function BeforeScreen({
      本番の会員の画面には、この「編集」は出さない。 */
   const [editing, setEditing] = useState(false);
 
-  /* 参加状況のポップアップを開いているかどうか。
+  /* 出欠席のポップアップを開いているかどうか。
      （準備の画面でまず知りたいのは日にちと自分のすることなので、
        名前の一覧は押したときだけ手前に出す） */
   const [showList, setShowList] = useState(false);
@@ -696,7 +696,7 @@ function BeforeScreen({
           aria-expanded={showList}
           onClick={() => setShowList((v) => !v)}
         >
-          参加状況
+          出欠席
         </button>
         {showList && (
           <AttendanceDialog
@@ -799,7 +799,7 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
     }
   };
 
-  // 全員の人数。参加状況に入っていればそれ、無ければ表に出てくる名前の数。
+  // 全員の人数。出欠席に人数が入っていればそれ、無ければ表に出てくる名前の数。
   const seen = new Set<string>();
   for (const r of rows ?? []) for (const n of r.names) seen.add(n);
   const total = attendeeCount > 0 ? attendeeCount : seen.size;
@@ -979,7 +979,7 @@ function groupByScene(items: GalleryItem[]): { sceneId: string; items: GalleryIt
 }
 
 /* 1枚を拡げて見る。暗い面に1枚だけ置き、左右で前後に動く。
-   置き場所は参加状況と同じく画面のいちばん外（document.body）。 */
+   置き場所は出欠席のポップアップと同じく画面のいちばん外（document.body）。 */
 function MediaViewer({
   items,
   index,
@@ -1103,7 +1103,7 @@ function MediaViewer({
 }
 
 /* 「すべて見る」で開く一覧。場面ごとに見出しを付けて3列に並べる。
-   枠の作りは参加状況のポップアップと同じ（md-scrim / md-dialog）。 */
+   枠の作りは出欠席のポップアップと同じ（md-scrim / md-dialog）。 */
 function GalleryDialog({
   items,
   onOpen,
@@ -1427,7 +1427,7 @@ export default function MemberDraft({
      それまでは前の回のふりかえりが続く（決まりは lib/eventOverview.ts）。 */
   const autoPhase = useMemo<Phase>(() => eventPhase(draft, jstYmd(nowMs)), [nowMs, draft]);
 
-  /* 会員名簿の名前と、今回の回の参加状況。
+  /* 会員名簿の名前と、今回の回の出欠席。
      どちらも画面に出てから読みにいく（描く前に読むと食い違いが出る）。 */
   const [names, setNames] = useState<string[]>([]);
   const [attending, setAttending] = useState<Set<string>>(() => new Set());

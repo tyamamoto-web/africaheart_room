@@ -471,7 +471,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 /* 保存している間。押せないことが見てわかるように薄くする。 */
 .md-save:disabled { border-color: #E4E5E8; color: #8B8E94; cursor: default; background: #FFFFFF; }
 
-/* 社長室：会員画面の下書きの「参加状況」。
+/* 社長室：会員画面の下書きの「出欠席」。
    見た目は MemberDraft.tsx の Button（tone="accent"）とそろえてある。
    あちらは押せない見本なので span、こちらは実際に押すので button。 */
 .md-cta {
@@ -495,7 +495,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 }
 .md-cta:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
 
-/* 参加状況の1行。やることの行（TodoRow）と同じ間の取り方にしてある。 */
+/* 出欠席の1行。やることの行（TodoRow）と同じ間の取り方にしてある。 */
 .md-row {
   display: flex;
   align-items: center;
@@ -516,7 +516,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 .md-row:focus-visible { outline: 2px solid #B24809; outline-offset: -2px; border-radius: 6px; }
 
 /* 会員画面「このあとの準備」の1行。押すと 設定 の該当する項目が開く。
-   寸法と間の取り方は参加状況の行（.md-row）と同じ。下の線だけは、最後の行で
+   寸法と間の取り方は出欠席の行（.md-row）と同じ。下の線だけは、最後の行で
    消したいので MemberDraft.tsx の TodoRow がインラインで持つ（border: none を
    ここで書いてあるので、インラインの borderBottom がそのまま効く）。
    触れたときは行ごと薄くする。面に色を足さないのは、この画面のオレンジを
@@ -543,7 +543,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .md-cta, .md-row, .md-todo { transition: none; }
 }
 
-/* 社長室：参加状況のポップアップ。
+/* 社長室：出欠席のポップアップ。
    スマホの枠の中に置くと枠に切られるので、画面のいちばん外に出して手前に重ねる。 */
 .md-scrim {
   position: fixed;
