@@ -362,9 +362,12 @@ function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?
      いまは会員が自分のぶんを自分で出す。出せるものは3つ、参加・不参加・未定。
      まだ出していない人は「未回答」（何も書かないことがその印）。
 
-   このアプリにログインは無いので、まず「自分がどの名前か」を名簿から
-   一度選んでもらい、その端末に覚えておく（lib/me.ts）。名前を打たせないのは
-   9/6 までと同じ理由で、名簿と食い違うと部屋割りにも会費にも響くため。
+   このアプリにログインは無いので、まず「あなたのお名前」を名簿から選んでもらい、
+   その端末に覚えておく（lib/me.ts）。選ぶところは、いつも同じ場所に出したままにする
+   （「名前を変える」のような押すところを別に置くと、それが何をするものか
+   分かりにくいため。出ているものを選び直せば、それが名前を変えることになる）。
+   打ち込ませないのは 9/6 までと同じ理由で、名簿と食い違うと
+   部屋割りにも会費にも響くため。
 
    下の一覧は、みんなが出したものを見るところ。押すところではない。
    自分のぶんを書き換えられるのは自分だけ（ほかの人の欄は触れない）。
@@ -376,6 +379,7 @@ function AttendanceDialog({
   attendance,
   me,
   busy,
+  error,
   whenText,
   onPickMe,
   onSet,
@@ -386,6 +390,8 @@ function AttendanceDialog({
   /** この端末の人の名前。まだ選んでいなければ空。 */
   me: string;
   busy: string;
+  /** 保存できなかったときの知らせ。何も無ければ空。 */
+  error: string;
   /** 見出しの下に出す、どの回のぶんかの一行。 */
   whenText: string;
   onPickMe: (name: string) => void;
@@ -393,9 +399,6 @@ function AttendanceDialog({
   onClose: () => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
-
-  /* 名前を選び直しているところかどうか。まだ選んでいない人には最初から出す。 */
-  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     // Esc で閉じる。開いている間は、後ろの画面を動かさない。
@@ -416,7 +419,6 @@ function AttendanceDialog({
   const total = names.length;
   const count = countAttendance(attendance, names);
   const mine = me ? attendance[me] ?? null : null;
-  const needPick = !me || picking;
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
 
   return createPortal(
@@ -454,70 +456,58 @@ function AttendanceDialog({
             <>
               {/* ── 自分のぶん。この画面でいちばん先にすること ── */}
               <div style={{ marginTop: 18 }}>
-                {needPick ? (
-                  <>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: INK }}>
-                      名簿から自分の名前を選んでください
-                    </p>
-                    <p style={{ margin: "5px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
-                      この端末に覚えておきます。ほかの人の画面には出ません。
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-                      {names.map((n) => (
-                        <button
-                          key={n}
-                          type="button"
-                          className="md-name"
-                          onClick={() => {
-                            onPickMe(n);
-                            setPicking(false);
-                          }}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                    {me && (
-                      <div style={{ marginTop: 14 }}>
-                        <button type="button" className="md-edit" onClick={() => setPicking(false)}>
-                          やめる
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-                      <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: INK, lineHeight: 1.4 }}>
-                        {me}
-                        <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: DIM }}>あなた</span>
-                      </p>
-                      <button type="button" className="md-edit" onClick={() => setPicking(true)}>
-                        名前を変える
-                      </button>
-                    </div>
+                <label
+                  htmlFor="md-me"
+                  style={{ display: "block", fontSize: 13, fontWeight: 700, letterSpacing: "0.02em", color: INK }}
+                >
+                  あなたのお名前
+                </label>
+                <select
+                  id="md-me"
+                  className={me ? "md-pick" : "md-pick is-empty"}
+                  value={me}
+                  onChange={(e) => onPickMe(e.target.value)}
+                  style={{ marginTop: 8 }}
+                >
+                  <option value="">名簿から選んでください</option>
+                  {names.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ margin: "7px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                  この端末に覚えておきます。ほかの人の画面には出ません。
+                </p>
 
-                    <div className="md-seg" style={{ marginTop: 12 }} role="group" aria-label="あなたの出欠">
-                      {ATTENDANCE_ORDER.map((st) => (
-                        <button
-                          key={st}
-                          type="button"
-                          className={`md-seg-btn is-${st}`}
-                          aria-pressed={mine === st}
-                          disabled={busy === me}
-                          onClick={() => onSet(me, mine === st ? null : st)}
-                        >
-                          {ATTENDANCE_LABEL[st]}
-                        </button>
-                      ))}
-                    </div>
+                <div className="md-seg" style={{ marginTop: 20 }} role="group" aria-label="あなたの出欠">
+                  {ATTENDANCE_ORDER.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      className={`md-seg-btn is-${st}`}
+                      aria-pressed={mine === st}
+                      disabled={!me || busy === me}
+                      onClick={() => onSet(me, mine === st ? null : st)}
+                    >
+                      {ATTENDANCE_LABEL[st]}
+                    </button>
+                  ))}
+                </div>
 
-                    <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
-                      {mine
-                        ? "あとから何度でも変えられます。同じところをもう一度押すと、未回答に戻ります。"
-                        : "いまのところで構いません。あとから何度でも変えられます。"}
-                    </p>
-                  </>
+                <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                  {!me
+                    ? "上でお名前を選ぶと、出欠を出せます。"
+                    : mine
+                      ? "あとから何度でも変えられます。同じところをもう一度押すと、未回答に戻ります。"
+                      : "いまのところで構いません。あとから何度でも変えられます。"}
+                </p>
+
+                {/* 押したのに保存できていないことに、気づけないままにしない。 */}
+                {error && (
+                  <p style={{ margin: "8px 2px 0", fontSize: 12, lineHeight: 1.7, color: ACC_TEXT }}>
+                    {error}
+                  </p>
                 )}
               </div>
 
@@ -757,6 +747,7 @@ function BeforeScreen({
   attendance,
   me,
   busyName,
+  attendanceError,
   onPickMe,
   onSetAttendance,
   onOpenFeature,
@@ -771,6 +762,8 @@ function BeforeScreen({
   /** この端末の人の名前（会員名簿の中の自分）。まだ選んでいなければ空。 */
   me: string;
   busyName: string;
+  /** 出欠が保存できなかったときの知らせ。 */
+  attendanceError: string;
   onPickMe: (name: string) => void;
   onSetAttendance: (name: string, status: AttendanceStatus | null) => void;
   /** 「このあとの準備」の行から、設定の下のその機能を開く。 */
@@ -877,6 +870,7 @@ function BeforeScreen({
             attendance={attendance}
             me={me}
             busy={busyName}
+            error={attendanceError}
             whenText={dateText ? `${dateText}のオフ会` : ""}
             onPickMe={onPickMe}
             onSet={onSetAttendance}
@@ -1608,6 +1602,8 @@ export default function MemberDraft({
   const [names, setNames] = useState<string[]>([]);
   const [attendance, setAttendance] = useState<AttendanceMap>({});
   const [busyName, setBusyName] = useState("");
+  /* 出欠が保存できなかったときの知らせ。書けたら消す。 */
+  const [attendanceError, setAttendanceError] = useState("");
 
   /* この端末の人の名前（会員名簿の中の自分）。まだ選んでいなければ空。
      覚えてあっても名簿から消えていれば空に戻す（lib/me.ts）。 */
@@ -1665,6 +1661,7 @@ export default function MemberDraft({
   const changeAttendance = async (name: string, status: AttendanceStatus | null) => {
     if (!eventKey || !name) return;
     setBusyName(name);
+    setAttendanceError("");
     // 先に画面だけ変えて、押した手ごたえを待たせない
     setAttendance((prev) => {
       const next = { ...prev };
@@ -1674,8 +1671,12 @@ export default function MemberDraft({
     });
     try {
       setAttendance(await writeAttendance(eventKey, name, status));
-    } catch {
-      // 書けなかったときは、保存されているほうに戻す
+    } catch (e) {
+      // 書けなかったときは、保存されているほうに戻したうえで、そのことを画面に出す。
+      // 黙って戻すと「押したのに戻った」だけが見えて、何が起きたのか分からない。
+      setAttendanceError(
+        e instanceof Error ? e.message : "保存できませんでした。もう一度お試しください"
+      );
       try {
         setAttendance(await readAttendance(eventKey));
       } catch {
@@ -1785,6 +1786,7 @@ export default function MemberDraft({
               attendance={attendance}
               me={me}
               busyName={busyName}
+              attendanceError={attendanceError}
               onPickMe={pickMe}
               onSetAttendance={changeAttendance}
               onOpenFeature={onOpenFeature}

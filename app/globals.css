@@ -553,22 +553,37 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 .md-seg-btn.is-absent[aria-pressed="true"]    { background: #33363C; border-color: #33363C; color: #FFFFFF; }
 .md-seg-btn.is-undecided[aria-pressed="true"] { background: #FFFFFF; border-color: #1B1C1E; color: #1B1C1E; box-shadow: inset 0 0 0 1px #1B1C1E; }
 
-/* 名簿から自分の名前を選ぶときの、名前ひとつ。 */
-.md-name {
-  padding: 9px 15px;
+/* 出欠席：名簿から自分の名前を選ぶところ。
+   押すところを別に置かず、選ぶところをそのまま出したままにしている。
+   字を16pxにしてあるのは、iPhoneで触ったときに画面が勝手に拡がらないため。
+   右の山形は背景の画（data URI）で描く。開いている印を出すためだけのものなので、
+   読み上げには渡らないほうがよい。 */
+.md-pick {
+  display: block;
+  width: 100%;
+  height: 46px;
+  padding: 0 38px 0 14px;
   border: 1px solid #E4E5E8;
-  border-radius: 999px;
-  background: #FFFFFF;
+  border-radius: 10px;
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'><path d='M1 1l4.5 4.5L10 1' fill='none' stroke='%238B8E94' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  -webkit-appearance: none;
+  appearance: none;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 700;
   color: #1B1C1E;
   cursor: pointer;
-  transition: background-color .14s ease, border-color .14s ease;
+  transition: border-color .14s ease;
 }
+/* まだ選んでいないとき。「選んでください」を、選んだ名前と同じ濃さで出さない。 */
+.md-pick.is-empty { font-weight: 500; color: #8B8E94; }
 @media (hover: hover) and (pointer: fine) {
-  .md-name:hover { background: #F6F7F8; border-color: #8B8E94; }
+  .md-pick:hover { border-color: #8B8E94; }
 }
-.md-name:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
+.md-pick:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
 
 /* みんなの一覧で、その人が出したものを示す小さな札。
    押すところではないので、ボタンには見せない。 */
@@ -592,7 +607,7 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 .md-bar { display: flex; width: 100%; height: 6px; border-radius: 999px; overflow: hidden; background: #ECEDEF; }
 .md-bar > span { display: block; height: 100%; transition: width .2s ease; }
 @media (prefers-reduced-motion: reduce) {
-  .md-seg-btn, .md-name, .md-bar > span { transition: none; }
+  .md-seg-btn, .md-pick, .md-bar > span { transition: none; }
 }
 
 /* 会員画面「このあとの準備」の1行。押すと 設定 の該当する項目が開く。
