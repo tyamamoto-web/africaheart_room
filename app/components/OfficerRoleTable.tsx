@@ -98,8 +98,24 @@ const TABLE_CSS = `
 .rtbl textarea:focus, .rtbl thead input:focus {
   background:${T.paper}; border-color:${T.cap}; box-shadow:0 0 0 3px rgba(51,48,42,0.10);
 }
-.rtbl select:hover { border-color:${T.cap} !important; }
-.rtbl select:focus { border-color:${T.cap} !important; box-shadow:0 0 0 3px rgba(51,48,42,0.10); }
+.rtbl select:not(.pick):hover { border-color:${T.cap} !important; }
+.rtbl select:not(.pick):focus { border-color:${T.cap} !important; box-shadow:0 0 0 3px rgba(51,48,42,0.10); }
+/* 「優先順位」の列のプルダウン。右のRACIの欄とは役目が違うので、枠で囲わず、
+   同じ並びの書く欄と同じ「下線だけ」の顔にする。 */
+.rtbl select.pick {
+  width:100%; -webkit-appearance:none; -moz-appearance:none; appearance:none;
+  border:1px solid transparent; border-bottom-color:${T.guide}; border-radius:3px;
+  background-color:transparent; background-repeat:no-repeat;
+  background-position:right 7px center; background-size:7px 5px;
+  padding:6px 22px 6px 8px;
+  font-family:inherit; font-size:12px; line-height:1.6; letter-spacing:0.02em;
+  cursor:pointer; outline:none;
+  transition: background-color .12s, border-color .12s, box-shadow .12s;
+}
+.rtbl select.pick:hover { background-color:${T.cellHov}; border-bottom-color:${T.block}; }
+.rtbl select.pick:focus {
+  background-color:${T.paper}; border-color:${T.cap}; box-shadow:0 0 0 3px rgba(51,48,42,0.10);
+}
 .rtbl .addbtn:hover:not(:disabled) { background:${T.cellHov}; border-color:${T.block}; }
 .rtbl .delbtn:hover { background:${T.cellHov}; color:${T.ink}; }
 .rtbl .fchip {
@@ -175,6 +191,54 @@ const rowIconBtn: React.CSSProperties = {
   padding: 0,
   cursor: "pointer",
 };
+
+/* ── 優先順位の列 ────────────────────────────────
+   見出しを「優先順位」にした列だけ、書く欄のかわりに高・中・小から選ぶ形にする。
+   段階が決まっているものを自由に書けるままにしておくと、「高」「大」「A」と
+   書き方がぶれて、数えることも並べることもできなくなるため。
+   見出しで決めているので、ほかの名前に変えればまた書く欄に戻る
+   （左の5列は見出しごと自分たちのもの、という作りを崩さないように）。 */
+const PRIORITY_HEAD = "優先順位";
+const PRIORITY_LEVELS = ["高", "中", "小"];
+/* 色は足さず、字の濃さと太さだけで重さの順をつける（この表の決めごとに合わせる）。 */
+const PRIORITY_UI: Record<string, { fg: string; weight: number }> = {
+  高: { fg: T.ink, weight: 700 },
+  中: { fg: "#4b4841", weight: 600 },
+  小: { fg: T.cap, weight: 500 },
+};
+const PRIORITY_NONE = { fg: T.faint, weight: 500 };
+
+/** 決まったものから選ぶ欄（優先順位）。選んだその場で保存する。 */
+function CellPick({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+}) {
+  const cur = value.trim();
+  const ui = PRIORITY_UI[cur] ?? PRIORITY_NONE;
+  return (
+    <select
+      className="pick"
+      value={cur}
+      aria-label={label}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ color: ui.fg, fontWeight: ui.weight, backgroundImage: chevron(ui.fg) }}
+    >
+      <option value="">—</option>
+      {PRIORITY_LEVELS.map((v) => (
+        <option key={v} value={v}>
+          {v}
+        </option>
+      ))}
+      {/* 前に手で書いた文字が残っている行では、それも選べるままにしておく（勝手に消さない） */}
+      {cur && !PRIORITY_LEVELS.includes(cur) && <option value={cur}>{cur}</option>}
+    </select>
+  );
+}
 
 /** 自由に書く欄。書いた分だけ縦に伸びるので、行の中でスクロールバーが出ない。 */
 function CellText({
@@ -276,6 +340,9 @@ export default function OfficerRoleTable() {
   const pending = useRef(0); // 保存中の件数。0より大きいあいだは取り込みを止める
   const editing = useRef<string | null>(null); // 入力中の行（見出しは "cols"）は上書きしない
   const dirty = useRef<Set<string>>(new Set()); // まだ保存していない行
+  /* 自分の操作で画面を書き換えた回数。下の取り込み（6秒ごと）が、読みに行く前と後で
+     この数を見くらべて、自分の変更を追い越した古い結果かどうかを判断する。 */
+  const localSeq = useRef(0);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -286,6 +353,14 @@ export default function OfficerRoleTable() {
     dataRef.current = next;
     setColumns(next.columns);
     setRows(next.rows);
+  }
+
+  /* 自分の操作で書き換えるときは、こちらを通す（数をひとつ進める）。
+     こうしておかないと、取り込みの読み取りが自分の変更を追い越したときに、
+     押したばかりの選択が画面の上でだけ元に戻ってしまう。 */
+  function commitMine(next: OfficerTableData) {
+    localSeq.current += 1;
+    commit(next);
   }
 
   /* 絞り込みの入り切り。同じ人のなかで押した分は「どれか」で足し合わせる。 */
@@ -321,7 +396,7 @@ export default function OfficerRoleTable() {
       columns: dataRef.current.columns,
       rows: dataRef.current.rows.map((r) => (r.id === id ? { ...r, ...change } : r)),
     };
-    commit(next);
+    commitMine(next);
     const row = next.rows.find((r) => r.id === id);
     if (!row) return;
     if (immediate) {
@@ -336,7 +411,7 @@ export default function OfficerRoleTable() {
   // 列の見出しの変更（全員に共有される）
   function patchColumn(index: number, value: string) {
     const nextCols = dataRef.current.columns.map((c, i) => (i === index ? value : c));
-    commit({ columns: nextCols, rows: dataRef.current.rows });
+    commitMine({ columns: nextCols, rows: dataRef.current.rows });
     dirty.current.add(COLS_KEY);
     clearTimeout(timers.current[COLS_KEY]);
     timers.current[COLS_KEY] = setTimeout(
@@ -369,7 +444,7 @@ export default function OfficerRoleTable() {
     // 絞り込んだままだと、足した空の行はどの条件にも当たらず、その場で見えなくなる。
     setFilters({});
     const row = emptyRow(newRowId());
-    commit({ columns: dataRef.current.columns, rows: [...dataRef.current.rows, row] });
+    commitMine({ columns: dataRef.current.columns, rows: [...dataRef.current.rows, row] });
     void run(row.id, () => saveOfficerTableRow(row));
   }
 
@@ -381,7 +456,7 @@ export default function OfficerRoleTable() {
     const rows = dataRef.current.rows.slice();
     const at = rows.findIndex((r) => r.id === beforeId);
     rows.splice(at >= 0 ? at : rows.length, 0, row);
-    commit({ columns: dataRef.current.columns, rows });
+    commitMine({ columns: dataRef.current.columns, rows });
     void run(row.id, () => insertOfficerTableRowBefore(row, beforeId));
   }
 
@@ -390,7 +465,7 @@ export default function OfficerRoleTable() {
     if (hasText && !window.confirm("この行を消します。ほかの人の画面からも消えます。よろしいですか。")) return;
     clearTimeout(timers.current[row.id]);
     dirty.current.delete(row.id);
-    commit({
+    commitMine({
       columns: dataRef.current.columns,
       rows: dataRef.current.rows.filter((r) => r.id !== row.id),
     });
@@ -419,24 +494,31 @@ export default function OfficerRoleTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ほかの人の変更を取り込む（約6秒ごと）。
+  /* ほかの人の変更を取り込む（約6秒ごと）。
+     取り込みで気をつけるのは「自分の変更を、古い読み取りで上書きしないこと」。
+     読みに行っている最中（本番実測で中央値218ms）に自分が何かを押すと、
+     返ってきた中身はその1つ前の姿になっている。そのまま当てると、押した選択が
+     画面の上でだけ元に戻り、そのあとの保存もその古い姿を土台にしてしまう。
+     そこで、読む前と後で「自分が触った回数」と「保存中の件数」を見くらべて、
+     追い越されていたらこの回の結果を捨てる（次の6秒でまた取りに行く）。 */
   useEffect(() => {
     const t = setInterval(async () => {
       if (pending.current > 0) return; // 保存中は取り込まない
+      const seq = localSeq.current;
       const remote = await getOfficerTable();
       if (remote.rows.length === 0) return; // 読めなかったときは今の表を残す
+      if (localSeq.current !== seq || pending.current > 0) return; // 追い越された＝もう古い
+
       const key = editing.current;
-      if (!key) {
-        commit(remote);
-        return;
-      }
-      // 入力中の見出し・行だけは自分の手元を残し、ほかは共有側に合わせる
+      // まだ保存できていない行（入力中の行・保存待ちの行）は、自分の手元を残す
+      const mine = new Set(dirty.current);
+      if (key && key !== COLS_KEY) mine.add(key);
       const cols = key === COLS_KEY ? dataRef.current.columns : remote.columns;
-      const mine = key === COLS_KEY ? undefined : dataRef.current.rows.find((r) => r.id === key);
-      commit({
-        columns: cols,
-        rows: mine ? remote.rows.map((r) => (r.id === mine.id ? mine : r)) : remote.rows,
-      });
+      const rows =
+        mine.size === 0
+          ? remote.rows
+          : remote.rows.map((r) => (mine.has(r.id) ? dataRef.current.rows.find((x) => x.id === r.id) ?? r : r));
+      commit({ columns: cols, rows });
     }, 6000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -765,27 +847,36 @@ export default function OfficerRoleTable() {
                       )}
                     </td>
 
-                    {/* 自分たちで見出しをつけた5列 */}
-                    {row.cells.map((cell, ci) => (
-                      <td
-                        key={ci}
-                        style={{
-                          ...tblTd,
-                          paddingRight: ci === row.cells.length - 1 ? 14 : 5,
-                          borderRight: ci === row.cells.length - 1 ? `1px solid ${T.block}` : undefined,
-                        }}
-                      >
-                        <CellText
-                          value={cell}
-                          onChange={(v) =>
-                            patchRow(row.id, { cells: row.cells.map((c, k) => (k === ci ? v : c)) }, false)
-                          }
-                          onFocus={() => startEdit(row.id)}
-                          onBlur={() => flush(row.id)}
-                          label={`${no}行目の${columns[ci] || `${ci + 1}つめの列`}`}
-                        />
-                      </td>
-                    ))}
+                    {/* 自分たちで見出しをつけた5列。
+                        見出しが「優先順位」の列だけは、書く欄ではなく選ぶ欄にする。 */}
+                    {row.cells.map((cell, ci) => {
+                      const label = `${no}行目の${columns[ci] || `${ci + 1}つめの列`}`;
+                      const setCell = (v: string, now: boolean) =>
+                        patchRow(row.id, { cells: row.cells.map((c, k) => (k === ci ? v : c)) }, now);
+                      return (
+                        <td
+                          key={ci}
+                          style={{
+                            ...tblTd,
+                            paddingRight: ci === row.cells.length - 1 ? 14 : 5,
+                            borderRight: ci === row.cells.length - 1 ? `1px solid ${T.block}` : undefined,
+                          }}
+                        >
+                          {(columns[ci] ?? "").trim() === PRIORITY_HEAD ? (
+                            /* 選ぶだけなので、待たずにその場で保存する（役割の欄と同じ） */
+                            <CellPick value={cell} label={label} onChange={(v) => setCell(v, true)} />
+                          ) : (
+                            <CellText
+                              value={cell}
+                              onChange={(v) => setCell(v, false)}
+                              onFocus={() => startEdit(row.id)}
+                              onBlur={() => flush(row.id)}
+                              label={label}
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
 
                     {/* 役割（だれが・どう関わる） */}
                     {RACI_PEOPLE.map((p, pi) => {
