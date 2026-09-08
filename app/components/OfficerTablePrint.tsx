@@ -197,7 +197,14 @@ function filterText(filters: Record<string, RaciRole[]>): string {
     .join("／");
 }
 
-type Job = { n: number; date: string; file: string };
+/* 紙の頭に入れる日付。刷った日ではなく、この紙を配る打ち合わせの日を入れる。
+   打ち合わせのたびに、ここ1行を書き替える。 */
+const SHEET_DATE = { y: 2026, m: 9, d: 11 };
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const SHEET_DATE_TEXT = `${SHEET_DATE.y}年${SHEET_DATE.m}月${SHEET_DATE.d}日`;
+const SHEET_FILE = `アフリカハート_役割分担_${SHEET_DATE.y}${pad2(SHEET_DATE.m)}${pad2(SHEET_DATE.d)}`;
+
+type Job = { n: number };
 
 export default function OfficerTablePrint({
   columns,
@@ -222,17 +229,11 @@ export default function OfficerTablePrint({
   const done = useRef(0); // 刷り終えた回数。開発中に効果が2回走っても2枚出さないための目印
   const count = useRef(0);
 
-  /* 押されたら、まず日付を決めて紙を組む（この時点ではまだ画面に出ない）。
+  /* 押されたら、まず紙を組む（この時点ではまだ画面に出ない）。
      組み上がってから下の効果が印刷を呼ぶ。 */
   function start() {
-    const d = new Date();
-    const p2 = (n: number) => String(n).padStart(2, "0");
     count.current += 1;
-    setJob({
-      n: count.current,
-      date: `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
-      file: `アフリカハート_役割分担_${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}`,
-    });
+    setJob({ n: count.current });
   }
 
   /* 紙が組み上がったあとに印刷を呼ぶ。
@@ -243,7 +244,7 @@ export default function OfficerTablePrint({
     done.current = job.n;
 
     const prevTitle = document.title;
-    document.title = job.file;
+    document.title = SHEET_FILE;
     let closed = false;
     const finish = () => {
       if (closed) return;
@@ -265,7 +266,7 @@ export default function OfficerTablePrint({
   /* 紙の中身は、押したときだけ組む。
      この表は1文字打つたびに描き直されるので、ふだんから紙を持っていると、
      そのたびに全部の行の幅を数えなおすことになる。 */
-  function sheet(j: Job) {
+  function sheet() {
     const weights = columnWeights(columns, view.map((v) => v.row));
     const wSum = weights.reduce((a, b) => a + b, 0) || 1;
     const freeInner = FREE_W - CELL_PAD * columns.length; // 文字が入るぶんの合計
@@ -286,100 +287,93 @@ export default function OfficerTablePrint({
           </div>
           <div className="meta">
             <span>アフリカハート　役員用</span>
-            <span>{j.date} 現在</span>
+            <span>{SHEET_DATE_TEXT} 現在</span>
             <span className="scope">
               {ft ? `絞り込み：${ft}（全${total}行のうち${view.length}行）` : `全${total}行`}
             </span>
           </div>
-      </div>
+        </div>
 
-      <table>
-        <colgroup>
-          <col style={{ width: `${NO_W}%` }} />
-          {weights.map((w, i) => (
-            <col
-              key={i}
-              style={{ width: `${(CELL_PAD + (w / wSum) * freeInner).toFixed(2)}%` }}
-            />
-          ))}
-          {RACI_PEOPLE.map((p) => (
-            <col key={p.id} style={{ width: `${WHO_W}%` }} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            <th className="noh" rowSpan={2}>
-              No
-            </th>
-            {columns.map((label, i) => (
-              <th key={i} rowSpan={2}>
-                {label}
-              </th>
+        <table>
+          <colgroup>
+            <col style={{ width: `${NO_W}%` }} />
+            {weights.map((w, i) => (
+              <col key={i} style={{ width: `${(CELL_PAD + (w / wSum) * freeInner).toFixed(2)}%` }} />
             ))}
-            <th className="group" colSpan={RACI_PEOPLE.length}>
-              役割（だれが・どう関わる）
-            </th>
-          </tr>
-          <tr>
             {RACI_PEOPLE.map((p) => (
-              <th key={p.id} className="who">
-                {p.name}
-                <span className="sb">{raciPersonSubLabel(p.role)}</span>
-              </th>
+              <col key={p.id} style={{ width: `${WHO_W}%` }} />
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {view.map(({ row, no }) => {
-            const written = row.cells.some((c) => c.trim());
-            const aCount = Object.values(row.roles).filter((v) => v === "a").length;
-            const needsOwner = written && aCount !== 1;
-            return (
-              <tr key={row.id}>
-                <td className="no">
-                  {no}
-                  {needsOwner && <span className="mark" />}
-                </td>
-                {columns.map((_, ci) => (
-                  <td key={ci} className="cell">
-                    {row.cells[ci] ?? ""}
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="noh" rowSpan={2}>
+                No
+              </th>
+              {columns.map((label, i) => (
+                <th key={i} rowSpan={2}>
+                  {label}
+                </th>
+              ))}
+              <th className="group" colSpan={RACI_PEOPLE.length}>
+                役割（だれが・どう関わる）
+              </th>
+            </tr>
+            <tr>
+              {RACI_PEOPLE.map((p) => (
+                <th key={p.id} className="who">
+                  {p.name}
+                  <span className="sb">{raciPersonSubLabel(p.role)}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {view.map(({ row, no }) => {
+              const written = row.cells.some((c) => c.trim());
+              const aCount = Object.values(row.roles).filter((v) => v === "a").length;
+              const needsOwner = written && aCount !== 1;
+              return (
+                <tr key={row.id}>
+                  <td className="no">
+                    {no}
+                    {needsOwner && <span className="mark" />}
                   </td>
-                ))}
-                {RACI_PEOPLE.map((p) => {
-                  const role = row.roles[p.id];
-                  return (
-                    <td key={p.id} className="role">
-                      {role && <span className={role}>{SHORT[role]}</span>}
+                  {columns.map((_, ci) => (
+                    <td key={ci} className="cell">
+                      {row.cells[ci] ?? ""}
                     </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  ))}
+                  {RACI_PEOPLE.map((p) => {
+                    const role = row.roles[p.id];
+                    return (
+                      <td key={p.id} className="role">
+                        {role && <span className={role}>{SHORT[role]}</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
 
-      <div className="legend">
-        <h2>役割の意味</h2>
-        <dl>
-          {raciDefs.map((d) => (
-            <div className="item" key={d.key}>
-              <dt>{d.short}</dt>
-              <dd>{firstSentence(d.hint)}</dd>
-            </div>
-          ))}
-        </dl>
-        {anyMark && (
-          <p className="foot">
-            <span className="mark" />
-            責任者がまだ1人に決まっていない行です。
-          </p>
-        )}
-        <p className="foot">
-          この紙は、アプリの「役員専用2」を{j.date}時点で写したものです。
-          決めたことをアプリに書き入れておくと、次に刷る紙にも残ります。
-        </p>
-      </div>
+        <div className="legend">
+          <h2>役割の意味</h2>
+          <dl>
+            {raciDefs.map((d) => (
+              <div className="item" key={d.key}>
+                <dt>{d.short}</dt>
+                <dd>{firstSentence(d.hint)}</dd>
+              </div>
+            ))}
+          </dl>
+          {anyMark && (
+            <p className="foot">
+              <span className="mark" />
+              責任者がまだ1人に決まっていない行です。
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -396,7 +390,7 @@ export default function OfficerTablePrint({
       >
         印刷・PDF
       </button>
-      {job && createPortal(sheet(job), document.body)}
+      {job && createPortal(sheet(), document.body)}
     </>
   );
 }
