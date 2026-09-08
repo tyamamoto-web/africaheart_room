@@ -18,6 +18,8 @@ import {
   seedOfficerTable, emptyRow, emptyColumns, newRowId, SEED_ROW_IDS,
   type OfficerTableRow, type OfficerTableData,
 } from "@/lib/officerTable";
+// 打ち合わせで配る紙（PDF）にする。画面の表とは別に、刷るためだけの表を組む。
+import OfficerTablePrint from "@/app/components/OfficerTablePrint";
 
 /* ── 役員専用2：オフ会運営のRACIチャート（役員全員で共同編集）───────
    表の形はRACIの基本どおり。左が「やることの特定」、右が「人ごとの役割」。
@@ -145,6 +147,21 @@ const tblTh: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 const tblTd: React.CSSProperties = { padding: "3px 5px", verticalAlign: "top" };
+
+/** 表の上に並ぶボタン（行を追加・印刷）の見た目。押せないときは枠も字も薄くする。 */
+function barBtn(on: boolean): React.CSSProperties {
+  return {
+    background: T.paper,
+    border: `1px solid ${on ? T.rule : T.hair}`,
+    borderRadius: 3,
+    padding: "7px 16px",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    color: on ? T.ink : T.faint,
+    cursor: on ? "pointer" : "default",
+  };
+}
 
 /** 行の右端に並べる小さなボタン（＋で足す・×で消す）の共通の見た目。 */
 const rowIconBtn: React.CSSProperties = {
@@ -470,24 +487,21 @@ export default function OfficerRoleTable() {
       <style>{TABLE_CSS}</style>
 
       <div className="flex items-center justify-between gap-3" style={{ marginBottom: 10 }}>
-        <button
-          onClick={addRow}
-          disabled={!loaded}
-          className="addbtn"
-          style={{
-            background: T.paper,
-            border: `1px solid ${loaded ? T.rule : T.hair}`,
-            borderRadius: 3,
-            padding: "7px 16px",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.04em",
-            color: loaded ? T.ink : T.faint,
-            cursor: loaded ? "pointer" : "default",
-          }}
-        >
-          行を追加
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={addRow} disabled={!loaded} className="addbtn" style={barBtn(loaded)}>
+            行を追加
+          </button>
+          {/* 打ち合わせで配る紙にする。出すのは、いま画面に出ている行（絞り込みも紙に書く）。 */}
+          <OfficerTablePrint
+            columns={columns}
+            view={view}
+            total={rows.length}
+            filters={filters}
+            disabled={!loaded || view.length === 0}
+            className="addbtn"
+            style={barBtn(loaded && view.length > 0)}
+          />
+        </div>
         {/* ふだんは何も出さない。保存に失敗したときだけ、その場で知らせる。 */}
         {err && <span style={{ fontSize: 11, letterSpacing: "0.02em", color: T.warn }}>{err}</span>}
       </div>
