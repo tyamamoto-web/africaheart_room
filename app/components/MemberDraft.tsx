@@ -122,6 +122,7 @@ import {
   type TimetableRow,
 } from "@/lib/timetable";
 import { eventTeaser, showTeaser } from "@/lib/eventTeaser";
+import { findVoice, readVoices, saveVoice, VOICE_MAX, type Voice } from "@/lib/voices";
 import PlanTable from "@/app/components/PlanTable";
 
 /* ── 日付まわりの小道具 ───────────────────────
@@ -351,32 +352,9 @@ function TodoRow({
   );
 }
 
-/* 押すところ。地は塗らず、外枠だけで示す。
-   その画面でいちばんしてほしいこと1つだけ枠をオレンジにして、
-   ほかは薄いグレーの枠にする。太さは同じ1pxのままにしてあるので、
-   並べたときに高さも字の位置もそろい、色の違いだけが伝わる。 */
-function Button({ children, tone = "quiet" }: { children: React.ReactNode; tone?: "accent" | "quiet" }) {
-  const accent = tone === "accent";
-  return (
-    <span
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: 54,
-        borderRadius: 12,
-        fontSize: 16,
-        fontWeight: 700,
-        background: WHITE,
-        // 白地に置く字なので、オレンジは濃いほう（ACC_TEXT）を使う
-        color: accent ? ACC_TEXT : SUB,
-        border: `1px solid ${accent ? ACC : LINE}`,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
+/* 押すところの見た目は app/globals.css の .md-cta（いちばんしてほしいこと1つ）と
+   .md-edit（そのほか）にある。ここに span で作った見本の Button があったが、
+   ふりかえりの「ひとこと」が本物のボタンになって使う場所が無くなったので外した（9/9）。 */
 
 /* ── 出欠席（ポップアップ）─────────────────
    「出欠席」を押すと、画面の手前にこれが開く。
@@ -1396,13 +1374,47 @@ function GalleryDialog({
   );
 }
 
-/* ── ふりかえりの画面 ─────────────────────── */
-function AfterScreen({ currentIso, today }: { currentIso: string; today: Ymd }) {
+/* ── ふりかえりの画面 ───────────────────────
+   【9/9：ひとことが本当に書けるようになった】
+     それまでの「ひとこと」は、灰色の枠と「送る」の形だけを置いた見本だった。
+     押しても打っても何も起きないので、書きに来た人には壊れて見えていた。
+     いまは、名前を名簿から選んでひとことを送ると、みんなの画面に並ぶ
+     （置き場所は lib/voices.ts）。
+
+     名前を打ち込ませないのは出欠席と同じ理由で、名簿と食い違うと
+     だれの感想なのか分からなくなるため。選んだ名前はこの端末に覚える
+     （lib/me.ts。出欠席で選んでいれば、そのまま入っている）。
+
+     ひとことは1人1件。もう一度送れば書き替えになる。
+     並びは新しいものから。書いたばかりのものが上に出るので、
+     送れたかどうかが目で分かる。 */
+function AfterScreen({
+  currentIso,
+  today,
+  names,
+  me,
+  onPickMe,
+}: {
+  currentIso: string;
+  today: Ymd;
+  names: string[];
+  me: string;
+  onPickMe: (name: string) => void;
+}) {
   // null は「まだ読んでいる」。読めたら配列（0件もありうる）。
   const [items, setItems] = useState<GalleryItem[] | null>(null);
   const [error, setError] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [view, setView] = useState<number | null>(null);
+
+  /* ひとこと。null は「まだ読んでいる」。 */
+  const [voices, setVoices] = useState<Voice[] | null>(null);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  /* どの名前のぶんを欄に出したか。打ちかけの文を、あとから来た読み込みで消さないため。 */
+  const filledFor = useRef<string | null>(null);
+  const boxRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -1420,6 +1432,38 @@ function AfterScreen({ currentIso, today }: { currentIso: string; today: Ymd }) 
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    readVoices(LAST_GALLERY.key)
+      .then((list) => {
+        if (alive) setVoices(list);
+      })
+      .catch(() => {
+        if (alive) setVoices([]); // 読めなくても、書くところは出す
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /* 自分がもう書いていたら、その文を欄に出す（書き直せるように）。
+     同じ名前のあいだは入れ直さないので、打っている途中の文は消えない。 */
+  useEffect(() => {
+    if (!voices || filledFor.current === me) return;
+    filledFor.current = me;
+    setText(me ? findVoice(voices, me)?.text ?? "" : "");
+    setVoiceError("");
+  }, [voices, me]);
+
+  /* 書いた分だけ縦に伸ばす。自分の文がぜんぶ見えていないと、
+     どこを直せばよいのか分からないまま「書き直す」を押すことになる。 */
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(88, el.scrollHeight)}px`;
+  }, [text]);
+
   // 見本のマスは写真を先に。動画は一覧用の画像が無く、暗いマスにしかならないため。
   const preview = useMemo(() => {
     if (!items) return [];
@@ -1436,6 +1480,30 @@ function AfterScreen({ currentIso, today }: { currentIso: string; today: Ymd }) 
 
   const closeAll = useCallback(() => setShowAll(false), []);
   const closeView = useCallback(() => setView(null), []);
+
+  const mine = voices && me ? findVoice(voices, me) : null;
+  const body = text.trim();
+  const canSend = !!me && !!body && !sending && body !== (mine?.text ?? "");
+
+  /* 送る。空にして送ることはできないので、取り消しは下の「取り消す」で受ける。 */
+  const send = async (next: string) => {
+    if (!me || sending) return;
+    setSending(true);
+    setVoiceError("");
+    try {
+      setVoices(await saveVoice(LAST_GALLERY.key, me, next));
+      setText(next);
+    } catch (e) {
+      setVoiceError(e instanceof Error ? e.message : "送れませんでした。もう一度お試しください");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const remove = () => {
+    if (!window.confirm("書いたひとことを取り消します。よろしいですか。")) return;
+    void send("");
+  };
 
   const d = isoYmd(LAST_GALLERY.key);
   const when = d ? `${d.m}月${d.d}日` : LAST_GALLERY.key;
@@ -1481,19 +1549,123 @@ function AfterScreen({ currentIso, today }: { currentIso: string; today: Ymd }) 
 
       <div style={{ marginTop: 40 }}>
         <Label>ひとこと</Label>
-        {/* 書き込む場所。1行でよい、と分かる高さにしてある。 */}
-        <div
-          style={{
-            marginTop: 14,
-            height: 88,
-            borderRadius: 12,
-            border: `1px solid ${LINE}`,
-            background: FACE,
-          }}
-        />
-        <div style={{ marginTop: 12 }}>
-          <Button tone="accent">送る</Button>
+        <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
+          {when}のオフ会はどうでしたか。ひとことどうぞ。書いたものは、みんなの画面に出ます。
+        </p>
+
+        <div style={{ marginTop: 18 }}>
+          <label
+            htmlFor="md-voice-me"
+            style={{ display: "block", fontSize: 13, fontWeight: 700, letterSpacing: "0.02em", color: INK }}
+          >
+            あなたのお名前
+          </label>
+          <select
+            id="md-voice-me"
+            className={me ? "md-pick" : "md-pick is-empty"}
+            value={me}
+            onChange={(e) => onPickMe(e.target.value)}
+            style={{ marginTop: 8 }}
+          >
+            <option value="">名簿から選んでください</option>
+            {names.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
         </div>
+
+        <textarea
+          ref={boxRef}
+          className="md-field md-field--area"
+          aria-label="ひとこと"
+          value={text}
+          maxLength={VOICE_MAX}
+          disabled={!me || sending}
+          placeholder="たのしかったこと、次にやってみたいこと など"
+          onChange={(e) => setText(e.target.value)}
+          style={{ marginTop: 14, minHeight: 88, overflow: "hidden", resize: "none" }}
+        />
+
+        <div style={{ marginTop: 12 }}>
+          <button type="button" className="md-cta" disabled={!canSend} onClick={() => void send(body)}>
+            {sending ? "送っています" : mine ? "書き直す" : "送る"}
+          </button>
+        </div>
+
+        {/* 押したのに送れていないことに、気づけないままにしない。 */}
+        {voiceError && (
+          <p style={{ margin: "8px 2px 0", fontSize: 12, lineHeight: 1.7, color: ACC_TEXT }}>{voiceError}</p>
+        )}
+
+        <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+          {!me
+            ? "上でお名前を選ぶと、ひとことを書けます。"
+            : mine
+              ? "もう一度送ると、前のひとことを書き替えます。"
+              : "あとから書き直せます。"}
+        </p>
+
+        {/* 書いたものを引っこめられるように。人に見えるところなので、自分で下げられる道を残す。 */}
+        {mine && (
+          <div style={{ marginTop: 10 }}>
+            <button type="button" className="md-edit" disabled={sending} onClick={remove}>
+              取り消す
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* みんなのひとこと。読むところで、押すところではない。 */}
+      <div style={{ marginTop: 36 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+          <Label>みんなのひとこと</Label>
+          {voices && voices.length > 0 && (
+            <span style={{ fontSize: 12, color: DIM }}>{voices.length}件</span>
+          )}
+        </div>
+
+        {voices === null ? (
+          <div aria-hidden="true" style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+            <Bar w="40%" h={13} />
+            <Bar w="88%" h={13} />
+          </div>
+        ) : voices.length === 0 ? (
+          <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
+            まだ誰も書いていません。
+          </p>
+        ) : (
+          <div style={{ marginTop: 6 }}>
+            {voices.map((v, i) => (
+              <div
+                key={v.name}
+                style={{
+                  padding: "14px 0",
+                  borderBottom: i === voices.length - 1 ? "none" : `1px solid ${LINE}`,
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: INK }}>{v.name}</span>
+                  {v.name === me && <span style={{ fontSize: 11, fontWeight: 500, color: DIM }}>あなた</span>}
+                </span>
+                {/* 改行はそのまま出す。書いた人が区切ったところを勝手に詰めない。 */}
+                <p
+                  style={{
+                    margin: "6px 0 0",
+                    fontSize: 15,
+                    lineHeight: 1.9,
+                    color: INK,
+                    whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {v.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* この回が終わってから、次の日時が決まるまでの間。
@@ -1853,7 +2025,15 @@ export default function MemberDraft({
           )}
           {/* 当日の部屋割の人数は、参加と出した人だけを数える。 */}
           {phase === "day"    && <DayScreen attendeeCount={countAttendance(attendance, names).going} />}
-          {phase === "after"  && <AfterScreen currentIso={draft.date} today={jstYmd(nowMs)} />}
+          {phase === "after" && (
+            <AfterScreen
+              currentIso={draft.date}
+              today={jstYmd(nowMs)}
+              names={names}
+              me={me}
+              onPickMe={pickMe}
+            />
+          )}
         </div>
       </div>
 

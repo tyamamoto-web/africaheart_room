@@ -494,6 +494,9 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   .md-cta:hover { background: rgba(243, 112, 33, 0.07); }
 }
 .md-cta:focus-visible { outline: 2px solid #B24809; outline-offset: 2px; }
+/* まだ送れないとき（名前を選んでいない・何も書いていない・送っている最中）。
+   隠さずに薄くするだけにして、押せば何が起きるかは読めるままにしておく。 */
+.md-cta:disabled { border-color: #E4E5E8; color: #8B8E94; background: #FFFFFF; cursor: default; }
 
 /* 出欠席の1行。やることの行（TodoRow）と同じ間の取り方にしてある。 */
 .md-row {
