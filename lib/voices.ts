@@ -33,10 +33,26 @@ export type Voice = { name: string; text: string; at: number };
 /** 1件の長さの上限。長めの文も置けるが、際限なく伸ばさない。 */
 export const VOICE_MAX = 400;
 
-/* 置いておく回の数と、全部の件数。
-   共有の1行に入る大きさ（SHARED_MAX_BYTES）に届く前に、古い回から落としていく。 */
-const MAX_EVENTS = 12;
-const MAX_TOTAL = 400;
+/* ── 書いたものを、こちらから消さないこと ─────────────────
+   はじめは「12回ぶんだけ残して、古い回から落とす」ようにしていた。
+   それは、共有の1行に入る大きさ（SHARED_MAX_BYTES＝400,000バイト）を
+   自分で守るためだったが、会員の書いた言葉を黙って捨てることになる。
+   何回目のオフ会の話かは覚えていても、いつ消えたかは誰も分からない。
+
+   なので、こちらから落とすのはやめた。全部の回のぶんを持ち続ける。
+
+   大きさの見積り：1件はおおよそ
+     日付・名前・時刻の決まった部分で約60バイト＋本文（日本語1文字3バイト）。
+   ふつうの長さ（100字くらい）なら1件400バイト弱、21名で1回8キロバイトほど。
+     400,000 ÷ 8,000 ＝ 50回ぶん（毎月なら4年以上）
+   全員が上限の400字いっぱいまで書いた場合でも
+     1回27キロバイトほどで、15回ぶん（1年以上）
+   入る。
+
+   それでも満杯になったときは、`writeSharedRow` が保存を中止して
+   「中身が大きくなりすぎました」と返す（画面にそのまま出る）。
+   黙って消えるより、書けないと分かるほうがよい。
+   そうなったら、役員が古い回のぶんを別の場所に移すことになる。 */
 
 type Entry = { d: string; n: string; t: string; a: number };
 
@@ -78,19 +94,11 @@ function decodeAll(raw: string[]): Entry[] {
   return out;
 }
 
-/* 大きくなりすぎないように、新しい回から順に残す。
-   同じ回のなかでは、あとから書かれたものを先に残す（あふれるときは古い声から落ちる）。 */
-function fitAll(list: Entry[]): Entry[] {
-  const keep = new Set(
-    Array.from(new Set(list.map((e) => e.d)))
-      .sort()
-      .reverse()
-      .slice(0, MAX_EVENTS)
-  );
-  return list
-    .filter((e) => keep.has(e.d))
-    .sort((x, y) => (x.d === y.d ? y.a - x.a : x.d < y.d ? 1 : -1))
-    .slice(0, MAX_TOTAL);
+/* 保存する並び。新しい回から、回のなかでは新しく書かれたものから。
+   1件も落とさない（並べ替えるだけ）。
+   並べておくのは、共有の中身を直に覗いたときに読み取れるようにするため。 */
+function orderAll(list: Entry[]): Entry[] {
+  return [...list].sort((x, y) => (x.d === y.d ? y.a - x.a : x.d < y.d ? 1 : -1));
 }
 
 /** その回のぶんだけを、新しいものから順に取り出す。 */
@@ -120,7 +128,7 @@ export async function saveVoice(eventDate: string, name: string, text: string): 
     // 自分のぶんを外してから書いたものを足す（何度呼ばれても同じ結果になるように）
     const rest = decodeAll(prev).filter((e) => !(e.d === eventDate && e.n === who));
     const next = body ? [...rest, { d: eventDate, n: who, t: body, a: Date.now() }] : rest;
-    return fitAll(next).map(encodeEntry);
+    return orderAll(next).map(encodeEntry);
   });
   return pick(decodeAll(raw), eventDate);
 }
