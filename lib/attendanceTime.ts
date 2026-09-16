@@ -10,10 +10,18 @@
    ここが分からないと組めない。だから出欠と同じ場所で受ける。
 
    持つのは1人につき2つだけ。
-     来る時間（in） … "" ＝はじめから ／ "未定" ／ "19:00"
-     帰る時間（out）… "" ＝最後まで   ／ "未定" ／ "20:30"
+     来る時間（in） … "" ＝はじめから ／ "未定" ／ 本人が書いた字
+     帰る時間（out）… "" ＝最後まで   ／ "未定" ／ 本人が書いた字
    「途中で抜けて、また戻る」は持たない。持てる形を増やすと、
    入れる人の手間も、役員が読む手間も増える。まず2つで始める。
+
+   ★ 時刻は選ばせず、本人に書いてもらう（2026-09-16 に変更）。
+     はじめは30分きざみのプルダウンにしていたが、実際に出てくるのは
+     「13時ごろ」「仕事が終わり次第」「30分くらい遅れます」のような言い方で、
+     刻みの合う時刻を選ばせると、そのどれも出せなかった。
+     ここを読むのは役員（人）であって計算ではないので、書いてもらうほうがよく伝わる。
+     そのぶん、並べ替えや自動の割り当てには使えない。長さだけ WHEN_MAX で押さえる。
+     押しただけで何も書いていない状態は "未定"（TIME_UNKNOWN）で持つ。
 
    ★ 出欠そのもの（lib/attendance.ts / 共有の id=11）は1文字も触らない。
      あちらの人の行は "参加:くる" の形で、コロンから後ろが全部名前になる
@@ -37,17 +45,24 @@
    ── そのときは in も out も "" になるので、その人の件ごと配列から消える。
 
    古い回のぶんも、こちらからは落とさない（lib/voices.ts と同じ考え方）。
-   1件はおよそ80バイト。遅れる人・帰る人のぶんしか作らないが、
-   最悪21名全員が毎回入れても1回1.7キロバイトで、
-     400,000 ÷ 1,700 ＝ 230回ぶん（毎月なら19年）
+   1件は、決まった部分が約70バイト＋書いた字（日本語1文字3バイト）。
+   ふつうの短い書き方なら1件100バイト前後で、遅れる人・帰る人のぶんしか作らない。
+   最悪、21名全員が毎回2つとも WHEN_MAX いっぱい（30字）まで書いても
+     1件250バイト × 21名 ＝ 1回5.3キロバイト
+     400,000 ÷ 5,300 ＝ 75回ぶん（毎月なら6年）
    入る。満杯になれば writeSharedRow が保存を中止して
    「中身が大きくなりすぎました」と返し、その文がそのまま画面に出る。
    ============================================================ */
 
 import { SHARED_ROW, readSharedLenient, writeSharedRow } from "./sharedRow";
 
-/** 時刻がまだ分からない、を表す値。保存にもこの文字を使う（Supabaseを直に見ても読めるように）。 */
+/** 押しただけで、まだ何も書いていない状態。保存にもこの文字を使う
+    （Supabaseを直に見ても読めるように）。本人が「未定」と書いた場合も同じ扱いでよい。 */
 export const TIME_UNKNOWN = "未定";
+
+/** 1つぶんに書ける長さ。時間のことをひとこと書ければよいので、短く押さえる
+    （長いと、みんなの一覧で1人の行だけが何行にも伸びる）。 */
+export const WHEN_MAX = 30;
 
 /** 来る時間・帰る時間。"" は決まりどおり（はじめから／最後まで）。 */
 export type AttendanceTime = { in: string; out: string };
@@ -58,20 +73,14 @@ export type AttendanceTimeMap = Record<string, AttendanceTime>;
 /** 何も出していない状態。押すところの初期値に使う（undefined を作らない）。 */
 export const EMPTY_TIME: AttendanceTime = { in: "", out: "" };
 
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_ONLY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
-/** 30分きざみで肢を作る。細かくすると、年配の方が長い車輪を回すことになる。 */
-const STEP = 30;
-/** 肢の数の頭打ち。長すぎる開催時間を入れ間違えても、車輪が伸び続けないように。 */
-const MAX_CHOICES = 24;
-
-/** 読めた値だけを通す。読めないものは「決まりどおり」に倒す（画面を止めない）。 */
+/* 読めた値だけを通す。
+   本人が書いた字をそのまま持つが、改行やタブが混じると
+   みんなの一覧の1行が崩れるので、続きの空白はひとつに詰める。 */
 function cleanValue(v: unknown): string {
   if (typeof v !== "string") return "";
-  const s = v.trim();
-  if (s === TIME_UNKNOWN) return TIME_UNKNOWN;
-  return HHMM.test(s) ? s : "";
+  return v.replace(/\s+/g, " ").trim().slice(0, WHEN_MAX);
 }
 
 /** 決まりどおりか（2つとも空）。true なら、その人のぶんは保存しない。 */
@@ -81,66 +90,19 @@ export function isEmptyTime(t: AttendanceTime | null | undefined): boolean {
 
 /**
  * 画面に出す言葉。決まりどおりなら ""（その行そのものを出さない）。
- *   "19:00" / ""      → 19:00から
- *   ""      / "20:30" → 20:30まで
- *   "19:00" / "20:30" → 19:00から20:30まで
- *   "未定"  / ""      → 遅れて参加
- *   "19:00" / "未定"  → 19:00から・途中で退席
+ * 本人が書いた字は、何と書いてあっても文として通るように、括弧に入れて添える。
+ *   "未定"     / ""         → 遅れて参加
+ *   "13時ごろ" / ""         → 遅れて参加（13時ごろ）
+ *   ""         / "17時ごろ" → 途中で退席（17時ごろ）
+ *   "13時ごろ" / "17時ごろ" → 遅れて参加（13時ごろ）・途中で退席（17時ごろ）
  */
 export function formatAttendanceTime(t: AttendanceTime | null | undefined): string {
   if (!t) return "";
-  const a = t.in === TIME_UNKNOWN ? "遅れて参加" : t.in ? `${t.in}から` : "";
-  const b = t.out === TIME_UNKNOWN ? "途中で退席" : t.out ? `${t.out}まで` : "";
-  if (!a || !b) return a || b;
-  // 「19:00から20:30まで」はひと続きで読めるので、区切りを挟まない。
-  if (t.in !== TIME_UNKNOWN && t.out !== TIME_UNKNOWN) return `${a}${b}`;
-  return `${a}・${b}`;
-}
-
-function toMinutes(s: string): number | null {
-  if (!HHMM.test(s)) return null;
-  return Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
-}
-
-function toText(m: number): string {
-  const h = Math.floor(m / 60) % 24;
-  const mi = m % 60;
-  return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
-}
-
-/**
- * 開催時間から、選べる時刻を作る。
- * 開始ちょうど・終了ちょうどは入れない（それは遅れてもいないし、途中で帰ってもいない）。
- * 終了が入っていなければ、開始の6時間後までで打ち切る。
- * 開始が読めなければ空（そのときは時刻を選ばせず、「遅れて行く」だけを受ける）。
- */
-export function timeChoices(start: string, end: string): string[] {
-  const s = toMinutes(start);
-  if (s === null) return [];
-  const e0 = toMinutes(end);
-  // 終わりが日をまたぐ回（22:00〜翌1:00）もあるので、後ろに回っていれば1日足して数える。
-  const e = e0 === null || e0 === s ? s + 6 * 60 : e0 > s ? e0 : e0 + 24 * 60;
-
-  const out: string[] = [];
-  for (let m = Math.floor(s / STEP) * STEP + STEP; m < e && out.length < MAX_CHOICES; m += STEP) {
-    out.push(toText(m));
-  }
-  return out;
-}
-
-/**
- * 保存してある時刻が肢に無ければ、時間順の位置に差し込んで返す。
- * 役員が開催時間を打ち直したとき、保存は 21:00 のままなのに
- * 画面だけ「まだ分かりません」に見える、という嘘を防ぐ。
- * （"HH:MM" は文字の大小がそのまま時間の前後になる。日をまたぐ回（22:00〜翌1:00 など）で
- *   0時台を保存していると、時間の順ではなく先頭に付く。並びが揃わないだけで、
- *   選んだものは選ばれたまま出るので、そこまでは面倒を見ない）
- */
-export function withSaved(choices: string[], saved: string): string[] {
-  if (!HHMM.test(saved) || choices.includes(saved)) return choices;
-  const at = choices.findIndex((c) => c > saved);
-  if (at < 0) return [...choices, saved];
-  return [...choices.slice(0, at), saved, ...choices.slice(at)];
+  const part = (v: string, head: string) =>
+    !v ? "" : v === TIME_UNKNOWN ? head : `${head}（${v}）`;
+  const a = part(t.in, "遅れて参加");
+  const b = part(t.out, "途中で退席");
+  return a && b ? `${a}・${b}` : a || b;
 }
 
 /**

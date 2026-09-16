@@ -118,8 +118,7 @@ import {
   isEmptyTime,
   readAttendanceTimes,
   setAttendanceTime as writeAttendanceTime,
-  timeChoices,
-  withSaved,
+  WHEN_MAX,
   type AttendanceTime,
   type AttendanceTimeMap,
 } from "@/lib/attendanceTime";
@@ -369,6 +368,86 @@ function TodoRow({
    .md-edit（そのほか）にある。ここに span で作った見本の Button があったが、
    ふりかえりの「ひとこと」が本物のボタンになって使う場所が無くなったので外した（9/9）。 */
 
+/* ── 時間をひとこと書く欄 ─────────────────────────
+   はじめは30分きざみのプルダウンだったが、実際に出てくるのは
+   「13時ごろ」「仕事が終わり次第」のような言い方なので、書いてもらう形にした。
+
+   1文字ごとに送ると共有の置き場所を叩き続けることになるので、
+   手が止まって少ししてから保存し、欄から離れたときは待たずに保存する。
+   打っているあいだは手元の字をそのまま出す（保存の返事で字が書き替わらないように）。
+   空のままでも構わない ── そのときは「未定」として持つ（lib/attendanceTime.ts）。 */
+const WHEN_WAIT = 800;
+
+function WhenField({
+  id,
+  label,
+  placeholder,
+  value,
+  onSave,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  /** 保存してある中身。「未定」は「押しただけで、まだ書いていない」なので空で出す。 */
+  value: string;
+  onSave: (text: string) => void;
+}) {
+  const shown = value === TIME_UNKNOWN ? "" : value;
+  const [text, setText] = useState(shown);
+  const typing = useRef(false);
+  const saved = useRef(shown);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* 外から変わったときだけ合わせる。打っている最中は手元の字を書き替えない。 */
+  useEffect(() => {
+    saved.current = shown;
+    if (!typing.current) setText(shown);
+  }, [shown]);
+
+  // 閉じるときに、待っている保存の呼び出しを残さない
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  const push = (v: string) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (v.trim() !== saved.current) onSave(v);
+  };
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <label htmlFor={id} style={{ display: "block", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        className="md-field"
+        maxLength={WHEN_MAX}
+        placeholder={placeholder}
+        value={text}
+        style={{ marginTop: 6 }}
+        onChange={(e) => {
+          const v = e.target.value;
+          typing.current = true;
+          setText(v);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => push(v), WHEN_WAIT);
+        }}
+        onBlur={() => {
+          typing.current = false;
+          push(text);
+        }}
+        /* スマホの「完了」でも、その場で保存して閉じられるように。 */
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+      />
+    </div>
+  );
+}
+
 /* ── 出欠席（ポップアップ）─────────────────
    「出欠席」を押すと、画面の手前にこれが開く。
 
@@ -391,7 +470,7 @@ function TodoRow({
      参加でも、頭から終わりまでいるとは限らない。遅れて来る人と先に帰る人がいると、
      当日の部屋割り（コマの顔ぶれ）が変わるので、役員はそこを知らないと組めない。
      これまでLINEや口頭で伝わっていたものを、出欠と同じ場所で受ける（lib/attendanceTime.ts）。
-     出すのは「遅れて行く」「途中で帰る」の2つで、押した側だけ時刻を選べる。
+     出すのは「遅れて行く」「途中で帰る」の2つで、押した側だけ時間を書ける。
      どちらも当てはまらない人の画面は、1行も増えない。
 
    出せるのは前の日の23:59まで（attendanceDeadline）。過ぎたら3つは押せなくする。
@@ -404,7 +483,6 @@ function AttendanceDialog({
   names,
   attendance,
   times,
-  choices,
   spanText,
   me,
   busy,
@@ -420,8 +498,6 @@ function AttendanceDialog({
   attendance: AttendanceMap;
   /** 参加の人の「来る時間・帰る時間」。出していない人は入っていない。 */
   times: AttendanceTimeMap;
-  /** 時刻のプルダウンに出す肢（開催時間から作る）。空なら時刻は選ばせない。 */
-  choices: string[];
   /** 「この回は 18:00〜21:30 です。」の一行。開始が入っていなければ空。 */
   spanText: string;
   /** この端末の人の名前。まだ選んでいなければ空。 */
@@ -472,30 +548,17 @@ function AttendanceDialog({
   const toggleWhen = (key: "in" | "out") =>
     onSetTime(me, { ...myTime, [key]: myTime[key] ? "" : TIME_UNKNOWN });
 
-  /* 時刻のプルダウン。片方ぶんを描く（来る・帰るで中身が同じなので、ここにまとめた）。
-     保存してある時刻が肢に無いときは、その時刻を差し込んでから出す（withSaved）。 */
-  const whenPick = (key: "in" | "out", id: string, label: string) =>
-    myTime[key] && choices.length > 0 ? (
-      <div style={{ marginTop: 12 }}>
-        <label htmlFor={id} style={{ display: "block", fontSize: 12, lineHeight: 1.7, color: DIM }}>
-          {label}
-        </label>
-        <select
-          id={id}
-          className="md-pick"
-          value={myTime[key]}
-          onChange={(e) => onSetTime(me, { ...myTime, [key]: e.target.value })}
-          style={{ marginTop: 6 }}
-        >
-          {/* いちばん迷っている人に、いちばん長く車輪を回させない。だから先頭に置く。 */}
-          <option value={TIME_UNKNOWN}>まだ分かりません</option>
-          {withSaved(choices, myTime[key]).map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </div>
+  /* 時間を書く欄。片方ぶんを描く（来る・帰るで中身が同じなので、ここにまとめた）。
+     押していないほうは出さない。 */
+  const whenField = (key: "in" | "out", id: string, label: string, hint: string) =>
+    myTime[key] ? (
+      <WhenField
+        id={id}
+        label={label}
+        placeholder={hint}
+        value={myTime[key]}
+        onSave={(text) => onSetTime(me, { ...myTime, [key]: text.trim() || TIME_UNKNOWN })}
+      />
     ) : null;
 
   return createPortal(
@@ -601,7 +664,6 @@ function AttendanceDialog({
                         type="button"
                         className="md-seg-btn is-when"
                         aria-pressed={!!myTime.in}
-                        disabled={busy === me}
                         onClick={() => toggleWhen("in")}
                       >
                         遅れて行く
@@ -610,22 +672,21 @@ function AttendanceDialog({
                         type="button"
                         className="md-seg-btn is-when"
                         aria-pressed={!!myTime.out}
-                        disabled={busy === me}
                         onClick={() => toggleWhen("out")}
                       >
                         途中で帰る
                       </button>
                     </div>
 
-                    {whenPick("in", "md-when-in", "着くのは何時ごろですか")}
-                    {whenPick("out", "md-when-out", "帰るのは何時ごろですか")}
+                    {whenField("in", "md-when-in", "着くのは何時ごろですか", "例：13時ごろ")}
+                    {whenField("out", "md-when-out", "帰るのは何時ごろですか", "例：17時ごろ")}
 
                     {/* 新しい欄を見て「押さないと悪いのか」と思わせない。
                         当てはまらない人には、そのままでよいとその場で言う。 */}
                     <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
                       {isEmptyTime(myTime)
                         ? "当てはまるものがあれば押してください。無ければ、このままで大丈夫です。"
-                        : "だいたいで構いません。あとから何度でも変えられます。"}
+                        : "時間が決まっていなければ、空のままで構いません。あとから何度でも変えられます。"}
                       {spanText && (
                         <>
                           <br />
@@ -637,7 +698,7 @@ function AttendanceDialog({
                 )}
 
                 {/* 締め切ったあと。押すところは出さないが、出したものは読めるままにしておく
-                    （プルダウンを押せなくすると、iPhoneでは中の字まで薄くなって読めなくなる）。 */}
+                    （欄を押せなくすると、iPhoneでは中の字まで薄くなって読めなくなる）。 */}
                 {mine === "going" && closed && !isEmptyTime(myTime) && (
                   <p style={{ margin: "14px 2px 0", fontSize: 13, lineHeight: 1.7, color: SUB }}>
                     あなたの時間　{formatAttendanceTime(myTime)}
@@ -740,6 +801,8 @@ function AttendanceDialog({
                           )}
                         </div>
 
+                        {/* 本人が書いた字がそのまま出るので、切らずに折り返す
+                            （切ってしまうと、役員がいちばん知りたい時間が読めない）。 */}
                         {whenLine && (
                           <p
                             style={{
@@ -747,9 +810,7 @@ function AttendanceDialog({
                               fontSize: 12,
                               lineHeight: 1.6,
                               color: DIM,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
+                              overflowWrap: "anywhere",
                             }}
                           >
                             {whenLine}
@@ -967,9 +1028,7 @@ function BeforeScreen({
   /* 出欠の〆切。毎回きまって、前の日の23:59まで。 */
   const deadline = attendanceDeadline(draft.date, today);
 
-  /* 当日の出入りに使うもの。
-     肢は開催時間から作るので、役員が時間を直せばそのまま付いてくる。 */
-  const whenChoices = useMemo(() => timeChoices(draft.start, draft.end), [draft.start, draft.end]);
+  /* 当日の出入りの欄に添える一行。何時から何時の会なのかが分かると、書きやすい。 */
   const spanText = draft.start && draft.end
     ? `この回は ${draft.start}〜${draft.end} です。`
     : draft.start
@@ -1077,7 +1136,6 @@ function BeforeScreen({
             names={names}
             attendance={attendance}
             times={times}
-            choices={whenChoices}
             spanText={spanText}
             me={me}
             busy={busyName}
@@ -2122,14 +2180,15 @@ export default function MemberDraft({
   };
 
   /* 押すたびに番号を振り、いちばん新しい返事だけを画面に当てる。
-     出欠の3つは保存中は押せなくしてあるが、時刻のプルダウンは押せるままにしてある
-     （押せなくすると、iPhoneでは中の字まで薄くなって読めなくなるため）。
-     だから「遅れて行く」を押した直後、その保存が返る前に時刻を選べる。
-     そのとき古いほうの返事を当ててしまうと、選んだ時刻がいったん
-     「まだ分かりません」に戻って見える ── 押したのに戻った、がいちばん困る。 */
+     出欠の3つは保存中は押せなくしてあるが、出入りの2つと時間の欄は押せるままにしてある
+     （欄を押せなくすると iPhone では中の字まで薄くなるうえ、打ち終わってすぐ
+       もう片方を押せないと「押したのに何も起きない」になる）。
+     だから前の保存が返る前に、続けて書いたり押したりできる。そのとき古いほうの
+     返事を当ててしまうと、書いた字がいったん消えて見える ──
+     押したのに戻った、がいちばん困る。 */
   const timeSeq = useRef(0);
 
-  /* 「遅れて行く」「途中で帰る」を押したとき、時刻を選び直したとき。
+  /* 「遅れて行く」「途中で帰る」を押したとき、時間の欄を書き替えたとき。
      参加を取り消しても、ここのぶんはこちらからは消さない（出さないだけ）。
      消し込みを当てにしない理由は lib/attendanceTime.ts の頭に書いた。
      本人が2つとも外したときだけ、その人のぶんが消える。 */
