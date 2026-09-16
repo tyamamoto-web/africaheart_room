@@ -110,6 +110,19 @@ import {
   type AttendanceMap,
   type AttendanceStatus,
 } from "@/lib/attendance";
+import {
+  EMPTY_TIME,
+  TIME_UNKNOWN,
+  countAttendanceTimes,
+  formatAttendanceTime,
+  isEmptyTime,
+  readAttendanceTimes,
+  setAttendanceTime as writeAttendanceTime,
+  timeChoices,
+  withSaved,
+  type AttendanceTime,
+  type AttendanceTimeMap,
+} from "@/lib/attendanceTime";
 import { resolveMe, saveMe } from "@/lib/me";
 import { readRoster, rosterNames } from "@/lib/roster";
 import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
@@ -374,6 +387,13 @@ function TodoRow({
    下の一覧は、みんなが出したものを見るところ。押すところではない。
    自分のぶんを書き換えられるのは自分だけ（ほかの人の欄は触れない）。
 
+   【9/16：参加の人には、当日の出入りも聞く】
+     参加でも、頭から終わりまでいるとは限らない。遅れて来る人と先に帰る人がいると、
+     当日の部屋割り（コマの顔ぶれ）が変わるので、役員はそこを知らないと組めない。
+     これまでLINEや口頭で伝わっていたものを、出欠と同じ場所で受ける（lib/attendanceTime.ts）。
+     出すのは「遅れて行く」「途中で帰る」の2つで、押した側だけ時刻を選べる。
+     どちらも当てはまらない人の画面は、1行も増えない。
+
    出せるのは前の日の23:59まで（attendanceDeadline）。過ぎたら3つは押せなくする。
    ただし、出したものと、みんなの出欠は、そのまま見られるようにしておく
    （当日にいちばん見たいのは「誰が来るのか」なので、画面ごと閉じない）。
@@ -383,6 +403,9 @@ function TodoRow({
 function AttendanceDialog({
   names,
   attendance,
+  times,
+  choices,
+  spanText,
   me,
   busy,
   error,
@@ -390,10 +413,17 @@ function AttendanceDialog({
   deadline,
   onPickMe,
   onSet,
+  onSetTime,
   onClose,
 }: {
   names: string[];
   attendance: AttendanceMap;
+  /** 参加の人の「来る時間・帰る時間」。出していない人は入っていない。 */
+  times: AttendanceTimeMap;
+  /** 時刻のプルダウンに出す肢（開催時間から作る）。空なら時刻は選ばせない。 */
+  choices: string[];
+  /** 「この回は 18:00〜21:30 です。」の一行。開始が入っていなければ空。 */
+  spanText: string;
   /** この端末の人の名前。まだ選んでいなければ空。 */
   me: string;
   busy: string;
@@ -405,6 +435,7 @@ function AttendanceDialog({
   deadline: Deadline | null;
   onPickMe: (name: string) => void;
   onSet: (name: string, status: AttendanceStatus | null) => void;
+  onSetTime: (name: string, time: AttendanceTime) => void;
   onClose: () => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -430,6 +461,42 @@ function AttendanceDialog({
   const mine = me ? attendance[me] ?? null : null;
   const closed = deadline !== null && !deadline.open;
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+
+  /* 自分の出入り。まだ出していなければ2つとも空（undefined を作らない）。 */
+  const myTime = (me ? times[me] : null) ?? EMPTY_TIME;
+  /* 参加の人のうち、出入りを出している人の数。参加の人数は動かさない。 */
+  const withTime = countAttendanceTimes(times, (n) => attendance[n] === "going", names);
+
+  /* 「遅れて行く」「途中で帰る」の押し外し。押すと「未定」で立ち、
+     もう一度押すと外れる。時刻はそのあとで、選ばなくても出せる。 */
+  const toggleWhen = (key: "in" | "out") =>
+    onSetTime(me, { ...myTime, [key]: myTime[key] ? "" : TIME_UNKNOWN });
+
+  /* 時刻のプルダウン。片方ぶんを描く（来る・帰るで中身が同じなので、ここにまとめた）。
+     保存してある時刻が肢に無いときは、その時刻を差し込んでから出す（withSaved）。 */
+  const whenPick = (key: "in" | "out", id: string, label: string) =>
+    myTime[key] && choices.length > 0 ? (
+      <div style={{ marginTop: 12 }}>
+        <label htmlFor={id} style={{ display: "block", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+          {label}
+        </label>
+        <select
+          id={id}
+          className="md-pick"
+          value={myTime[key]}
+          onChange={(e) => onSetTime(me, { ...myTime, [key]: e.target.value })}
+          style={{ marginTop: 6 }}
+        >
+          {/* いちばん迷っている人に、いちばん長く車輪を回させない。だから先頭に置く。 */}
+          <option value={TIME_UNKNOWN}>まだ分かりません</option>
+          {withSaved(choices, myTime[key]).map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </div>
+    ) : null;
 
   return createPortal(
     // 外の暗いところを押しても閉じる。
@@ -522,6 +589,61 @@ function AttendanceDialog({
                   )}
                 </p>
 
+                {/* ── 当日の出入り。参加と出した人にだけ出す ──
+                    遅れて来る人と先に帰る人がいると、当日の部屋割り（コマの顔ぶれ）が変わる。
+                    ここを先に「出す・出さない」の2つだけで受けて、時刻は押した側にだけ聞く。
+                    どちらも当てはまらない人の画面は1行も増えないし、
+                    時刻がまだ分からない人は、押すだけで先に知らせられる。 */}
+                {mine === "going" && !closed && (
+                  <div style={{ marginTop: 16 }}>
+                    <div className="md-seg md-seg--2" role="group" aria-label="当日の出入り">
+                      <button
+                        type="button"
+                        className="md-seg-btn is-when"
+                        aria-pressed={!!myTime.in}
+                        disabled={busy === me}
+                        onClick={() => toggleWhen("in")}
+                      >
+                        遅れて行く
+                      </button>
+                      <button
+                        type="button"
+                        className="md-seg-btn is-when"
+                        aria-pressed={!!myTime.out}
+                        disabled={busy === me}
+                        onClick={() => toggleWhen("out")}
+                      >
+                        途中で帰る
+                      </button>
+                    </div>
+
+                    {whenPick("in", "md-when-in", "着くのは何時ごろですか")}
+                    {whenPick("out", "md-when-out", "帰るのは何時ごろですか")}
+
+                    {/* 新しい欄を見て「押さないと悪いのか」と思わせない。
+                        当てはまらない人には、そのままでよいとその場で言う。 */}
+                    <p style={{ margin: "9px 2px 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                      {isEmptyTime(myTime)
+                        ? "当てはまるものがあれば押してください。無ければ、このままで大丈夫です。"
+                        : "だいたいで構いません。あとから何度でも変えられます。"}
+                      {spanText && (
+                        <>
+                          <br />
+                          {spanText}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* 締め切ったあと。押すところは出さないが、出したものは読めるままにしておく
+                    （プルダウンを押せなくすると、iPhoneでは中の字まで薄くなって読めなくなる）。 */}
+                {mine === "going" && closed && !isEmptyTime(myTime) && (
+                  <p style={{ margin: "14px 2px 0", fontSize: 13, lineHeight: 1.7, color: SUB }}>
+                    あなたの時間　{formatAttendanceTime(myTime)}
+                  </p>
+                )}
+
                 {/* 押したのに保存できていないことに、気づけないままにしない。 */}
                 {error && (
                   <p style={{ margin: "8px 2px 0", fontSize: 12, lineHeight: 1.7, color: ACC_TEXT }}>
@@ -552,53 +674,86 @@ function AttendanceDialog({
                   参加 {count.going}　不参加 {count.absent}　未定 {count.undecided}　未回答 {count.unanswered}
                   <span style={{ color: DIM }}>　（全{total}名）</span>
                 </p>
+                {/* 遅刻・途中退席は参加の内わけなので、上の数字も帯も動かさない。
+                    当日の部屋割りに効くのはこの数なので、その下に1行だけ添える。 */}
+                {withTime > 0 && (
+                  <p style={{ margin: "3px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                    うち 遅れて参加・途中で退席 {withTime}名
+                  </p>
+                )}
 
                 <div style={{ marginTop: 14 }}>
                   {names.map((n, i) => {
                     const st = attendance[n] ?? null;
                     const isMe = n === me;
+                    /* 出入りを出すのは参加の人だけ。不参加や未定に変えた人のぶんは
+                       消さずに持っておき、ここで出さないだけにしてある（lib/attendanceTime.ts）。 */
+                    const whenLine = st === "going" ? formatAttendanceTime(times[n]) : "";
                     return (
                       <div
                         key={n}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 12,
                           padding: "11px 0",
                           borderBottom: i === names.length - 1 ? "none" : `1px solid ${LINE}`,
                         }}
                       >
-                        {/* 名前が長いときに切るのは名前のほうだけ。
-                            「あなた」の印は切らない（切れると自分の行が分からなくなる）。 */}
-                        <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
-                          <span
+                        {/* 名前と札の行。出入りを足すときも、この1行の組み方は変えない
+                            （左に足すと名前と取り合いになり、札に足すと行ごとはみ出す）。 */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                          }}
+                        >
+                          {/* 名前が長いときに切るのは名前のほうだけ。
+                              「あなた」の印は切らない（切れると自分の行が分からなくなる）。 */}
+                          <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+                            <span
+                              style={{
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontSize: 15,
+                                lineHeight: 1.5,
+                                fontWeight: isMe ? 700 : 400,
+                                color: st ? INK : DIM,
+                              }}
+                            >
+                              {n}
+                            </span>
+                            {isMe && (
+                              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, color: DIM }}>あなた</span>
+                            )}
+                          </span>
+
+                          {st ? (
+                            <span className={`md-st is-${st}`} style={{ flexShrink: 0 }}>
+                              {ATTENDANCE_LABEL[st]}
+                            </span>
+                          ) : (
+                            <span style={{ flexShrink: 0, fontSize: 12, letterSpacing: "0.03em", color: DIM }}>
+                              未回答
+                            </span>
+                          )}
+                        </div>
+
+                        {whenLine && (
+                          <p
                             style={{
-                              minWidth: 0,
+                              margin: "3px 0 0",
+                              fontSize: 12,
+                              lineHeight: 1.6,
+                              color: DIM,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
-                              fontSize: 15,
-                              lineHeight: 1.5,
-                              fontWeight: isMe ? 700 : 400,
-                              color: st ? INK : DIM,
                             }}
                           >
-                            {n}
-                          </span>
-                          {isMe && (
-                            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 500, color: DIM }}>あなた</span>
-                          )}
-                        </span>
-
-                        {st ? (
-                          <span className={`md-st is-${st}`} style={{ flexShrink: 0 }}>
-                            {ATTENDANCE_LABEL[st]}
-                          </span>
-                        ) : (
-                          <span style={{ flexShrink: 0, fontSize: 12, letterSpacing: "0.03em", color: DIM }}>
-                            未回答
-                          </span>
+                            {whenLine}
+                          </p>
                         )}
                       </div>
                     );
@@ -764,11 +919,13 @@ function BeforeScreen({
   onSave,
   names,
   attendance,
+  times,
   me,
   busyName,
   attendanceError,
   onPickMe,
   onSetAttendance,
+  onSetAttendanceTime,
   onOpenFeature,
   today,
 }: {
@@ -778,6 +935,8 @@ function BeforeScreen({
   onSave: (next: EventOverview) => Promise<boolean>;
   names: string[];
   attendance: AttendanceMap;
+  /** 参加の人の「来る時間・帰る時間」。出していない人は入っていない。 */
+  times: AttendanceTimeMap;
   /** この端末の人の名前（会員名簿の中の自分）。まだ選んでいなければ空。 */
   me: string;
   busyName: string;
@@ -785,6 +944,7 @@ function BeforeScreen({
   attendanceError: string;
   onPickMe: (name: string) => void;
   onSetAttendance: (name: string, status: AttendanceStatus | null) => void;
+  onSetAttendanceTime: (name: string, time: AttendanceTime) => void;
   /** 「このあとの準備」の行から、設定の下のその機能を開く。 */
   onOpenFeature: (featureId: string) => void;
   /** いまの日本時間の年月日。予告を出すかどうかの判定に使う。 */
@@ -806,6 +966,17 @@ function BeforeScreen({
   const goingCount = countAttendance(attendance, names).going;
   /* 出欠の〆切。毎回きまって、前の日の23:59まで。 */
   const deadline = attendanceDeadline(draft.date, today);
+
+  /* 当日の出入りに使うもの。
+     肢は開催時間から作るので、役員が時間を直せばそのまま付いてくる。 */
+  const whenChoices = useMemo(() => timeChoices(draft.start, draft.end), [draft.start, draft.end]);
+  const spanText = draft.start && draft.end
+    ? `この回は ${draft.start}〜${draft.end} です。`
+    : draft.start
+      ? `この回は ${draft.start} からです。`
+      : "";
+  /* ボタンの下に出す、自分の出入り。出していなければ空。 */
+  const myWhen = myStatus === "going" ? formatAttendanceTime(times[me]) : "";
   const footText = [
     draft.rooms && `${draft.rooms}部屋`,
     draft.fee && `会費 ${comma(draft.fee)}円`,
@@ -884,6 +1055,15 @@ function BeforeScreen({
               <span style={{ margin: "0 6px" }}>・</span>
               参加 {goingCount}名
             </p>
+            {/* 上の1行は〈自分のこと ・ みんなのこと〉の対で組んであるので、
+                3つめの事実はそこへ差し込まず、行を分けて出す。 */}
+            {myStatus === "going" && (myWhen || deadline?.open !== false) && (
+              <p style={{ margin: "3px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+                {myWhen
+                  ? `あなたの時間：${myWhen}`
+                  : "遅れて行く・途中で帰るときも、出欠席から出せます。"}
+              </p>
+            )}
             {deadline && (
               <p style={{ margin: "3px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
                 {deadline.open ? `${deadline.text}まで` : "出欠の受付は締め切りました"}
@@ -896,6 +1076,9 @@ function BeforeScreen({
           <AttendanceDialog
             names={names}
             attendance={attendance}
+            times={times}
+            choices={whenChoices}
+            spanText={spanText}
             me={me}
             busy={busyName}
             error={attendanceError}
@@ -903,6 +1086,7 @@ function BeforeScreen({
             deadline={deadline}
             onPickMe={onPickMe}
             onSet={onSetAttendance}
+            onSetTime={onSetAttendanceTime}
             onClose={() => setShowList(false)}
           />
         )}
@@ -1824,6 +2008,9 @@ export default function MemberDraft({
      どちらも画面に出てから読みにいく（描く前に読むと食い違いが出る）。 */
   const [names, setNames] = useState<string[]>([]);
   const [attendance, setAttendance] = useState<AttendanceMap>({});
+  /* 参加の人の「来る時間・帰る時間」。出欠とは別の置き場所にしてある
+     （lib/attendanceTime.ts。理由はあちらの頭に書いた）。 */
+  const [times, setTimes] = useState<AttendanceTimeMap>({});
   const [busyName, setBusyName] = useState("");
   /* 出欠が保存できなかったときの知らせ。書けたら消す。 */
   const [attendanceError, setAttendanceError] = useState("");
@@ -1878,6 +2065,23 @@ export default function MemberDraft({
     };
   }, [eventKey]);
 
+  /* 当日の出入り。出欠とは別の行なので、読むのも別に立てる
+     （片方が読めなくても、もう片方は出る）。 */
+  useEffect(() => {
+    if (!eventKey) return;
+    let alive = true;
+    readAttendanceTimes(eventKey)
+      .then((map) => {
+        if (alive) setTimes(map);
+      })
+      .catch(() => {
+        // 読めなければ、誰も出していない状態で出す
+      });
+    return () => {
+      alive = false;
+    };
+  }, [eventKey]);
+
   /* 参加・不参加・未定 を押したとき（null は「未回答に戻す」）。
      書くのは押した1人ぶんだけなので、同じ回に何人が同時に出しても、
      ほかの人の出したものを消さない。 */
@@ -1914,6 +2118,60 @@ export default function MemberDraft({
       }
     } finally {
       setBusyName("");
+    }
+  };
+
+  /* 押すたびに番号を振り、いちばん新しい返事だけを画面に当てる。
+     出欠の3つは保存中は押せなくしてあるが、時刻のプルダウンは押せるままにしてある
+     （押せなくすると、iPhoneでは中の字まで薄くなって読めなくなるため）。
+     だから「遅れて行く」を押した直後、その保存が返る前に時刻を選べる。
+     そのとき古いほうの返事を当ててしまうと、選んだ時刻がいったん
+     「まだ分かりません」に戻って見える ── 押したのに戻った、がいちばん困る。 */
+  const timeSeq = useRef(0);
+
+  /* 「遅れて行く」「途中で帰る」を押したとき、時刻を選び直したとき。
+     参加を取り消しても、ここのぶんはこちらからは消さない（出さないだけ）。
+     消し込みを当てにしない理由は lib/attendanceTime.ts の頭に書いた。
+     本人が2つとも外したときだけ、その人のぶんが消える。 */
+  const changeAttendanceTime = async (name: string, time: AttendanceTime) => {
+    if (!eventKey || !name) return;
+    /* 〆切は出欠と同じ。押すところは締め切ったあと出さないが、時計は画面を開いたときの
+       ものなので、開きっぱなしで日付をまたいだ場合の用心にここでも数え直す。 */
+    const gate = attendanceDeadline(draft.date, jstYmd(Date.now()));
+    if (gate && !gate.open) {
+      setAttendanceError("出欠の受付は終わりました。");
+      return;
+    }
+    timeSeq.current += 1;
+    const seq = timeSeq.current;
+    const latest = () => timeSeq.current === seq; // 追い越されていないか
+    setBusyName(name);
+    setAttendanceError("");
+    // 先に画面だけ変えて、押した手ごたえを待たせない（出欠のときと同じ）
+    setTimes((prev) => {
+      const next = { ...prev };
+      if (isEmptyTime(time)) delete next[name];
+      else next[name] = time;
+      return next;
+    });
+    try {
+      const saved = await writeAttendanceTime(eventKey, name, time);
+      if (latest()) setTimes(saved);
+    } catch (e) {
+      // 追い越されているなら、あとの保存の結果とその知らせのほうが正しい
+      if (!latest()) return;
+      setAttendanceError(
+        e instanceof Error ? e.message : "保存できませんでした。もう一度お試しください"
+      );
+      try {
+        const cur = await readAttendanceTimes(eventKey);
+        if (latest()) setTimes(cur);
+      } catch {
+        /* 取り直しにも失敗したら、そのままにしておく */
+      }
+    } finally {
+      // まだ次の保存が飛んでいるあいだは、押すところの鍵を開けない
+      if (latest()) setBusyName("");
     }
   };
 
@@ -2014,11 +2272,13 @@ export default function MemberDraft({
               onSave={saveDraft}
               names={names}
               attendance={attendance}
+              times={times}
               me={me}
               busyName={busyName}
               attendanceError={attendanceError}
               onPickMe={pickMe}
               onSetAttendance={changeAttendance}
+              onSetAttendanceTime={changeAttendanceTime}
               onOpenFeature={onOpenFeature}
               today={jstYmd(nowMs)}
             />

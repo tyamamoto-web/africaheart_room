@@ -530,7 +530,10 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
      未定  … 塗らずに、細い枠を二重にする（まだ決まっていない、を形で出す）
    どれも中の文字は「参加」「不参加」「未定」と書いてあるので、
    色が見えにくい人でも読み分けられる。 */
-.md-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+/* 1fr は minmax(auto, 1fr) なので、中の字が入りきらないと列が縮まずに溢れる。
+   溢れたぶんは .md-dialog の overflow: hidden が外側で切ってしまい、
+   横に動かせる手がかりも出ない。だから minmax(0, 1fr) で必ず縮むようにする。 */
+.md-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .md-seg-btn {
   display: flex;
   align-items: center;
@@ -557,6 +560,13 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
 .md-seg-btn.is-going[aria-pressed="true"]     { background: #F37021; border-color: #F37021; color: #FFFFFF; }
 .md-seg-btn.is-absent[aria-pressed="true"]    { background: #33363C; border-color: #33363C; color: #FFFFFF; }
 .md-seg-btn.is-undecided[aria-pressed="true"] { background: #FFFFFF; border-color: #1B1C1E; color: #1B1C1E; box-shadow: inset 0 0 0 1px #1B1C1E; }
+
+/* 出欠席：参加の人にだけ出す「遅れて行く／途中で帰る」。2つなので2列で並べる。
+   押した印は参加の札（.md-st.is-going）と同じ色みにして、参加の仲間だと色で分かるようにする。
+   参加のべた塗りオレンジとははっきり差が付くので、主役は上の3つのボタンのまま。
+   新しい色は足していない（3つとも、このファイルに既にある値）。 */
+.md-seg--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.md-seg-btn.is-when[aria-pressed="true"] { background: #FDF1E8; border-color: #F37021; color: #B24809; }
 
 /* 出欠席：名簿から自分の名前を選ぶところ。
    押すところを別に置かず、選ぶところをそのまま出したままにしている。
