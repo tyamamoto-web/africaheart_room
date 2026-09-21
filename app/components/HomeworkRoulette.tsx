@@ -332,6 +332,74 @@ export default function HomeworkRoulette() {
         </div>
       </div>
 
+      {/* 宿題リストの編集（応募）。会員がふだんするのはこちらなので、ルーレットより上に置く（9/21）。
+          ルーレットは抽選のときに役員が回すだけで、いつも目立っている必要はない。 */}
+      <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #efe9e1" }}>
+        <button
+          onClick={() => setShowEdit((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3"
+          style={{ background: "#faf8f5" }}
+        >
+          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
+            宿題を応募する（{monthThemes.length}/{MAX_PER_MONTH}）
+          </span>
+          <span className="text-xs font-black" style={{ color: "#C81E77" }}>
+            {showEdit ? "閉じる" : "開く"}
+          </span>
+        </button>
+        {showEdit && (
+          <div className="px-4 py-3 flex flex-col gap-3" style={{ background: "#fff" }}>
+            <div className="flex flex-wrap gap-2">
+              {monthThemes.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-bold"
+                  style={{ background: "#f4f0ea", color: "#555" }}
+                >
+                  {t}
+                  <button
+                    onClick={() => removeTheme(t)}
+                    disabled={needsSetup}
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-sm"
+                    style={{ background: "#fff0f0", color: "#ff6b6b", opacity: needsSetup ? 0.4 : 1 }}
+                    aria-label={`${t}を削除`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {monthThemes.length === 0 && (
+                <span className="text-xs" style={{ color: "#bbb" }}>{selMonth}月はまだ登録がありません。下から追加してください。</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newTheme}
+                onChange={(e) => setNewTheme(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addTheme();
+                }}
+                disabled={needsSetup || monthFull}
+                placeholder={needsSetup ? "共有設定が必要です" : monthFull ? `${selMonth}月は登録上限（${MAX_PER_MONTH}件）です` : `${selMonth}月に曲を追加`}
+                className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+                style={{ background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent", opacity: needsSetup || monthFull ? 0.6 : 1 }}
+              />
+              <button
+                onClick={addTheme}
+                disabled={!newTheme.trim() || needsSetup || monthFull}
+                className="px-4 rounded-xl text-sm font-bold text-white transition-opacity"
+                style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: newTheme.trim() && !needsSetup && !monthFull ? 1 : 0.4 }}
+              >
+                追加
+              </button>
+            </div>
+            <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
+              宿題リストは12ヶ月分、各月{MAX_PER_MONTH}曲まで登録できます。全員で共有され、約5秒ごとに最新へ更新（同じ月の重複は防止）。抽選は選択中の月の曲から行われ、決定済みは除外されます。
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* 決定枠（3つ） */}
       <div className="grid grid-cols-3 gap-2">
         {Array.from({ length: PICK_COUNT }).map((_, idx) => {
@@ -457,7 +525,7 @@ export default function HomeworkRoulette() {
 
       {pool.length === 0 && !done && (
         <p className="text-xs text-center" style={{ color: "#c0392b" }}>
-          {selMonth}月の候補曲がありません。下のリストに追加してください。
+          {selMonth}月の候補曲がありません。上の「宿題を応募する」から追加してください。
         </p>
       )}
 
@@ -470,73 +538,6 @@ export default function HomeworkRoulette() {
           {lastBy ? `最終更新: ${lastBy}・` : ""}宿題リストも結果も全員で共有・保存されます
         </p>
       )}
-
-      {/* 宿題リストの編集 */}
-      <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #efe9e1" }}>
-        <button
-          onClick={() => setShowEdit((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3"
-          style={{ background: "#faf8f5" }}
-        >
-          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
-            宿題を応募する（{monthThemes.length}/{MAX_PER_MONTH}）
-          </span>
-          <span className="text-xs font-black" style={{ color: "#C81E77" }}>
-            {showEdit ? "閉じる" : "開く"}
-          </span>
-        </button>
-        {showEdit && (
-          <div className="px-4 py-3 flex flex-col gap-3" style={{ background: "#fff" }}>
-            <div className="flex flex-wrap gap-2">
-              {monthThemes.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-bold"
-                  style={{ background: "#f4f0ea", color: "#555" }}
-                >
-                  {t}
-                  <button
-                    onClick={() => removeTheme(t)}
-                    disabled={needsSetup}
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-sm"
-                    style={{ background: "#fff0f0", color: "#ff6b6b", opacity: needsSetup ? 0.4 : 1 }}
-                    aria-label={`${t}を削除`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {monthThemes.length === 0 && (
-                <span className="text-xs" style={{ color: "#bbb" }}>{selMonth}月はまだ登録がありません。下から追加してください。</span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={newTheme}
-                onChange={(e) => setNewTheme(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addTheme();
-                }}
-                disabled={needsSetup || monthFull}
-                placeholder={needsSetup ? "共有設定が必要です" : monthFull ? `${selMonth}月は登録上限（${MAX_PER_MONTH}件）です` : `${selMonth}月に曲を追加`}
-                className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm focus:outline-none"
-                style={{ background: "#f4f0ea", color: "#2c2c2c", border: "2px solid transparent", opacity: needsSetup || monthFull ? 0.6 : 1 }}
-              />
-              <button
-                onClick={addTheme}
-                disabled={!newTheme.trim() || needsSetup || monthFull}
-                className="px-4 rounded-xl text-sm font-bold text-white transition-opacity"
-                style={{ background: "linear-gradient(135deg,#A8175F,#C81E77)", opacity: newTheme.trim() && !needsSetup && !monthFull ? 1 : 0.4 }}
-              >
-                追加
-              </button>
-            </div>
-            <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-              宿題リストは12ヶ月分、各月{MAX_PER_MONTH}曲まで登録できます。全員で共有され、約5秒ごとに最新へ更新（同じ月の重複は防止）。抽選は選択中の月の曲から行われ、決定済みは除外されます。
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
