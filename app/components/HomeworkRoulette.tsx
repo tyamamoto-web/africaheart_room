@@ -479,7 +479,7 @@ export default function HomeworkRoulette() {
           style={{ background: "#faf8f5" }}
         >
           <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
-            {selMonth}月の宿題リスト（{monthThemes.length}/{MAX_PER_MONTH}）
+            宿題を応募する（{monthThemes.length}/{MAX_PER_MONTH}）
           </span>
           <span className="text-xs font-black" style={{ color: "#C81E77" }}>
             {showEdit ? "閉じる" : "開く"}
