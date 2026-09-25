@@ -67,6 +67,33 @@ const TONES: Record<"day" | "archive", Tone> = {
   },
 };
 
+/**
+ * 企画の名前を「・」「／」の後ろで折り返せるようにする。
+ * 入れる先のマスを wordBreak: keep-all にしてあるので、折り返しはここで入れた
+ * ところだけで起きる。「自己紹介・課題曲」が「自己紹介・」「課題曲」で折れる
+ * （そうしないと「自己紹介・課題」「曲」のように言葉の途中で割れる）。
+ * 区切りが無い言葉は、はみ出すときだけ overflowWrap: anywhere で折れる。
+ */
+function breakableTitle(title: string): React.ReactNode {
+  const parts: string[] = [];
+  let buf = "";
+  for (const ch of title) {
+    buf += ch;
+    if (ch === "・" || ch === "／" || ch === "/") {
+      parts.push(buf);
+      buf = "";
+    }
+  }
+  if (buf) parts.push(buf);
+  if (parts.length < 2) return title;
+  return parts.map((p, i) => (
+    <Fragment key={i}>
+      {p}
+      {i < parts.length - 1 ? <wbr /> : null}
+    </Fragment>
+  ));
+}
+
 /** 「13:20〜14:20」を開始と終了に分ける。区切りが無ければ全部を開始として出す。 */
 function splitTime(time: string): [string, string] {
   const m = time.split(/〜|~|－|–|-/);
@@ -104,7 +131,7 @@ export default function PlanTable({
   rows,
   total,
   variant,
-  minWidth = 280, // スマホの枠の中（幅298px）に収まる大きさ。設定の画面ではもっと広く渡す
+  minWidth = 248, // 幅375pxのスマホでも横に流さずに収まる大きさ。設定の画面ではもっと広く渡す
 }: {
   rows: PlanRow[];
   /** 全員の人数。「全員（9名）」と出すのに使う。0なら人数は出さない。 */
@@ -148,16 +175,20 @@ export default function PlanTable({
     <div style={{ overflowX: "auto" }}>
       <div style={{ border: hair, borderRadius: 10, overflow: "hidden", minWidth }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          {/* 幅の配り方（9/25 に見直した）。部屋番号のマスは「A」や「26」しか入らないのに
+              見出しの「部屋番号」4文字ぶんを取っていたので、見出しを「部屋」にして詰め、
+              浮いたぶんを企画と名前に回した。企画は「イントロクイズ」が1行で収まる幅、
+              名前は1行に2人ぶんが並ぶ幅がめやす。 */}
           <colgroup>
-            <col style={{ width: "27%" }} />
-            <col style={{ width: "18%" }} />
-            <col style={{ width: "23%" }} />
-            <col style={{ width: "32%" }} />
+            <col style={{ width: "20%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "31%" }} />
+            <col style={{ width: "37%" }} />
           </colgroup>
           <thead>
             <tr style={{ background: T.head }}>
               <th style={{ ...th, color: T.time }}>時間</th>
-              <th style={th}>部屋番号</th>
+              <th style={th}>部屋</th>
               <th style={th}>企画</th>
               <th style={th}>名前</th>
             </tr>
@@ -223,10 +254,11 @@ export default function PlanTable({
                         fontWeight: 700,
                         lineHeight: 1.35,
                         color: all ? T.all.fg : T.sub,
-                        wordBreak: "break-word",
+                        wordBreak: "keep-all",
+                        overflowWrap: "anywhere",
                       }}
                     >
-                      {r.title}
+                      {breakableTitle(r.title)}
                     </td>
                   )}
 
@@ -237,10 +269,20 @@ export default function PlanTable({
                       </p>
                     ) : (
                       <>
-                        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "2px 8px" }}>
+                        {/* 名前は「・」で区切って続けて出す。1人ぶんを nowrap にしてあるので、
+                            「あんちゃん」が「あんち」「ゃん」のように途中で割れない。
+                            9/25 まではすきま（gap）だけで区切っていたが、2人が1行に並ぶと
+                            どこまでが1人の名前か読み取りにくかった。 */}
+                        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1px 0" }}>
                           {r.names.map((n, k) => (
-                            <span key={`${n}-${k}`} style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4, color: T.ink }}>
+                            <span
+                              key={`${n}-${k}`}
+                              style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, color: T.ink, whiteSpace: "nowrap" }}
+                            >
                               {n}
+                              {k < r.names.length - 1 ? (
+                                <span style={{ color: T.dim, fontWeight: 400 }}>・</span>
+                              ) : null}
                             </span>
                           ))}
                         </div>

@@ -1332,7 +1332,9 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
           )}
         </div>
       ) : (
-        <div style={{ marginTop: 16 }}>
+        /* 表だけは枠の余白（左右28px）に少しはみ出させる。名前のマスがいちばん
+           狭くて読みにくかったので、14pxずつ広げて名前に回している。 */
+        <div style={{ marginTop: 16, marginLeft: -14, marginRight: -14 }}>
           <PlanTable rows={view} total={total} variant="day" />
         </div>
       )}
