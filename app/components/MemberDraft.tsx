@@ -1300,7 +1300,9 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
           type="button"
           className="md-edit"
           aria-expanded={editing}
-          disabled={rows === null}
+          // 保存している間は閉じられないようにする。閉じたあとに保存が失敗すると、
+          // 失敗したことがどこにも出ないまま直しだけが消えてしまうため。
+          disabled={rows === null || saving}
           onClick={() => (editing ? setEditing(false) : startEdit())}
         >
           {editing ? "やめる" : "編集"}
