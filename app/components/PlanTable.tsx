@@ -13,7 +13,8 @@
      同じ時間の行が続いていれば、時間のマスはつないで1つにする。
      その中で企画も同じなら、企画のマスもつなぐ
      （コマ①を2部屋でやるときは、時間と企画が1つで、部屋と名前が2段になる）。
-     名前が空の行は「全員」として出し、地の色を変える（過去の回の表と同じ扱い）。
+     名前が空の行は「全員」として出す。当日の表ではオレンジの枠でぐるりと囲み、
+     地は塗らない。過去の回の表はうすい地の色のまま（tone の all.line の有無で決まる）。
      部屋番号は、出てきた順に色を当てる（1つめ・2つめ。3つめからは色なし）。
      行にメモ（note。集合の枠の退席時刻や宿題のお題など、枠に付いていた補足）があれば、
      その行の下に横いっぱいの1段で小さく出す。時間をつないだ枠の途中の行だと段を
@@ -27,6 +28,8 @@ import { Fragment } from "react";
 import type { PlanRow } from "@/lib/timetable";
 
 type RoomTone = { bg: string; fg: string };
+/** 全員で集まる行の見せ方。line を入れると、地を塗らずにその色で1周囲む。 */
+type AllTone = RoomTone & { line?: string };
 type Tone = {
   ink: string;
   sub: string;
@@ -35,7 +38,7 @@ type Tone = {
   head: string; // 見出しの行の地
   time: string; // 「時間」の見出しの色
   rooms: RoomTone[]; // 部屋番号ごとの色（出てきた順）
-  all: RoomTone; // 全員で集まる行
+  all: AllTone; // 全員で集まる行
 };
 
 const TONES: Record<"day" | "archive", Tone> = {
@@ -50,7 +53,9 @@ const TONES: Record<"day" | "archive", Tone> = {
       { bg: "rgba(90,150,230,0.10)", fg: "#2F6DB5" },
       { bg: "rgba(255,120,180,0.10)", fg: "#B8336A" },
     ],
-    all: { bg: "rgba(245,197,66,0.14)", fg: "#8A6100" },
+    // 全員の行は塗らず、差し色のオレンジ（#F37021）で囲む。
+    // 企画の字はそのオレンジのままだと白地で薄いので、濃いほう（#B24809）を使う。
+    all: { bg: "transparent", fg: "#B24809", line: "#F37021" },
   },
   archive: {
     ink: "#1B1C1E",
@@ -157,6 +162,24 @@ export default function PlanTable({
     verticalAlign: "top",
   };
 
+  /* 全員の行の囲み。当日の表だけ、地を塗るかわりに枠で囲む（tone に line があるとき）。
+     表は borderCollapse: collapse なので、線は行ではなくマスに付ける。
+     行の左端・右端のマスにだけ外側の線を足し、間の縦線はもとの細い線のまま残す。 */
+  const allLine = T.all.line ? `1px solid ${T.all.line}` : "";
+  const allEdge = (
+    on: boolean,
+    side: "left" | "right" | "",
+    bottom: boolean,
+  ): React.CSSProperties =>
+    !on || !allLine
+      ? {}
+      : {
+          borderTop: allLine,
+          ...(bottom ? { borderBottom: allLine } : {}),
+          ...(side === "left" ? { borderLeft: allLine } : {}),
+          ...(side === "right" ? { borderRight: allLine } : {}),
+        };
+
   // 部屋番号に色を当てる（出てきた順）
   const roomOrder: string[] = [];
   for (const r of rows) {
@@ -217,6 +240,7 @@ export default function PlanTable({
                         verticalAlign: sp.time > 1 ? "middle" : "top",
                         height: empty ? 46 : undefined,
                         background: sp.time > 1 ? "#FFFFFF" : undefined,
+                        ...allEdge(all, "left", !noteBelow),
                       }}
                     >
                       <p style={{ margin: 0, fontSize: 12, fontWeight: 700, lineHeight: 1.25, color: T.ink }}>{startT}</p>
@@ -239,6 +263,7 @@ export default function PlanTable({
                       lineHeight: 1.3,
                       color: rt?.fg ?? T.ink,
                       wordBreak: "break-word",
+                      ...allEdge(all, "", !noteBelow),
                     }}
                   >
                     {r.room}
@@ -264,13 +289,21 @@ export default function PlanTable({
                         color: all ? T.all.fg : T.sub,
                         wordBreak: "keep-all",
                         overflowWrap: "anywhere",
+                        ...allEdge(all, "", !noteBelow),
                       }}
                     >
                       {breakableTitle(r.title)}
                     </td>
                   )}
 
-                  <td style={{ ...td, borderLeft: hair, verticalAlign: all ? "middle" : "top" }}>
+                  <td
+                    style={{
+                      ...td,
+                      borderLeft: hair,
+                      verticalAlign: all ? "middle" : "top",
+                      ...allEdge(all, "right", !noteBelow),
+                    }}
+                  >
                     {empty ? null : all ? (
                       <p style={{ margin: 0, fontSize: 12, fontWeight: 700, textAlign: "center", color: T.ink }}>
                         全員{total > 0 ? `（${total}名）` : ""}
@@ -317,6 +350,10 @@ export default function PlanTable({
                         color: T.sub,
                         whiteSpace: "pre-line",
                         wordBreak: "break-word",
+                        // 囲みは、この段の下でいったん閉じる（枠が途中で切れないように）
+                        ...(all && allLine
+                          ? { borderBottom: allLine, borderLeft: allLine, borderRight: allLine }
+                          : {}),
                       }}
                     >
                       {note}
