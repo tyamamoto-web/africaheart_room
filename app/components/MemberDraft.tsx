@@ -136,6 +136,7 @@ import {
 import { eventTeaser, showTeaser } from "@/lib/eventTeaser";
 import { findVoice, readVoices, saveVoice, VOICE_MAX, type Voice } from "@/lib/voices";
 import PlanTable from "@/app/components/PlanTable";
+import PlanCrossTable from "@/app/components/PlanCrossTable";
 
 /* ── 日付まわりの小道具 ───────────────────────
    場面の判定そのものは lib/eventOverview.ts（eventPhase）にある。
@@ -1193,7 +1194,7 @@ const toDraft = (r: TimetableRow): PlanDraft => ({ time: r.time, room: r.room, t
 const fromDraft = (d: PlanDraft): TimetableRow => ({ time: d.time, room: d.room, title: d.title, names: splitNames(d.names) });
 const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "" });
 
-function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
+function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: string[] }) {
   // null は「まだ読んでいる」。読めたら配列（0行もありうる）。
   const [rows, setRows] = useState<TimetableRow[] | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1334,8 +1335,15 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
       ) : (
         /* 表だけは枠の余白（左右28px）に少しはみ出させる。名前のマスがいちばん
            狭くて読みにくかったので、14pxずつ広げて名前に回している。 */
-        <div style={{ marginTop: 16, marginLeft: -14, marginRight: -14 }}>
-          <PlanTable rows={view} total={total} variant="day" />
+        <div>
+          <div style={{ marginTop: 16, marginLeft: -14, marginRight: -14 }}>
+            <PlanTable rows={view} total={total} variant="day" />
+          </div>
+          {/* 誰と誰が同じ部屋になるか。もとは上の表そのものなので、
+              部屋割を書き換えればここも一緒に変わる。 */}
+          <div style={{ marginLeft: -14, marginRight: -14 }}>
+            <PlanCrossTable rows={rows ?? []} order={roster} />
+          </div>
         </div>
       )}
     </div>
@@ -1343,12 +1351,12 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
 }
 
 /* ── 当日の画面 ─────────────────────────────── */
-function DayScreen({ attendeeCount }: { attendeeCount: number }) {
+function DayScreen({ attendeeCount, roster }: { attendeeCount: number; roster: string[] }) {
   return (
     <>
       {/* 部屋割と当日の流れは一体なので、ひとつの表にまとめてある。
           次のコマも表に載るので、「このあと」のような別の欄は置かない。 */}
-      <RoomPlan attendeeCount={attendeeCount} />
+      <RoomPlan attendeeCount={attendeeCount} roster={roster} />
     </>
   );
 }
@@ -2345,7 +2353,7 @@ export default function MemberDraft({
             />
           )}
           {/* 当日の部屋割の人数は、参加と出した人だけを数える。 */}
-          {phase === "day"    && <DayScreen attendeeCount={countAttendance(attendance, names).going} />}
+          {phase === "day"    && <DayScreen attendeeCount={countAttendance(attendance, names).going} roster={names} />}
           {phase === "after" && (
             <AfterScreen
               currentIso={draft.date}
