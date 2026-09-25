@@ -1188,18 +1188,28 @@ function BeforeScreen({
 const HAIR = `1px solid ${LINE}`;
 const EMPTY_PLAN_ROWS = 4;
 
-/* 入力欄に出すための形。名前は「、」区切りの文字のまま持つ。 */
-type PlanDraft = { time: string; room: string; title: string; names: string };
-const toDraft = (r: TimetableRow): PlanDraft => ({ time: r.time, room: r.room, title: r.title, names: joinNames(r.names) });
+/* 入力欄に出すための形。名前は「、」区切りの文字のまま持つ。
+   group は「部屋番号をまとめて変える」欄の何番目に属する行か（属さないなら -1）。
+   いまマスに入っている文字ではなく番号で覚えるのは、欄を一度空にしてから打ち直しても
+   同じ行にきちんと戻すため。文字で照らし合わせると、空にした瞬間に
+   「まだ何も入っていない行」まで巻き込んでしまう。 */
+type PlanDraft = { time: string; room: string; title: string; names: string; group: number };
+const toDraft = (r: TimetableRow, group: number): PlanDraft => ({
+  time: r.time,
+  room: r.room,
+  title: r.title,
+  names: joinNames(r.names),
+  group,
+});
 const fromDraft = (d: PlanDraft): TimetableRow => ({ time: d.time, room: d.room, title: d.title, names: splitNames(d.names) });
-const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "" });
+const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "", group: -1 });
 
 /* いま使われている部屋（出てきた順。空の行は数えない）。
    「部屋番号をまとめて変える」欄の並びは、これで決まる。 */
-const distinctRooms = (ds: PlanDraft[]): string[] => {
+const distinctRooms = (rows: TimetableRow[]): string[] => {
   const out: string[] = [];
-  for (const d of ds) {
-    const room = d.room.trim();
+  for (const r of rows) {
+    const room = r.room.trim();
     if (room && !out.includes(room)) out.push(room);
   }
   return out;
@@ -1231,10 +1241,12 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
   }, []);
 
   const startEdit = () => {
-    const base = (rows ?? []).map(toDraft);
+    const src = rows ?? [];
+    const rs = distinctRooms(src);
+    const base = src.map((r) => toDraft(r, rs.indexOf(r.room.trim())));
     // 空なら空の行を4つ。あれば末尾に空の行を1つ足して、続きを打てるようにする。
     setEdit(base.length ? [...base, blankDraft()] : Array.from({ length: EMPTY_PLAN_ROWS }, blankDraft));
-    setRooms(distinctRooms(base));
+    setRooms(rs);
     setRoomNote("");
     setError("");
     setEditing(true);
@@ -1246,16 +1258,19 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
   const renameRoom = (i: number, to: string) => {
     const from = rooms[i];
     if (from === undefined || to === from) return;
-    if (rooms.some((r, n) => n !== i && r === to)) {
+    if (to.trim() !== "" && rooms.some((r, n) => n !== i && r === to)) {
       setRoomNote("ほかの部屋と同じ番号にはできません。");
       return;
     }
     setRoomNote("");
     setRooms((rs) => rs.map((r, n) => (n === i ? to : r)));
-    setEdit((ds) => ds.map((d) => (d.room.trim() === from ? { ...d, room: to } : d)));
+    setEdit((ds) => ds.map((d) => (d.group === i ? { ...d, room: to } : d)));
   };
-  const setField = (i: number, key: keyof PlanDraft, v: string) =>
-    setEdit((ds) => ds.map((d, n) => (n === i ? { ...d, [key]: v } : d)));
+  const setField = (i: number, key: "time" | "room" | "title" | "names", v: string) =>
+    setEdit((ds) =>
+      // 部屋番号だけを手で直した行は、まとまりから外す（あとで「まとめて変える」に巻き込まれないように）
+      ds.map((d, n) => (n === i ? { ...d, [key]: v, ...(key === "room" ? { group: -1 } : null) } : d)),
+    );
   const removeRow = (i: number) => setEdit((ds) => ds.filter((_, n) => n !== i));
   const addRow = () => setEdit((ds) => [...ds, blankDraft()]);
 
@@ -1322,7 +1337,7 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
                     onChange={(e) => renameRoom(i, e.target.value)}
                   />
                   <span style={{ fontSize: 12, color: SUB, whiteSpace: "nowrap" }}>
-                    {edit.filter((d) => d.room.trim() === r).length}行
+                    {edit.filter((d) => d.group === i).length}行
                   </span>
                 </div>
               ))}
