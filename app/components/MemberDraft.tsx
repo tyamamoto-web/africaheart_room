@@ -1194,11 +1194,25 @@ const toDraft = (r: TimetableRow): PlanDraft => ({ time: r.time, room: r.room, t
 const fromDraft = (d: PlanDraft): TimetableRow => ({ time: d.time, room: d.room, title: d.title, names: splitNames(d.names) });
 const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "" });
 
+/* いま使われている部屋（出てきた順。空の行は数えない）。
+   「部屋番号をまとめて変える」欄の並びは、これで決まる。 */
+const distinctRooms = (ds: PlanDraft[]): string[] => {
+  const out: string[] = [];
+  for (const d of ds) {
+    const room = d.room.trim();
+    if (room && !out.includes(room)) out.push(room);
+  }
+  return out;
+};
+
 function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: string[] }) {
   // null は「まだ読んでいる」。読めたら配列（0行もありうる）。
   const [rows, setRows] = useState<TimetableRow[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<PlanDraft[]>([]);
+  // 編集をはじめた時点の部屋の並び。行を直しても数が増えたり減ったりしないよう、別に持つ。
+  const [rooms, setRooms] = useState<string[]>([]);
+  const [roomNote, setRoomNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1220,8 +1234,25 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
     const base = (rows ?? []).map(toDraft);
     // 空なら空の行を4つ。あれば末尾に空の行を1つ足して、続きを打てるようにする。
     setEdit(base.length ? [...base, blankDraft()] : Array.from({ length: EMPTY_PLAN_ROWS }, blankDraft));
+    setRooms(distinctRooms(base));
+    setRoomNote("");
     setError("");
     setEditing(true);
+  };
+
+  /* 部屋番号をまとめて変える。当日、お店で実際の番号を聞いてから14行を1つずつ直すのは
+     大変なので、同じ部屋の行をひとまとめに書き換える。
+     ほかの部屋と同じ番号にする入力だけは、2つの部屋が1つに混ざって戻せなくなるので断る。 */
+  const renameRoom = (i: number, to: string) => {
+    const from = rooms[i];
+    if (from === undefined || to === from) return;
+    if (rooms.some((r, n) => n !== i && r === to)) {
+      setRoomNote("ほかの部屋と同じ番号にはできません。");
+      return;
+    }
+    setRoomNote("");
+    setRooms((rs) => rs.map((r, n) => (n === i ? to : r)));
+    setEdit((ds) => ds.map((d) => (d.room.trim() === from ? { ...d, room: to } : d)));
   };
   const setField = (i: number, key: keyof PlanDraft, v: string) =>
     setEdit((ds) => ds.map((d, n) => (n === i ? { ...d, [key]: v } : d)));
@@ -1274,6 +1305,37 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
       {editing ? (
         /* 打ち込む形。1行ごとに、時間・部屋番号・企画・名前。 */
         <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+          {rooms.length > 0 && (
+            /* 当日は、お店で聞いた番号に置きかえるのがいちばん多い直し方なので、
+               1行ずつの欄より先に、いちばん上に置く。 */
+            <div style={{ padding: 14, border: HAIR, borderRadius: 12, display: "grid", gap: 10, background: "#FAFAFB" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>
+                部屋番号をまとめて変える
+              </span>
+              {rooms.map((r, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10 }}>
+                  <input
+                    className="md-field"
+                    value={r}
+                    placeholder="部屋番号"
+                    aria-label={`${i + 1}つめの部屋の番号`}
+                    onChange={(e) => renameRoom(i, e.target.value)}
+                  />
+                  <span style={{ fontSize: 12, color: SUB, whiteSpace: "nowrap" }}>
+                    {edit.filter((d) => d.room.trim() === r).length}行
+                  </span>
+                </div>
+              ))}
+              {roomNote ? (
+                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>{roomNote}</p>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
+                  {"ここを書き換えると、同じ部屋の行がまとめて変わります。下の1行ずつの欄にもすぐ映るので、" +
+                    "たしかめてから保存してください。表の部屋のマスは狭いので、「26」のように短い番号が収まります。"}
+                </p>
+              )}
+            </div>
+          )}
           {edit.map((d, i) => (
             <div key={i} style={{ padding: 14, border: HAIR, borderRadius: 12, display: "grid", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
