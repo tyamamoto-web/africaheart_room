@@ -203,7 +203,7 @@ export default function PlanCrossTable({
 
       <p style={{ margin: "10px 0 0", fontSize: 11, lineHeight: 1.7, color: SUB }}>
         {never.length === 0
-          ? "全員が、誰とも一度は同じ部屋になります。"
+          ? "全員が、ほかの全員と一度は同じ部屋になります。"
           : `一度も同じ部屋にならないのは ${never.length}組（白いマス）。`}
         {never.length > 0 && never.length <= 6 && (
           <>
