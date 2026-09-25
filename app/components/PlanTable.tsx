@@ -224,6 +224,9 @@ export default function PlanTable({
                     </td>
                   )}
 
+                  {/* 部屋の呼び名（A・B）と、当日お店で聞いた実際の番号。
+                      呼び名はLINEの告知や打ち合わせで使う言い方なので消さず、
+                      番号はその下に添える（番号が入るまでは呼び名だけ）。 */}
                   <td
                     style={{
                       ...td,
@@ -239,6 +242,11 @@ export default function PlanTable({
                     }}
                   >
                     {r.room}
+                    {(r.roomNo ?? "").trim() !== "" && (
+                      <span style={{ display: "block", fontSize: 10, fontWeight: 700, lineHeight: 1.4, opacity: 0.75 }}>
+                        {r.roomNo}
+                      </span>
+                    )}
                   </td>
 
                   {sp.title > 0 && (

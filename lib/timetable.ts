@@ -18,8 +18,10 @@
      割り当ては SHARED_ROW.timetable（=12）。行が無ければ初回の保存で作られる。
 
    しまい方（themes: text[] の中）:
-     raw[i] … 1行ぶんを JSON にしたもの [時間, 部屋番号, 企画, 名前の配列]
-              例 ["13:20〜14:20","26","コマ①",["よっちゃん","くる"]]
+     raw[i] … 1行ぶんを JSON にしたもの [時間, 部屋, 企画, 名前の配列, 部屋番号]
+              例 ["13:20〜14:20","A","コマ①",["よっちゃん","くる"],"26"]
+              5つめ（実際の部屋番号）は 9/25 に足した。空のときは4つのまま書くので、
+              それまでに保存したものと形は変わらない。
      （9/6 に A室・B室の2列から、この4列の形に変えた。変えた時点で行は空だったので、
        前の形のものは残っていない）
 
@@ -31,9 +33,10 @@ import { SHARED_ROW, readSharedLenient, writeSharedRow } from "./sharedRow";
 
 export type TimetableRow = {
   time: string; // "13:20〜14:20"
-  room: string; // "26"（部屋番号。「A」のような記号でもよい）
+  room: string; // "A"（部屋の呼び名。「26」のような番号そのものでもよい）
   title: string; // "コマ①"
   names: string[]; // その部屋の顔ぶれ。空なら「全員」
+  roomNo?: string; // "26"（当日お店で聞いた実際の番号。呼び名とは別に持つ）
 };
 
 export const blankTimetableRow = (): TimetableRow => ({ time: "", room: "", title: "", names: [] });
@@ -54,12 +57,14 @@ function parseLine(line: string): TimetableRow | null {
   try {
     const v = JSON.parse(line) as unknown;
     if (!Array.isArray(v)) return null;
-    const [time, room, title, names] = v as unknown[];
+    const [time, room, title, names, roomNo] = v as unknown[];
     return {
       time: typeof time === "string" ? time : "",
       room: typeof room === "string" ? room : "",
       title: typeof title === "string" ? title : "",
       names: toNames(names),
+      // 5つめは 9/25 に足した実際の部屋番号。無い行（それまでに保存したもの）は空でよい。
+      roomNo: typeof roomNo === "string" ? roomNo : "",
     };
   } catch {
     return null;
@@ -70,7 +75,11 @@ function decode(raw: string[]): TimetableRow[] {
   return raw.map(parseLine).filter((r): r is TimetableRow => r !== null);
 }
 
-/** 何も入っていない行は残さない。前後の空白も落とす。 */
+/**
+ * 何も入っていない行は残さない。前後の空白も落とす。
+ * 部屋番号（roomNo）しか入っていない行も「何も入っていない行」として捨てる。
+ * 実際の番号は行の中身ではなく、部屋に付いている覚え書きだから。
+ */
 function encode(rows: TimetableRow[]): string[] {
   return rows
     .map((r) => ({
@@ -78,9 +87,15 @@ function encode(rows: TimetableRow[]): string[] {
       room: r.room.trim(),
       title: r.title.trim(),
       names: r.names.map((n) => n.trim()).filter(Boolean),
+      roomNo: (r.roomNo ?? "").trim(),
     }))
     .filter((r) => r.time !== "" || r.room !== "" || r.title !== "" || r.names.length > 0)
-    .map((r) => JSON.stringify([r.time, r.room, r.title, r.names]));
+    // 番号が空のときは4つのままにして、それまでに保存したものと同じ形で残す。
+    .map((r) =>
+      r.roomNo === ""
+        ? JSON.stringify([r.time, r.room, r.title, r.names])
+        : JSON.stringify([r.time, r.room, r.title, r.names, r.roomNo]),
+    );
 }
 
 /** 「よっちゃん、くる」のように区切って書かれた名前を配列にする（区切りは 、，, ／ / 改行）。 */

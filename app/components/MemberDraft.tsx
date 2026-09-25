@@ -1189,27 +1189,32 @@ const HAIR = `1px solid ${LINE}`;
 const EMPTY_PLAN_ROWS = 4;
 
 /* 入力欄に出すための形。名前は「、」区切りの文字のまま持つ。
-   group は「部屋番号をまとめて変える」欄の何番目に属する行か（属さないなら -1）。
-   いまマスに入っている文字ではなく番号で覚えるのは、欄を一度空にしてから打ち直しても
-   同じ行にきちんと戻すため。文字で照らし合わせると、空にした瞬間に
-   「まだ何も入っていない行」まで巻き込んでしまう。 */
-type PlanDraft = { time: string; room: string; title: string; names: string; group: number };
-const toDraft = (r: TimetableRow, group: number): PlanDraft => ({
+   部屋は「呼び名（A・B）」と「当日の実際の番号（26・32）」の2つに分けてある。
+   呼び名はLINEの告知や打ち合わせで使う言い方なので、番号を入れても消えない。 */
+type PlanDraft = { time: string; room: string; title: string; names: string; roomNo: string };
+const toDraft = (r: TimetableRow): PlanDraft => ({
   time: r.time,
   room: r.room,
   title: r.title,
   names: joinNames(r.names),
-  group,
+  roomNo: r.roomNo ?? "",
 });
-const fromDraft = (d: PlanDraft): TimetableRow => ({ time: d.time, room: d.room, title: d.title, names: splitNames(d.names) });
-const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "", group: -1 });
+const fromDraft = (d: PlanDraft): TimetableRow => ({
+  time: d.time,
+  room: d.room,
+  title: d.title,
+  names: splitNames(d.names),
+  roomNo: d.roomNo,
+});
+const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "", roomNo: "" });
 
-/* いま使われている部屋（出てきた順。空の行は数えない）。
-   「部屋番号をまとめて変える」欄の並びは、これで決まる。 */
-const distinctRooms = (rows: TimetableRow[]): string[] => {
+/* いま出てくる部屋の呼び名（出てきた順。呼び名が空の行は数えない）。
+   「部屋番号をまとめて入れる」欄の並びは、これで決まる。
+   呼び名そのものは書き換えないので、打っている途中で並びが崩れることはない。 */
+const distinctRooms = (ds: PlanDraft[]): string[] => {
   const out: string[] = [];
-  for (const r of rows) {
-    const room = r.room.trim();
+  for (const d of ds) {
+    const room = d.room.trim();
     if (room && !out.includes(room)) out.push(room);
   }
   return out;
@@ -1220,9 +1225,6 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
   const [rows, setRows] = useState<TimetableRow[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<PlanDraft[]>([]);
-  // 編集をはじめた時点の部屋の並び。行を直しても数が増えたり減ったりしないよう、別に持つ。
-  const [rooms, setRooms] = useState<string[]>([]);
-  const [roomNote, setRoomNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1241,36 +1243,20 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
   }, []);
 
   const startEdit = () => {
-    const src = rows ?? [];
-    const rs = distinctRooms(src);
-    const base = src.map((r) => toDraft(r, rs.indexOf(r.room.trim())));
+    const base = (rows ?? []).map(toDraft);
     // 空なら空の行を4つ。あれば末尾に空の行を1つ足して、続きを打てるようにする。
     setEdit(base.length ? [...base, blankDraft()] : Array.from({ length: EMPTY_PLAN_ROWS }, blankDraft));
-    setRooms(rs);
-    setRoomNote("");
     setError("");
     setEditing(true);
   };
 
-  /* 部屋番号をまとめて変える。当日、お店で実際の番号を聞いてから14行を1つずつ直すのは
-     大変なので、同じ部屋の行をひとまとめに書き換える。
-     ほかの部屋と同じ番号にする入力だけは、2つの部屋が1つに混ざって戻せなくなるので断る。 */
-  const renameRoom = (i: number, to: string) => {
-    const from = rooms[i];
-    if (from === undefined || to === from) return;
-    if (to.trim() !== "" && rooms.some((r, n) => n !== i && r === to)) {
-      setRoomNote("ほかの部屋と同じ番号にはできません。");
-      return;
-    }
-    setRoomNote("");
-    setRooms((rs) => rs.map((r, n) => (n === i ? to : r)));
-    setEdit((ds) => ds.map((d) => (d.group === i ? { ...d, room: to } : d)));
-  };
+  /* 当日、お店で聞いた番号を入れるところ。A室の行ぜんぶに一度で入る。
+     書き換えるのは番号（roomNo）だけで、呼び名（A・B）には触らない。
+     だから何を打っても、消しても、A室B室の区別が消えることはない。 */
+  const setRoomNo = (room: string, no: string) =>
+    setEdit((ds) => ds.map((d) => (d.room.trim() === room ? { ...d, roomNo: no } : d)));
   const setField = (i: number, key: "time" | "room" | "title" | "names", v: string) =>
-    setEdit((ds) =>
-      // 部屋番号だけを手で直した行は、まとまりから外す（あとで「まとめて変える」に巻き込まれないように）
-      ds.map((d, n) => (n === i ? { ...d, [key]: v, ...(key === "room" ? { group: -1 } : null) } : d)),
-    );
+    setEdit((ds) => ds.map((d, n) => (n === i ? { ...d, [key]: v } : d)));
   const removeRow = (i: number) => setEdit((ds) => ds.filter((_, n) => n !== i));
   const addRow = () => setEdit((ds) => [...ds, blankDraft()]);
 
@@ -1294,6 +1280,13 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
 
   const view: TimetableRow[] =
     rows && rows.length ? rows : Array.from({ length: EMPTY_PLAN_ROWS }, blankTimetableRow);
+
+  // 「部屋番号をまとめて入れる」欄に出す部屋と、番号のぶつかり（A室とB室が同じ番号）
+  const planRooms = distinctRooms(edit);
+  const usedNos = planRooms
+    .map((r) => (edit.find((d) => d.room.trim() === r)?.roomNo ?? "").trim())
+    .filter((n) => n !== "");
+  const dupRoomNo = new Set(usedNos).size !== usedNos.length;
 
   return (
     <div>
@@ -1320,33 +1313,41 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
       {editing ? (
         /* 打ち込む形。1行ごとに、時間・部屋番号・企画・名前。 */
         <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
-          {rooms.length > 0 && (
-            /* 当日は、お店で聞いた番号に置きかえるのがいちばん多い直し方なので、
+          {planRooms.length > 0 && (
+            /* 当日は、お店で聞いた番号を入れるのがいちばん多い直し方なので、
                1行ずつの欄より先に、いちばん上に置く。 */
             <div style={{ padding: 14, border: HAIR, borderRadius: 12, display: "grid", gap: 10, background: "#FAFAFB" }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>
-                部屋番号をまとめて変える
+                部屋番号をまとめて入れる
               </span>
-              {rooms.map((r, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10 }}>
-                  <input
-                    className="md-field"
-                    value={r}
-                    placeholder="部屋番号"
-                    aria-label={`${i + 1}つめの部屋の番号`}
-                    onChange={(e) => renameRoom(i, e.target.value)}
-                  />
-                  <span style={{ fontSize: 12, color: SUB, whiteSpace: "nowrap" }}>
-                    {edit.filter((d) => d.group === i).length}行
-                  </span>
-                </div>
-              ))}
-              {roomNote ? (
-                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>{roomNote}</p>
+              {planRooms.map((r) => {
+                const mine = edit.filter((d) => d.room.trim() === r);
+                return (
+                  <div
+                    key={r}
+                    style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", alignItems: "center", gap: 10 }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 700, color: INK, minWidth: 18, textAlign: "center" }}>{r}</span>
+                    <input
+                      className="md-field"
+                      value={mine[0]?.roomNo ?? ""}
+                      placeholder="部屋番号"
+                      inputMode="numeric"
+                      aria-label={`${r}室の部屋番号`}
+                      onChange={(e) => setRoomNo(r, e.target.value)}
+                    />
+                    <span style={{ fontSize: 12, color: SUB, whiteSpace: "nowrap" }}>{mine.length}行</span>
+                  </div>
+                );
+              })}
+              {dupRoomNo ? (
+                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>
+                  ちがう部屋に同じ番号が入っています。
+                </p>
               ) : (
                 <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
-                  {"ここを書き換えると、同じ部屋の行がまとめて変わります。下の1行ずつの欄にもすぐ映るので、" +
-                    "たしかめてから保存してください。表の部屋のマスは狭いので、「26」のように短い番号が収まります。"}
+                  {"A・Bという呼び名はそのままで、その部屋の行ぜんぶに番号が入ります。" +
+                    "表には呼び名の下に番号が出ます。空にすれば番号だけが消え、呼び名は残ります。"}
                 </p>
               )}
             </div>
@@ -1372,8 +1373,8 @@ function RoomPlan({ attendeeCount, roster }: { attendeeCount: number; roster: st
                 <input
                   className="md-field"
                   value={d.room}
-                  placeholder="部屋番号"
-                  aria-label={`${i + 1}行目の部屋番号`}
+                  placeholder="部屋（AやB）"
+                  aria-label={`${i + 1}行目の部屋`}
                   onChange={(e) => setField(i, "room", e.target.value)}
                 />
               </div>
