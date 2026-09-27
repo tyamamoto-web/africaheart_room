@@ -1876,7 +1876,7 @@ function AfterScreen({
       <div style={{ marginTop: 40 }}>
         <Label>ひとこと</Label>
         <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
-          {when}はおつかれさまでした。よかったら一言、書いていってください。ほかの人にも見えます。
+          {when}はおつかれさまでした。よかったら一言、書いていってください。
         </p>
 
         <div style={{ marginTop: 18 }}>
