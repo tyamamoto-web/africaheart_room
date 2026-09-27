@@ -125,6 +125,7 @@ import {
 import { resolveMe, saveMe } from "@/lib/me";
 import { readRoster, rosterNames } from "@/lib/roster";
 import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
+import { CURRENT_ROUND } from "@/lib/eventRound";
 import {
   blankTimetableRow,
   joinNames,
@@ -1434,17 +1435,18 @@ function DayScreen({ attendeeCount }: { attendeeCount: number }) {
 }
 
 /* ── 前回の写真と動画 ─────────────────────────
-   ふりかえりの画面に出す写真と動画。前回（8月22日・諏訪）に運営が入れたものを、
-   Supabase Storage の gallery/2026-08-22/ から読む（lib/gallery.ts）。
-   本番では「いま終わったばかりの回」の日付にする。ここは下書きなので、
-   諏訪の回に決め打ちしてある。
+   ふりかえりの画面に出す写真と動画。いま終わったばかりの回のぶんを、
+   Supabase Storage の gallery/<開催日>/ から読む（lib/gallery.ts）。
+   どの回かは lib/eventRound.ts の CURRENT_ROUND ひとつで決まる。運営が写真を
+   入れる先（ギャラリーの画面）も同じ値を見ているので、入れ先と読み先がずれない。
+   前の回のぶんは別のフォルダに残っていて、ギャラリーの画面で回を選べば見られる。
 
-   一覧用の小さい画像は、写真には全部あるが、動画には1本も無い
-   （動画は1本が100MBを超え、端末で1コマ取り出せなかった）。
+   一覧用の小さい画像は、写真には作られるが、動画には無いことがある
+   （大きい動画は端末で1コマ取り出せない）。
    だから動画のマスは、暗い面に再生の印を置くだけにしている。
    9マスの見本には写真を先に出し、動画はそのあとに回す。暗いマスが
    並ぶより、その日の様子が一目で伝わるほうを取った。 */
-const LAST_GALLERY = { key: "2026-08-22", place: "諏訪" };
+const LAST_GALLERY = { key: CURRENT_ROUND.key, place: CURRENT_ROUND.place };
 const PREVIEW_COUNT = 9; // 見本のマスの数（3列×3段）
 
 function PlayMark({ size = 24 }: { size?: number }) {

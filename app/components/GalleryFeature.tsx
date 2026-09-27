@@ -4,14 +4,15 @@
    ギャラリー：当日の写真・動画を見る／保存する／（運営は）入れる
    ------------------------------------------------------------
    ・見るのは誰でも。入れる・消すのは合言葉（役員）のうしろ。
-   ・並びは撮影シーンごと（lib/gallery.ts の SCENES＝カラオケの枠＋前後の予定）。
+   ・並びは撮影シーンごと（lib/eventRound.ts が回ごとに持つ SCENES＝その日の進行）。
+   ・上の行で回を選べる。前の回は見るだけで、追加はいまの回にしかできない。
    ・一覧は小さい画像（thumbs/）を読む。原寸は拡げたときだけ読む。
    ・色はグレーだけにして、写真そのものが主役になるようにしている。
    ============================================================ */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent } from "react";
 import {
-  listGallery,
+  listGalleryFor,
   uploadToGallery,
   deleteFromGallery,
   GallerySetupError,
@@ -20,6 +21,13 @@ import {
   sceneLabel,
   type GalleryItem,
 } from "@/lib/gallery";
+import { ROUNDS, CURRENT_ROUND, roundWhen } from "@/lib/eventRound";
+import { readVoices, type Voice } from "@/lib/voices";
+
+/** その1件がどの回のものか。置き場所は <回>/<シーン>/<名前> なので、先頭を見る。 */
+function roundKeyOf(item: GalleryItem): string {
+  return item.path.split("/")[0] || GALLERY_EVENT;
+}
 import {
   prepareFile,
   isVideoFile,
@@ -196,7 +204,7 @@ function Lightbox({
     setMsg("");
     try {
       const ext = item.name.split(".").pop() || "jpg";
-      await downloadFile(item.url, `africaheart-${GALLERY_EVENT}-${item.sceneId}-${index + 1}.${ext}`);
+      await downloadFile(item.url, `africaheart-${roundKeyOf(item)}-${item.sceneId}-${index + 1}.${ext}`);
       setMsg(isIOS() ? "「ファイル」アプリに保存しました" : "保存しました");
     } catch (e) {
       setMsg(errText(e));
@@ -237,7 +245,9 @@ function Lightbox({
             <path d="M5 5 L19 19 M19 5 L5 19" stroke="#d3d1c7" strokeWidth="2" fill="none" />
           </svg>
         </button>
-        <p className="text-xs" style={{ color: "#d3d1c7" }}>{sceneLabel(item.sceneId)}</p>
+        <p className="text-xs" style={{ color: "#d3d1c7" }}>
+          {sceneLabel(item.sceneId, roundKeyOf(item))}
+        </p>
         <button
           type="button"
           onClick={save}
@@ -739,17 +749,22 @@ export default function GalleryFeature() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [reloading, setReloading] = useState(false);
+  /* 見ている回。はじめはいまの回。前の回に切り替えると、そのフォルダを読む。
+     前の回は見るだけ（追加はできない）にしてある。入れ先を選べるようにすると、
+     終わった回に新しい写真が混ざる事故が起きるため。 */
+  const [round, setRound] = useState(CURRENT_ROUND.key);
+  const [voices, setVoices] = useState<Voice[]>([]);
 
   const load = useCallback(async () => {
     setErr("");
     try {
-      setItems(await listGallery());
+      setItems(await listGalleryFor(round));
     } catch (e) {
       setErr(errText(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [round]);
 
   // 運営があとから足したぶんを、開いたまま取り直す。
   // 常時ポーリングにしないのは、画像の一覧は1回が重く、当日以外はまず増えないから。
@@ -764,12 +779,46 @@ export default function GalleryFeature() {
     setOfficer(isOfficerUnlocked());
   }, [load]);
 
+  /* 前の回を見ているときだけ、その日のひとことも一緒に出す。
+     いまの回のひとことは「ふりかえり」の画面にあるので、ここでは重ねない。
+     読めなくても写真の一覧は出したいので、失敗は黙って無いものとして扱う。 */
+  useEffect(() => {
+    if (round === CURRENT_ROUND.key) {
+      setVoices([]);
+      return;
+    }
+    let alive = true;
+    readVoices(round)
+      .then((v) => {
+        if (alive) setVoices(v);
+      })
+      .catch(() => {
+        if (alive) setVoices([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [round]);
+
+  /* 回を切り替える。前の回のものを選んだまま残すと、数と中身が食い違うので捨てる。 */
+  const pickRound = (key: string) => {
+    if (key === round) return;
+    setLoading(true);
+    setItems([]);
+    setSelecting(false);
+    setPicked([]);
+    setSaveMsg("");
+    setViewIdx(null);
+    setRound(key);
+  };
+  const isCurrent = round === CURRENT_ROUND.key;
+
   const shown = useMemo(
     () => (filter === "all" ? items : items.filter((i) => i.kind === filter)),
     [items, filter]
   );
 
-  // 見出し（シーン）ごとにまとめる。SCENESの並び順は listGallery で保証済み。
+  // 見出し（シーン）ごとにまとめる。並び順は listGalleryFor がその回のシーン順に整えている。
   const groups = useMemo(() => {
     const out: { sceneId: string; items: GalleryItem[] }[] = [];
     for (const it of shown) {
@@ -801,7 +850,7 @@ export default function GalleryFeature() {
       const it = targets[n];
       try {
         const ext = it.name.split(".").pop() || "jpg";
-        await downloadFile(it.url, `africaheart-${GALLERY_EVENT}-${it.sceneId}-${n + 1}.${ext}`);
+        await downloadFile(it.url, `africaheart-${roundKeyOf(it)}-${it.sceneId}-${n + 1}.${ext}`);
         ok++;
         // 続けて何件も落とすとブラウザに止められるので、少し間をあける
         await new Promise((r) => setTimeout(r, 400));
@@ -813,8 +862,41 @@ export default function GalleryFeature() {
     setSaveMsg(`${ok}件を保存しました`);
   }
 
+  /* 回の選び分け。回が1つしか無いうちは出さない。
+     読み込み中も出しておく（切り替えた直後に消えると、戻る手が無くなるため）。 */
+  const roundBar =
+    ROUNDS.length < 2 ? null : (
+      <div className="flex gap-1 mb-3" role="group" aria-label="どの回を見るか">
+        {ROUNDS.map((r) => {
+          const on = r.key === round;
+          return (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => pickRound(r.key)}
+              aria-pressed={on}
+              className="flex-1 py-1.5 text-xs font-bold"
+              style={{
+                background: on ? FACE : "transparent",
+                color: on ? INK : DIM,
+                border: `1px solid ${on ? "transparent" : LINE}`,
+                borderRadius: 7,
+              }}
+            >
+              {roundWhen(r.key)} {r.place}
+            </button>
+          );
+        })}
+      </div>
+    );
+
   if (loading) {
-    return <p className="text-sm" style={{ color: DIM }}>読み込んでいます…</p>;
+    return (
+      <div className="w-full">
+        {roundBar}
+        <p className="text-sm" style={{ color: DIM }}>読み込んでいます…</p>
+      </div>
+    );
   }
 
   if (panel === "upload") {
@@ -831,6 +913,7 @@ export default function GalleryFeature() {
 
   return (
     <div className="w-full">
+      {roundBar}
       {/* 上の行 */}
       <div className="flex items-center justify-between">
         <p className="text-xs" style={{ color: DIM }}>
@@ -860,14 +943,17 @@ export default function GalleryFeature() {
               {selecting ? "やめる" : "選ぶ"}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setPanel("upload")}
-            className="text-xs font-bold px-3 py-1.5"
-            style={{ background: FACE, color: SUB, borderRadius: 7 }}
-          >
-            追加（運営）
-          </button>
+          {/* 追加はいまの回だけ。終わった回に新しい写真が混ざらないようにする */}
+          {isCurrent && (
+            <button
+              type="button"
+              onClick={() => setPanel("upload")}
+              className="text-xs font-bold px-3 py-1.5"
+              style={{ background: FACE, color: SUB, borderRadius: 7 }}
+            >
+              追加（運営）
+            </button>
+          )}
         </div>
       </div>
 
@@ -902,11 +988,13 @@ export default function GalleryFeature() {
         err ? null : (
         <div className="py-12 text-center">
           <p className="text-sm" style={{ color: SUB }}>
-            {items.length === 0 ? "当日の写真はまだありません" : "この種類はまだありません"}
+            {items.length === 0 ? "この回の写真はまだありません" : "この種類はまだありません"}
           </p>
           {items.length === 0 && (
             <p className="text-xs mt-2 leading-relaxed" style={{ color: DIM }}>
-              オフ会が終わったら、運営が撮った写真と動画をここに載せます。
+              {isCurrent
+                ? "運営が撮った写真と動画を、ここに載せていきます。"
+                : `${roundWhen(round)}のぶんは、まだ入っていません。`}
             </p>
           )}
         </div>
@@ -916,7 +1004,7 @@ export default function GalleryFeature() {
           {groups.map((g) => (
             <div key={`${g.sceneId}-${g.items[0]?.path ?? ""}`} className="mb-4">
               <p className="text-[11px] mb-1.5 tracking-wide" style={{ color: DIM }}>
-                {sceneLabel(g.sceneId)}
+                {sceneLabel(g.sceneId, round)}
               </p>
               <div className="grid grid-cols-3 gap-[3px]">
                 {g.items.map((it) => (
@@ -931,6 +1019,26 @@ export default function GalleryFeature() {
                   />
                 ))}
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* その日のひとこと（前の回を見ているときだけ。読むだけで、書き足しはできない） */}
+      {!isCurrent && voices.length > 0 && (
+        <div className="mt-6 pt-4" style={{ borderTop: `1px solid ${LINE}` }}>
+          <p className="text-[11px] mb-2 tracking-wide" style={{ color: DIM }}>
+            {roundWhen(round)}のひとこと
+          </p>
+          {voices.map((v) => (
+            <div key={`${v.name}-${v.at}`} className="mb-3">
+              <p className="text-xs font-bold" style={{ color: SUB }}>{v.name}</p>
+              <p
+                className="text-sm leading-relaxed"
+                style={{ color: INK, whiteSpace: "pre-line", wordBreak: "break-word" }}
+              >
+                {v.text}
+              </p>
             </div>
           ))}
         </div>

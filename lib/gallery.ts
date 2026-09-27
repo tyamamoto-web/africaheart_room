@@ -26,7 +26,7 @@
    ※ 公開バケットなので、URLを知っていれば誰でも見られる。人に見せたくないものは置かない。
    ============================================================ */
 
-import { nextEvent, karaokeRooms } from "./data";
+import { CURRENT_ROUND, scenesOf, type Scene } from "./eventRound";
 
 const SUPA_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gdajpgbfngvigrdbiwsw.supabase.co";
@@ -45,41 +45,31 @@ export function isGalleryConfigured(): boolean {
 
 /* ── 回（イベント）ごとのフォルダ ───────────────────── */
 
-// "2026年8月22日（土）" → "2026-08-22"。フォルダ名に使うのでASCIIに直す。
-// lib/data.ts の nextEvent.date から作るので、回が変わればフォルダも自動で変わる
-// （前回の写真が次回に混ざらない）。日付の書式が変わって読めないときは misc へ逃がす。
-function eventKeyFrom(label: string): string {
-  const m = label.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
-  if (!m) return "misc";
-  return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
-}
-export const GALLERY_EVENT = eventKeyFrom(nextEvent.date);
+// 回のフォルダ名は lib/eventRound.ts が持つ（入れ先と読み先を1か所にそろえるため）。
+// 以前は lib/data.ts の nextEvent.date から作っていたが、ふりかえり側の直書きと
+// ずれると「入れたのに出てこない」が起きるので、出どころをひとつにした。
+export const GALLERY_EVENT = CURRENT_ROUND.key;
 
 /* ── 撮影シーン（一覧の見出し＝フォルダ）───────────── */
 
-export type Scene = { id: string; label: string };
+export type { Scene };
 
 /**
- * 並び順がそのまま一覧の並び順になる。カラオケの枠は lib/data.ts の
- * karaokeRooms.slots から作るので、予定を直せばギャラリーの見出しも一緒に変わる。
+ * いまの回の撮影シーン。並び順がそのまま一覧の並び順になる。
+ * 過去の回は中身が違うので、回を指定して読むときは scenesOf(eventKey) を使う。
  */
-export const SCENES: Scene[] = [
-  { id: "meet", label: "集合" },
-  ...karaokeRooms.slots.map((s) => ({ id: s.id, label: s.label })),
-  { id: "yakiniku", label: "焼肉パーティー" },
-  { id: "hanabi", label: "サマーナイト花火" },
-  { id: "bar", label: "カラオケバー ミルユッテ" },
-  { id: "other", label: "その他" },
-];
+export const SCENES: Scene[] = CURRENT_ROUND.scenes;
 
-export function sceneLabel(id: string): string {
-  return SCENES.find((s) => s.id === id)?.label ?? "その他";
+/** シーンの見出し。回を渡さなければ、いまの回の読み方で引く。 */
+export function sceneLabel(id: string, eventKey: string = GALLERY_EVENT): string {
+  return scenesOf(eventKey).find((s) => s.id === id)?.label ?? "その他";
 }
 
-// 一覧の並び替えに使う。SCENESに無いフォルダ（手で足したものなど）は最後へ。
-function sceneOrder(id: string): number {
-  const i = SCENES.findIndex((s) => s.id === id);
-  return i < 0 ? SCENES.length : i;
+// 一覧の並び替えに使う。その回のシーンに無いフォルダ（手で足したものなど）は最後へ。
+function sceneOrder(id: string, eventKey: string): number {
+  const list = scenesOf(eventKey);
+  const i = list.findIndex((s) => s.id === id);
+  return i < 0 ? list.length : i;
 }
 
 /* ── 中身の型 ───────────────────────────────────── */
@@ -228,12 +218,12 @@ export async function listGalleryFor(eventKey: string): Promise<GalleryItem[]> {
   const items = chunks.flat();
   if (items.length === 0 && (await bucketMissing())) throw new GallerySetupError();
   return items.sort((a, b) => {
-    const s = sceneOrder(a.sceneId) - sceneOrder(b.sceneId);
+    const s = sceneOrder(a.sceneId, eventKey) - sceneOrder(b.sceneId, eventKey);
     return s !== 0 ? s : a.takenAt - b.takenAt;
   });
 }
 
-/** 今回の回（lib/data.ts の nextEvent の日付のフォルダ）のぶんを全部読む。 */
+/** いまの回（lib/eventRound.ts の CURRENT_ROUND のフォルダ）のぶんを全部読む。 */
 export function listGallery(): Promise<GalleryItem[]> {
   return listGalleryFor(GALLERY_EVENT);
 }

@@ -311,7 +311,7 @@ export default function PlanTable({
                     ) : (
                       <>
                         {/* 名前は「・」で区切って続けて出す。1人ぶんを nowrap にしてあるので、
-                            「あんちゃん」が「あんち」「ゃん」のように途中で割れない。
+                            長い呼び名が「あいう」「えお」のように途中で割れない。
                             9/25 まではすきま（gap）だけで区切っていたが、2人が1行に並ぶと
                             どこまでが1人の名前か読み取りにくかった。 */}
                         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1px 0" }}>
