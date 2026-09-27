@@ -22,7 +22,7 @@ import {
   type GalleryItem,
 } from "@/lib/gallery";
 import { ROUNDS, CURRENT_ROUND, roundWhen } from "@/lib/eventRound";
-import { readVoiceBoard, type Voice, type Reply } from "@/lib/voices";
+import { readVoiceBoard, groupReplies, type Voice, type Reply } from "@/lib/voices";
 
 /** その1件がどの回のものか。置き場所は <回>/<シーン>/<名前> なので、先頭を見る。 */
 function roundKeyOf(item: GalleryItem): string {
@@ -856,6 +856,8 @@ export default function GalleryFeature() {
     setRound(key);
   };
   const isCurrent = round === CURRENT_ROUND.key;
+  // 返信先のひとことが取り消されたぶんも読めるように（ふりかえりの画面と同じ扱い）
+  const voiceGroups = groupReplies(voices, replies);
 
   const shown = useMemo(
     () => (filter === "all" ? items : items.filter((i) => i.kind === filter)),
@@ -1069,7 +1071,7 @@ export default function GalleryFeature() {
       )}
 
       {/* その日のひとこと（前の回を見ているときだけ。読むだけで、書き足しはできない） */}
-      {!isCurrent && voices.length > 0 && (
+      {!isCurrent && (voices.length > 0 || replies.length > 0) && (
         <div className="mt-6 pt-4" style={{ borderTop: `1px solid ${LINE}` }}>
           <p className="text-[11px] mb-2 tracking-wide" style={{ color: DIM }}>
             {roundWhen(round)}のひとこと
@@ -1084,9 +1086,7 @@ export default function GalleryFeature() {
                 {v.text}
               </p>
               {/* その回に付いた返信も読めるようにする（ここは読むだけ） */}
-              {replies
-                .filter((r) => r.to === v.name)
-                .map((r) => (
+              {voiceGroups.under(v.id).map((r) => (
                   <div key={r.id} className="mt-2 pl-3" style={{ borderLeft: `2px solid ${LINE}` }}>
                     <p className="text-[11px] font-bold" style={{ color: DIM }}>{r.name}</p>
                     <p
@@ -1097,6 +1097,25 @@ export default function GalleryFeature() {
                     </p>
                   </div>
                 ))}
+            </div>
+          ))}
+
+          {voiceGroups.orphans.map((g) => (
+            <div key={`orphan-${g.replies[0].to}`} className="mb-3">
+              <p className="text-xs" style={{ color: DIM }}>
+                {g.name}さんのひとことは取り消されました
+              </p>
+              {g.replies.map((r) => (
+                <div key={r.id} className="mt-2 pl-3" style={{ borderLeft: `2px solid ${LINE}` }}>
+                  <p className="text-[11px] font-bold" style={{ color: DIM }}>{r.name}</p>
+                  <p
+                    className="text-sm leading-relaxed"
+                    style={{ color: INK, whiteSpace: "pre-line", wordBreak: "break-word" }}
+                  >
+                    {r.text}
+                  </p>
+                </div>
+              ))}
             </div>
           ))}
         </div>

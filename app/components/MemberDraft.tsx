@@ -141,6 +141,7 @@ import {
   readVoiceBoard,
   saveVoice,
   saveReply,
+  groupReplies,
   VOICE_MAX,
   type Voice,
   type Reply,
@@ -1776,11 +1777,21 @@ function GalleryDialog({
      ひとことは1人1件。もう一度送れば書き替えになる。
      並びは新しいものから。書いたばかりのものが上に出るので、
      送れたかどうかが目で分かる。 */
+/** 書きかけの返信につける札。送り直しても同じ札を使い、同じ返信が2件に増えないようにする。 */
+function newDraftId(): string {
+  try {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  } catch {
+    return `${Date.now().toString(36)}${Math.floor(Math.random() * 1e8).toString(36)}`;
+  }
+}
+
 /* ひとこと1件にぶら下がる返信のかたまり。
    返信は1人が何件でも書けるので、書きかけの文は返信先ごとに別々に持つ。
    この部品の中だけで完結させ、上の画面には「送ってきた」ことだけを返す。 */
 function ReplyThread({
   to,
+  toName,
   replies,
   names,
   me,
@@ -1789,27 +1800,36 @@ function ReplyThread({
   onRemove,
 }: {
   to: string;
+  toName: string;
   replies: Reply[];
   names: string[];
   me: string;
   onPickMe: (name: string) => void;
-  onSend: (to: string, text: string) => Promise<boolean>;
+  onSend: (to: string, toName: string, text: string, id: string) => Promise<string>;
   onRemove: (id: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [err, setErr] = useState("");
+  /* 書きかけ1つにつき札を1つ。送れたか分からないまま押し直しても、
+     同じ札で上書きになるので、同じ返信が2件に増えない。 */
+  const draftId = useRef(newDraftId());
   const body = text.trim();
 
   const send = async () => {
     if (!me || !body || sending) return;
     setSending(true);
-    const ok = await onSend(to, body);
+    setErr("");
+    const message = await onSend(to, toName, body, draftId.current);
     setSending(false);
-    if (ok) {
-      setText("");
-      setOpen(false);
+    if (message) {
+      setErr(message);
+      return;
     }
+    draftId.current = newDraftId(); // 次の書きかけは別の札で
+    setText("");
+    setOpen(false);
   };
 
   return (
@@ -1874,35 +1894,40 @@ function ReplyThread({
           </select>
           <textarea
             className="md-field md-field--area"
-            aria-label={`${to}さんへの返信`}
+            aria-label={`${toName}さんへの返信`}
             value={text}
             maxLength={VOICE_MAX}
             disabled={!me || sending}
-            placeholder={`${to}さんへ`}
+            placeholder={`${toName}さんへ`}
             onChange={(e) => setText(e.target.value)}
             style={{ marginTop: 8, minHeight: 64, resize: "none" }}
           />
-          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
+          {/* md-cta は横いっぱいの高さ54pxなので、やめるを横に置くと狭い幅で折れる。縦に積む。 */}
+          <div style={{ marginTop: 8 }}>
             <button type="button" className="md-cta" disabled={!me || !body || sending} onClick={() => void send()}>
               {sending ? "送っています" : "返信する"}
             </button>
-            <button
-              type="button"
-              className="md-edit"
-              disabled={sending}
-              onClick={() => {
-                setOpen(false);
-                setText("");
-              }}
-            >
-              やめる
-            </button>
           </div>
+          {err && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.7, color: ACC_TEXT }}>{err}</p>
+          )}
           {!me && (
             <p style={{ margin: "6px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
               お名前を選ぶと、返信できます。
             </p>
           )}
+          <button
+            type="button"
+            className="md-edit"
+            style={{ marginTop: 8 }}
+            disabled={sending}
+            onClick={() => {
+              setOpen(false);
+              setErr("");
+            }}
+          >
+            やめる
+          </button>
         </div>
       ) : (
         <button
@@ -2039,18 +2064,16 @@ function AfterScreen({
     void send("");
   };
 
-  /* 返信を送る。送れたら true を返す（送れていないのに欄を閉じないため）。 */
-  const sendReply = async (to: string, next: string): Promise<boolean> => {
-    if (!me) return false;
-    setVoiceError("");
+  /* 返信を送る。送れたら空文字、だめならその理由を返す（返信欄のそばに出すため）。 */
+  const sendReply = async (to: string, toName: string, next: string, id: string): Promise<string> => {
+    if (!me) return "お名前を選んでください";
     try {
-      const board = await saveReply(LAST_GALLERY.key, to, me, next);
+      const board = await saveReply(LAST_GALLERY.key, to, toName, me, next, id);
       setVoices(board.voices);
       setReplies(board.replies);
-      return true;
+      return "";
     } catch (e) {
-      setVoiceError(e instanceof Error ? e.message : "送れませんでした。もう一度お試しください");
-      return false;
+      return e instanceof Error ? e.message : "送れませんでした。もう一度お試しください";
     }
   };
 
@@ -2060,7 +2083,7 @@ function AfterScreen({
     if (!r || !me) return;
     setVoiceError("");
     try {
-      const board = await saveReply(LAST_GALLERY.key, r.to, me, "", id);
+      const board = await saveReply(LAST_GALLERY.key, r.to, r.toName, me, "", id);
       setVoices(board.voices);
       setReplies(board.replies);
     } catch (e) {
@@ -2069,10 +2092,8 @@ function AfterScreen({
   };
 
   /* 返信先のひとことが取り消されると、その返信だけが宙に浮く。
-     書いた人の言葉を黙って隠したくないので、下にまとめて出す。 */
-  const orphanTargets = voices
-    ? Array.from(new Set(replies.map((r) => r.to))).filter((t) => !voices.some((v) => v.name === t))
-    : [];
+     書いた人の言葉を黙って隠したくないので、下にまとめて出す（lib/voices.ts と共通）。 */
+  const grouped = groupReplies(voices ?? [], replies);
 
   const d = isoYmd(LAST_GALLERY.key);
   const when = d ? `${d.m}月${d.d}日` : LAST_GALLERY.key;
@@ -2200,7 +2221,7 @@ function AfterScreen({
             <Bar w="40%" h={13} />
             <Bar w="88%" h={13} />
           </div>
-        ) : voices.length === 0 ? (
+        ) : voices.length === 0 && grouped.orphans.length === 0 ? (
           <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
             まだ誰も書いていません。
           </p>
@@ -2232,8 +2253,9 @@ function AfterScreen({
                   {v.text}
                 </p>
                 <ReplyThread
-                  to={v.name}
-                  replies={replies.filter((r) => r.to === v.name)}
+                  to={v.id}
+                  toName={v.name}
+                  replies={grouped.under(v.id)}
                   names={names}
                   me={me}
                   onPickMe={onPickMe}
@@ -2243,15 +2265,14 @@ function AfterScreen({
               </div>
             ))}
 
-            {/* 返信先のひとことが取り消されたぶん。返信そのものは残して読めるようにする。 */}
-            {orphanTargets.map((t) => (
-              <div key={`orphan-${t}`} style={{ padding: "14px 0", borderTop: `1px solid ${LINE}` }}>
+            {/* 返信先のひとことが取り消されたぶん。返信そのものは残して読めるようにする。
+                ひとことが1件も無くなっても、ここだけは出す。 */}
+            {grouped.orphans.map((g) => (
+              <div key={`orphan-${g.replies[0].to}`} style={{ padding: "14px 0", borderTop: `1px solid ${LINE}` }}>
                 <p style={{ margin: 0, fontSize: 13, color: DIM }}>
-                  {t}さんのひとことは取り消されました
+                  {g.name}さんのひとことは取り消されました
                 </p>
-                {replies
-                  .filter((r) => r.to === t)
-                  .map((r) => (
+                {g.replies.map((r) => (
                     <div
                       key={r.id}
                       style={{ marginTop: 8, paddingLeft: 12, borderLeft: `2px solid ${LINE}` }}
@@ -2268,9 +2289,9 @@ function AfterScreen({
                         }}
                       >
                         {r.text}
-                      </p>
-                    </div>
-                  ))}
+                    </p>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
