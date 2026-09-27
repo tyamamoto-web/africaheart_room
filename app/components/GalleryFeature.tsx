@@ -546,7 +546,16 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
             },
             (r) => patch(p.key, { progress: r })
           );
-          patch(p.key, { status: "done", progress: 1, note: humanSize(prep.blob.size) });
+          patch(p.key, {
+            status: "done",
+            progress: 1,
+            // 焼き直せなかったものは、一覧に絵が出ないことを伝える
+            note: prep.asIs
+              ? `${humanSize(prep.blob.size)}・焼き直せなかったので、撮ったそのまま入れました${
+                  prep.thumb ? "" : "（一覧に絵が出ません）"
+                }`
+              : humanSize(prep.blob.size),
+          });
           ok++;
         } catch (e) {
           patch(p.key, { status: "error", note: errText(e) });

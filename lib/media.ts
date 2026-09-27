@@ -61,6 +61,8 @@ export type Prepared = {
   kind: "photo" | "video";
   codec?: VideoCodec; // 動画のときだけ
   thumb?: Blob; // 一覧用の小さいJPEG（作れなかったときは無し）
+  /** 焼き直さず、撮ったそのままを置くとき。この端末では中身を開けなかった印。 */
+  asIs?: boolean;
 };
 
 /* ── 写真：JPEGに焼き直す ───────────────────────── */
@@ -120,18 +122,62 @@ async function toJpeg(d: Decoded, maxEdge: number, quality: number): Promise<Blo
   return blob;
 }
 
+/** 焼き直せなかった写真を、そのまま置くときのMIME。 */
+function imageContentType(ext: string, given: string): string {
+  if (given.startsWith("image/")) return given;
+  if (ext === "heic") return "image/heic";
+  if (ext === "heif") return "image/heif";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+  return "image/jpeg";
+}
+
+/** 焼き直さずに、撮ったそのままを置く形。thumb は作れていれば付ける。 */
+function asIsPhoto(file: File, thumb?: Blob): Prepared {
+  const raw = (file.name.split(".").pop() || "").toLowerCase();
+  const ext = /^[a-z0-9]{1,5}$/.test(raw) ? raw : "jpg";
+  return {
+    blob: file,
+    ext,
+    contentType: imageContentType(ext, file.type || ""),
+    takenAt: file.lastModified || Date.now(),
+    kind: "photo",
+    thumb,
+    asIs: true,
+  };
+}
+
+/**
+ * 写真を入れられる形にする。
+ *
+ * 9/27まではここで断ることがあり、そうすると写真が1枚も入らなかった。
+ * いまは、うまくいかなくても撮ったそのままを入れる。断るより残すほうがよい。
+ * 詰まりどころは2つあって、どちらも「そのまま入れる」で抜ける。
+ *   ・この端末では中身を開けない（WindowsやアンドロイドでのHEICなど）
+ *   ・開けたが、焼き直しの途中で端末の持ち物が足りなくなった
+ *     （大きい動画を何本も入れたあとのiPhoneで起きる）
+ *
+ * 小さい画像（一覧用）は先に作る。こちらは長辺480pxで軽いので、
+ * 原寸の焼き直しが持ち物不足で落ちても、一覧の絵だけは残ることが多い。
+ */
 export async function prepareImage(file: File): Promise<Prepared> {
-  let d: Decoded;
+  let d: Decoded | null = null;
   try {
     d = await decodeImage(file);
   } catch {
-    throw new Error(
-      `「${file.name}」を開けませんでした。iPhoneの写真形式（HEIC）かもしれません。撮影したiPhoneから入れ直すか、設定→カメラ→フォーマット→「互換性優先」にしてから撮り直してください`
-    );
+    d = null;
   }
+  if (!d) return asIsPhoto(file);
+
   try {
-    const blob = await toJpeg(d, MAX_EDGE, JPEG_QUALITY);
     const thumb = await toJpeg(d, THUMB_EDGE, THUMB_QUALITY).catch(() => undefined);
+    let blob: Blob;
+    try {
+      blob = await toJpeg(d, MAX_EDGE, JPEG_QUALITY);
+    } catch {
+      return asIsPhoto(file, thumb);
+    }
     return {
       blob,
       ext: "jpg",

@@ -1461,8 +1461,12 @@ function PlayMark({ size = 24 }: { size?: number }) {
 
 /* 写真か動画の1マス。more を渡すと「残り○件」のマスになる。 */
 function MediaTile({ item, more, onClick }: { item: GalleryItem; more?: number; onClick: () => void }) {
-  // 動画は一覧用の画像が無いので、はじめから何も読まない（原寸は動画ファイルなので img では描けない）。
-  const [src, setSrc] = useState(item.kind === "photo" ? item.thumbUrl : "");
+  /* 一覧用の小さい画像は、写真にも動画にもある（動画は入れるときに1コマ抜いて作る）。
+     9/27まで動画は最初から読まずに黒いマスにしていたが、いまは絵が出る。
+     作れなかったものだけ、暗い面に再生の印が残る。
+     読めなかったときの逃げ道は写真だけ。動画の原寸は動画ファイルなので、
+     img に入れても描けないうえ、何百MBも落としにいってしまう。 */
+  const [src, setSrc] = useState(item.thumbUrl);
   const label = more ? `残り${more}件をすべて見る` : item.kind === "video" ? "動画を開く" : "写真を開く";
   return (
     <button
@@ -1478,8 +1482,10 @@ function MediaTile({ item, more, onClick }: { item: GalleryItem; more?: number; 
           alt=""
           loading="lazy"
           decoding="async"
-          // 小さい画像が無ければ原寸に落とす。それも無ければ灰色のまま。
-          onError={() => setSrc(src === item.thumbUrl ? item.url : "")}
+          // 写真は、小さい画像が無ければ原寸に落とす。それも無ければ地の色のまま。
+          onError={() =>
+            setSrc(item.kind === "photo" && src === item.thumbUrl ? item.url : "")
+          }
         />
       )}
       {item.kind === "video" && !more && (
