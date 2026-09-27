@@ -12,11 +12,14 @@
         ついでに長辺2560pxまで縮めるので、通信量も置き場所も軽くなる。
         向き（EXIF）もこのときに焼き込まれるので、横倒しにならない。
 
-   ② 動画：iPhoneの既定は HEVC(H.265)。アンドロイドのブラウザでは再生できない。
-      → こちらはブラウザの中では直せない（作り直しになる）。
-        なので「入れる前に見つけて知らせる」方針。ファイルの中を覗いて
-        H.264 か HEVC かを判定する（下の probeVideoCodec）。
-        根本の対処は撮影前の設定：
+   ② 動画：iPhoneの既定は HEVC(H.265)。これはブラウザの中では直せない（作り直しになる）。
+      → 入れるのは止めない（9/27に方針を変えた。それまでは弾いていたので、
+        iPhoneからは動画を1本も入れられなかった）。
+        いまのアンドロイドは HEVC を再生できる端末が多い。再生できない端末でも、
+        拡大した画面から保存すれば、端末の動画アプリで見られる。
+        中身が H.264 か HEVC かは下の probeVideoCodec で分かるので、
+        入れる人への案内にだけ使う。
+        撮る前に設定しておくと、そもそも起きない：
           iPhone → 設定 → カメラ → フォーマット → 「互換性優先」
         これにすると写真はJPEG・動画はH.264で撮れるので、①②とも起きなくなる。
 
@@ -255,16 +258,27 @@ async function makeVideoPoster(file: File): Promise<Blob | undefined> {
   }
 }
 
+/**
+ * 置くときのMIME。入れ物（拡張子）に合わせる。
+ * .mov は QuickTime だが、中の箱の造りは mp4 と同じなので video/mp4 として配る。
+ * video/quicktime で配ると、その場で再生せずに落とすだけになる端末がある。
+ * webm・3gp は造りが別なので、それぞれの名前で配らないと再生できない。
+ */
+function videoContentType(ext: string): string {
+  if (ext === "webm") return "video/webm";
+  if (ext === "3gp" || ext === "3gpp") return "video/3gpp";
+  return "video/mp4"; // mp4 / m4v / mov / 分からないもの
+}
+
 export async function prepareVideo(file: File): Promise<Prepared> {
   const codec = await probeVideoCodec(file);
   const thumb = await makeVideoPoster(file);
   const raw = (file.name.split(".").pop() || "").toLowerCase();
+  const ext = /^[a-z0-9]{1,5}$/.test(raw) ? raw : "mp4";
   return {
     blob: file,
-    ext: /^[a-z0-9]{1,5}$/.test(raw) ? raw : "mp4",
-    // .mov のまま配ると、端末によっては再生されずダウンロードになってしまう。
-    // 中身がH.264なら video/mp4 として配れば、どちらの端末でもその場で再生できる。
-    contentType: "video/mp4",
+    ext,
+    contentType: videoContentType(ext),
     takenAt: file.lastModified || Date.now(),
     kind: "video",
     codec,
@@ -296,19 +310,32 @@ export function isIOS(): boolean {
 /**
  * 端末に保存する。別ドメイン（Supabase）のURLをそのまま <a download> にしても
  * ダウンロードにならないので、いったん取り込んでから保存する。
+ *
+ * ただし大きい動画は、まるごと取り込む途中でスマホの持ち物が足りなくなって
+ * 落ちることがある。そのときは、その動画だけを別のタブで開く。
+ * そこから iPhone は共有 → ビデオを保存、アンドロイドは長押し → ダウンロードで保存できる。
  */
 export async function downloadFile(url: string, filename: string): Promise<void> {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("保存に失敗しました");
-  const blob = await res.blob();
-  const objUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = objUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(objUrl), 10_000);
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 10_000);
+  } catch {
+    const w = window.open(url, "_blank", "noopener,noreferrer");
+    if (!w) {
+      throw new Error(
+        "保存できませんでした。この動画だけを別のタブで開こうとしましたが、ブラウザに止められました。ポップアップを許可してから、もう一度お試しください"
+      );
+    }
+  }
 }
 
 /** 見やすい容量表示（「12.4MB」など）。 */

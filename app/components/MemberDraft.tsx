@@ -126,6 +126,7 @@ import { resolveMe, saveMe } from "@/lib/me";
 import { readRoster, rosterNames } from "@/lib/roster";
 import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
 import { CURRENT_ROUND } from "@/lib/eventRound";
+import { downloadFile, isIOS } from "@/lib/media";
 import {
   blankTimetableRow,
   joinNames,
@@ -1520,10 +1521,29 @@ function MediaViewer({
   const boxRef = useRef<HTMLDivElement>(null);
   const touchX = useRef<number | null>(null);
   const [playFailed, setPlayFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
 
   useEffect(() => {
     setPlayFailed(false);
+    setSaveMsg("");
   }, [item.path]);
+
+  /* 再生できない動画を、端末に落として見てもらうため。 */
+  const saveItem = async () => {
+    setSaving(true);
+    setSaveMsg("");
+    try {
+      const ext = item.name.split(".").pop() || "mp4";
+      const round = item.path.split("/")[0] || LAST_GALLERY.key;
+      await downloadFile(item.url, `africaheart-${round}-${item.sceneId}-${index + 1}.${ext}`);
+      setSaveMsg(isIOS() ? "「ファイル」アプリに保存しました" : "保存しました");
+    } catch (e) {
+      setSaveMsg(e instanceof Error ? e.message : "保存できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     const go = (d: number) => {
@@ -1598,8 +1618,36 @@ function MediaViewer({
         )}
         {item.kind === "video" ? (
           playFailed ? (
+            /* 開けない形式でも行き止まりにしない。保存すれば端末の動画アプリで見られる。 */
             <div style={{ textAlign: "center", padding: "0 24px" }}>
-              <p style={{ margin: 0, fontSize: 14 }}>この端末では再生できない形式です</p>
+              <p style={{ margin: 0, fontSize: 14 }}>この端末では、ここで再生できない動画です</p>
+              <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.8, opacity: 0.75 }}>
+                保存すると、端末の動画アプリで見られます。
+              </p>
+              {/* 暗い画面の上なので、md-viewer-btn（44px角の丸ボタン）は使えない。
+                  文字が入る幅の枠付きボタンを、ここだけで組む。 */}
+              <button
+                type="button"
+                style={{
+                  marginTop: 14,
+                  padding: "9px 18px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#FFFFFF",
+                  background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.45)",
+                  borderRadius: 8,
+                  cursor: saving ? "default" : "pointer",
+                  opacity: saving ? 0.6 : 1,
+                }}
+                disabled={saving}
+                onClick={() => void saveItem()}
+              >
+                {saving ? "保存しています" : "この動画を保存"}
+              </button>
+              {saveMsg && (
+                <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.7, opacity: 0.8 }}>{saveMsg}</p>
+              )}
             </div>
           ) : (
             <video

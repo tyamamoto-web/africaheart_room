@@ -341,7 +341,7 @@ function Lightbox({
 }
 
 /* ── 運営：入れる ─────────────────────────────── */
-type PendStatus = "checking" | "ready" | "blocked" | "toobig" | "uploading" | "done" | "error";
+type PendStatus = "checking" | "ready" | "toobig" | "uploading" | "done" | "error";
 type Pending = {
   key: string;
   file: File;
@@ -355,7 +355,6 @@ type Pending = {
 const STATUS_LABEL: Record<PendStatus, string> = {
   checking: "確認中",
   ready: "待機",
-  blocked: "非対応",
   toobig: "大きすぎ",
   uploading: "",
   done: "完了",
@@ -368,7 +367,6 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [codeErr, setCodeErr] = useState("");
   const [scene, setScene] = useState(SCENES[0]?.id ?? "other");
   const [pend, setPend] = useState<Pending[]>([]);
-  const [allowHevc, setAllowHevc] = useState(false);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState("");
   // 「選ぶ」を押してから、端末がファイルを渡してくるまでのあいだ
@@ -476,20 +474,25 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
         });
         continue;
       }
+      // HEVC（iPhoneの既定）も止めない。9/27まではここで弾いていたが、
+      // そうするとiPhoneからは動画をひとつも入れられなかった。
+      // いまのアンドロイドはHEVCを再生できる端末が多く、できない端末でも
+      // 拡大した画面から保存すれば端末の動画アプリで見られる。
+      // 入れられないより、入れたうえで見方を案内するほうがよい。
       const codec = await probeVideoCodec(p.file);
       patch(p.key, {
         codec,
-        status: codec === "hevc" ? "blocked" : "ready",
+        status: "ready",
         note:
           codec === "hevc"
-            ? "iPhone専用の形式（HEVC）。アンドロイドで再生できません"
+            ? `${humanSize(p.file.size)}・iPhoneの形式（HEVC）`
             : humanSize(p.file.size),
       });
     }
   }
 
   const hasHevc = pend.some((p) => p.codec === "hevc");
-  const queued = pend.filter((p) => p.status === "ready" || (allowHevc && p.status === "blocked"));
+  const queued = pend.filter((p) => p.status === "ready");
   // 大きいものが混ざっているときは、待ち時間を先に言っておく（途中で閉じられると消える）
   const hasBig = queued.some((p) => p.file.size > 200 * 1024 * 1024);
 
@@ -577,7 +580,7 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       </div>
 
       <p className="text-xs mt-2 leading-relaxed" style={{ color: DIM }}>
-        撮る前に、iPhoneは 設定 → カメラ → フォーマット → 「互換性優先」にしてください。写真も動画も、アンドロイドで開ける形で撮れます。
+        iPhoneの写真（HEIC）も動画（HEVC）も、そのまま追加できます。撮る前に 設定 → カメラ → フォーマット → 「互換性優先」にしておくと、どの端末でもその場で再生できる形で撮れます。
       </p>
       <p className="text-xs mt-1.5 leading-relaxed" style={{ color: DIM }}>
         長い動画（10分以上）は、パソコンから入れてください。スマホからだと、動画をブラウザに渡す途中で止まり、選んでも何も起きないことがあります。iPhoneはパソコンにつないで写真アプリから書き出し、その動画をこの画面に入れてください。
@@ -679,7 +682,7 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
             >
               <div className="flex items-center gap-2">
                 <span className="text-xs truncate flex-1" style={{ color: SUB }}>{p.file.name}</span>
-                <span className="text-xs shrink-0" style={{ color: p.status === "error" || p.status === "blocked" || p.status === "toobig" ? "#a33" : DIM }}>
+                <span className="text-xs shrink-0" style={{ color: p.status === "error" || p.status === "toobig" ? "#a33" : DIM }}>
                   {p.status === "uploading" ? `${Math.round(p.progress * 100)}%` : STATUS_LABEL[p.status]}
                 </span>
               </div>
@@ -695,17 +698,9 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       )}
 
       {hasHevc && (
-        <label className="flex items-start gap-2 mt-3 text-xs leading-relaxed" style={{ color: SUB }}>
-          <input
-            type="checkbox"
-            checked={allowHevc}
-            onChange={(e) => setAllowHevc(e.target.checked)}
-            className="mt-0.5"
-          />
-          <span>
-            アンドロイドで再生できない動画も、そのまま追加する（見られない人は保存して端末の動画アプリで再生します）
-          </span>
-        </label>
+        <p className="text-[11px] mt-3 leading-relaxed" style={{ color: DIM }}>
+          iPhoneの形式（HEVC）の動画が入っています。そのまま追加できます。開いてもその場で再生できない端末では、拡大した画面から保存すれば、端末の動画アプリで見られます。
+        </p>
       )}
 
       <button
