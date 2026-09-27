@@ -444,9 +444,20 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
     if (files && files.length > 0) void onPick(files);
   }
 
-  const patch = useCallback((key: string, next: Partial<Pending>) => {
-    setPend((prev) => prev.map((p) => (p.key === key ? { ...p, ...next } : p)));
+  /* 並んでいるものの、いまの中身。
+     追加の途中は何分も待つので、そのあいだに増えたぶんも拾えるように、
+     画面の state とは別に「いまの一覧」を持っておく（state は次の描画まで古いまま）。 */
+  const pendRef = useRef<Pending[]>([]);
+  const editPend = useCallback((fn: (prev: Pending[]) => Pending[]) => {
+    pendRef.current = fn(pendRef.current);
+    setPend(pendRef.current);
   }, []);
+  const patch = useCallback(
+    (key: string, next: Partial<Pending>) => {
+      editPend((prev) => prev.map((p) => (p.key === key ? { ...p, ...next } : p)));
+    },
+    [editPend]
+  );
 
   async function onPick(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -459,7 +470,7 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       progress: 0,
       note: humanSize(file.size),
     }));
-    setPend((prev) => [...prev, ...added]);
+    editPend((prev) => [...prev, ...added]);
 
     // 動画だけ、入れる前に中身の形式と大きさを見る（写真はこのあと必ずJPEGに焼き直す）
     for (const p of added) {
@@ -493,47 +504,62 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   const hasHevc = pend.some((p) => p.codec === "hevc");
   const queued = pend.filter((p) => p.status === "ready");
+  const nowUploading = pend.find((p) => p.status === "uploading");
   // 大きいものが混ざっているときは、待ち時間を先に言っておく（途中で閉じられると消える）
   const hasBig = queued.some((p) => p.file.size > 200 * 1024 * 1024);
 
+  /* 1件ずつ、待機しているものが無くなるまで続ける。
+     9/27まではボタンを押した時点の一覧をそのまま回していたので、
+     1件目に何分もかかるあいだに画面が描き直されると、2件目から先へ進まなかった
+     （2.0GBを1本入れたあと、残り2本が待機のまま止まった）。
+     いまは「そのとき待機しているもの」を毎回取り直す。追加の途中で足したものも拾う。
+     一度手を付けたものは done に控えて、二度回さない。 */
   async function run() {
-    if (queued.length === 0) return;
+    if (running) return;
     setRunning(true);
     setErr("");
     let ok = 0;
-    for (const p of queued) {
-      patch(p.key, { status: "uploading", progress: 0, note: "" });
-      try {
-        const prep = await prepareFile(p.file);
-        if (prep.blob.size > MAX_UPLOAD_BYTES) {
-          patch(p.key, {
-            status: "toobig",
-            note: `${humanSize(prep.blob.size)}（1件${humanSize(MAX_UPLOAD_BYTES)}まで）`,
-          });
-          continue;
-        }
-        await uploadToGallery(
-          {
-            blob: prep.blob,
-            ext: prep.ext,
-            contentType: prep.contentType,
-            takenAt: prep.takenAt,
-            sceneId: scene,
-            thumb: prep.thumb,
-          },
-          (r) => patch(p.key, { progress: r })
-        );
-        patch(p.key, { status: "done", progress: 1, note: humanSize(prep.blob.size) });
-        ok++;
-      } catch (e) {
-        patch(p.key, { status: "error", note: errText(e) });
-        if (e instanceof GallerySetupError) {
-          setErr(e.message);
-          break;
+    const seen = new Set<string>();
+    try {
+      for (;;) {
+        const p = pendRef.current.find((x) => x.status === "ready" && !seen.has(x.key));
+        if (!p) break;
+        seen.add(p.key);
+        patch(p.key, { status: "uploading", progress: 0, note: "" });
+        try {
+          const prep = await prepareFile(p.file);
+          if (prep.blob.size > MAX_UPLOAD_BYTES) {
+            patch(p.key, {
+              status: "toobig",
+              note: `${humanSize(prep.blob.size)}（1件${humanSize(MAX_UPLOAD_BYTES)}まで）`,
+            });
+            continue;
+          }
+          await uploadToGallery(
+            {
+              blob: prep.blob,
+              ext: prep.ext,
+              contentType: prep.contentType,
+              takenAt: prep.takenAt,
+              sceneId: scene,
+              thumb: prep.thumb,
+            },
+            (r) => patch(p.key, { progress: r })
+          );
+          patch(p.key, { status: "done", progress: 1, note: humanSize(prep.blob.size) });
+          ok++;
+        } catch (e) {
+          patch(p.key, { status: "error", note: errText(e) });
+          if (e instanceof GallerySetupError) {
+            setErr(e.message);
+            break;
+          }
         }
       }
+    } finally {
+      // 途中で何が起きても、押せない状態のままにしない
+      setRunning(false);
     }
-    setRunning(false);
     if (ok > 0) onDone();
   }
 
@@ -717,9 +743,16 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       >
         {running ? "追加しています…" : queued.length > 0 ? `${queued.length}件を追加する` : "追加する"}
       </button>
+      {/* 1件に何分もかかるので、止まっているのか進んでいるのかが分かるようにする */}
+      {running && nowUploading && (
+        <p className="text-[11px] mt-2 leading-relaxed" style={{ color: SUB }}>
+          いま「{nowUploading.file.name}」を追加しています
+          {queued.length > 0 ? `（このあと あと${queued.length}件）` : "（これで最後です）"}
+        </p>
+      )}
       {hasBig && (
         <p className="text-[11px] mt-2 leading-relaxed" style={{ color: DIM }}>
-          大きい動画は、追加し終わるまでに10分以上かかることがあります。終わるまで、この画面を閉じないでください。
+          大きい動画は、追加し終わるまでに10分以上かかることがあります。終わるまで、この画面を閉じないでください。途中で閉じると、その1件は入りません。
         </p>
       )}
       {err && <p className="text-xs mt-2 leading-relaxed" style={{ color: "#a33" }}>{err}</p>}
