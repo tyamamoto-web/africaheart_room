@@ -30,6 +30,17 @@ import { SHARED_ROW, readSharedLenient, writeSharedRow } from "./sharedRow";
 /** 画面に出す1件。 */
 export type Voice = { name: string; text: string; at: number };
 
+/**
+ * ひとことへの返信。
+ * to は返信先の人の名前。同じ回に1人1件しか置けないので、名前だけで先が決まる。
+ * id はその返信そのものの札。ひとことと違って1人が何件でも書けるので、
+ * 書き替え・取り消しの相手を名前だけでは決められない。
+ */
+export type Reply = { id: string; to: string; name: string; text: string; at: number };
+
+/** その回のひとことと返信をまとめたもの。画面はこれを1つ持てばよい。 */
+export type VoiceBoard = { voices: Voice[]; replies: Reply[] };
+
 /** 1件の長さの上限。長めの文も置けるが、際限なく伸ばさない。 */
 export const VOICE_MAX = 400;
 
@@ -54,9 +65,21 @@ export const VOICE_MAX = 400;
    黙って消えるより、書けないと分かるほうがよい。
    そうなったら、役員が古い回のぶんを別の場所に移すことになる。 */
 
-type Entry = { d: string; n: string; t: string; a: number };
+/* 共有の1行に入る1件。to と id があれば返信、無ければひとこと本体。
+   古い（to も id も無い）ぶんはそのまま本体として読めるので、
+   すでに入っている8月・9月のひとことは何もしなくても残る。 */
+type Entry = { d: string; n: string; t: string; a: number; to?: string; id?: string };
 
 const DATE_ONLY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+
+/** 返信の札を作る。保存のやり直しで札が変わらないよう、呼ぶのは1回だけにすること。 */
+function newReplyId(): string {
+  try {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  } catch {
+    return `${Date.now().toString(36)}${Math.floor(Math.random() * 1e8).toString(36)}`;
+  }
+}
 
 // themes の1要素を1件に戻す（読めないものは無視して、画面を止めない）。
 function parseEntry(s: unknown): Entry | null {
@@ -74,22 +97,39 @@ function parseEntry(s: unknown): Entry | null {
   const t = typeof r.t === "string" ? r.t : "";
   if (!DATE_ONLY.test(d) || !n || !t.trim()) return null;
   const a = typeof r.a === "number" && Number.isFinite(r.a) ? r.a : 0;
-  return { d, n, t: t.slice(0, VOICE_MAX), a };
+  const to = typeof r.to === "string" ? r.to.trim() : "";
+  const id = typeof r.id === "string" ? r.id.trim() : "";
+  const base = { d, n, t: t.slice(0, VOICE_MAX), a };
+  if (!to) return base;
+  // 返信先はあるのに札が無いもの（手で足した等）は、中身から決まる札を当てて拾う
+  return { ...base, to, id: id || `${d}|${n}|${to}|${a}` };
 }
 
 function encodeEntry(e: Entry): string {
-  return JSON.stringify({ d: e.d, n: e.n, t: e.t, a: e.a });
+  return e.to
+    ? JSON.stringify({ d: e.d, n: e.n, t: e.t, a: e.a, to: e.to, id: e.id })
+    : JSON.stringify({ d: e.d, n: e.n, t: e.t, a: e.a });
+}
+
+/** 同じものが2件あれば、あとのほうを採る。ひとことは「回＋名前」、返信は札で見分ける。 */
+function keyOf(e: Entry): string {
+  return e.id ? `r:${e.id}` : `v:${e.d}|${e.n}`;
 }
 
 function decodeAll(raw: string[]): Entry[] {
   const out: Entry[] = [];
+  const at = new Map<string, number>();
   for (const s of raw) {
     const e = parseEntry(s);
     if (!e) continue;
-    // 同じ回・同じ名前が2件あれば、あとのほうを採る
-    const at = out.findIndex((x) => x.d === e.d && x.n === e.n);
-    if (at >= 0) out[at] = e;
-    else out.push(e);
+    const k = keyOf(e);
+    const i = at.get(k);
+    if (i === undefined) {
+      at.set(k, out.length);
+      out.push(e);
+    } else {
+      out[i] = e;
+    }
   }
   return out;
 }
@@ -101,17 +141,31 @@ function orderAll(list: Entry[]): Entry[] {
   return [...list].sort((x, y) => (x.d === y.d ? y.a - x.a : x.d < y.d ? 1 : -1));
 }
 
-/** その回のぶんだけを、新しいものから順に取り出す。 */
+/** その回のひとこと（返信でないもの）を、新しいものから順に取り出す。 */
 function pick(list: Entry[], eventDate: string): Voice[] {
   return list
-    .filter((e) => e.d === eventDate)
+    .filter((e) => e.d === eventDate && !e.to)
     .sort((x, y) => y.a - x.a)
     .map((e) => ({ name: e.n, text: e.t, at: e.a }));
+}
+
+/** その回の返信を、古いものから順に取り出す（話の流れに沿って読めるように）。 */
+function pickReplies(list: Entry[], eventDate: string): Reply[] {
+  return list
+    .filter((e) => e.d === eventDate && !!e.to && !!e.id)
+    .sort((x, y) => x.a - y.a)
+    .map((e) => ({ id: e.id as string, to: e.to as string, name: e.n, text: e.t, at: e.a }));
 }
 
 /** その回のひとことを読む（まだ無ければ空。読めなかったときも空で返す）。 */
 export async function readVoices(eventDate: string): Promise<Voice[]> {
   return pick(decodeAll(await readSharedLenient(SHARED_ROW.voices)), eventDate);
+}
+
+/** その回のひとことと返信をまとめて読む。 */
+export async function readVoiceBoard(eventDate: string): Promise<VoiceBoard> {
+  const all = decodeAll(await readSharedLenient(SHARED_ROW.voices));
+  return { voices: pick(all, eventDate), replies: pickReplies(all, eventDate) };
 }
 
 /**
@@ -124,13 +178,48 @@ export async function saveVoice(eventDate: string, name: string, text: string): 
   const body = text.trim().slice(0, VOICE_MAX);
   if (!DATE_ONLY.test(eventDate) || !who) return readVoices(eventDate);
 
+  // 何度やり直しても同じ結果になるよう、時刻はここで1回だけ決める
+  const at = Date.now();
   const raw = await writeSharedRow(SHARED_ROW.voices, (prev) => {
-    // 自分のぶんを外してから書いたものを足す（何度呼ばれても同じ結果になるように）
-    const rest = decodeAll(prev).filter((e) => !(e.d === eventDate && e.n === who));
-    const next = body ? [...rest, { d: eventDate, n: who, t: body, a: Date.now() }] : rest;
+    // 自分のひとことだけを外してから書いたものを足す（返信は外さない）
+    const rest = decodeAll(prev).filter((e) => !(e.d === eventDate && e.n === who && !e.to));
+    const next = body ? [...rest, { d: eventDate, n: who, t: body, a: at }] : rest;
     return orderAll(next).map(encodeEntry);
   });
   return pick(decodeAll(raw), eventDate);
+}
+
+/**
+ * ひとことへの返信を置く。
+ * id を渡すとその返信を書き替え、渡さなければ新しく足す。
+ * text を空にすると、その返信を取り消す（id が要る）。
+ * 書き替え・取り消しができるのは、その返信を書いた名前のぶんだけ。
+ */
+export async function saveReply(
+  eventDate: string,
+  to: string,
+  name: string,
+  text: string,
+  id?: string
+): Promise<VoiceBoard> {
+  const whom = to.trim();
+  const who = name.trim();
+  const body = text.trim().slice(0, VOICE_MAX);
+  if (!DATE_ONLY.test(eventDate) || !who || !whom) return readVoiceBoard(eventDate);
+  if (!body && !id) return readVoiceBoard(eventDate);
+
+  // 札と時刻は、やり直しても変わらないようにここで1回だけ決める
+  const rid = id || newReplyId();
+  const at = Date.now();
+  const raw = await writeSharedRow(SHARED_ROW.voices, (prev) => {
+    const all = decodeAll(prev);
+    // 書き替え・取り消しは、自分が書いたものだけ。人のぶんには触らない。
+    const rest = all.filter((e) => !(e.id === rid && e.n === who));
+    const next = body ? [...rest, { d: eventDate, n: who, t: body, a: at, to: whom, id: rid }] : rest;
+    return orderAll(next).map(encodeEntry);
+  });
+  const all = decodeAll(raw);
+  return { voices: pick(all, eventDate), replies: pickReplies(all, eventDate) };
 }
 
 /** 一覧のなかから、その名前のぶんを探す（無ければ null）。 */

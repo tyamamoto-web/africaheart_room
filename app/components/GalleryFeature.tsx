@@ -22,7 +22,7 @@ import {
   type GalleryItem,
 } from "@/lib/gallery";
 import { ROUNDS, CURRENT_ROUND, roundWhen } from "@/lib/eventRound";
-import { readVoices, type Voice } from "@/lib/voices";
+import { readVoiceBoard, type Voice, type Reply } from "@/lib/voices";
 
 /** その1件がどの回のものか。置き場所は <回>/<シーン>/<名前> なので、先頭を見る。 */
 function roundKeyOf(item: GalleryItem): string {
@@ -791,6 +791,7 @@ export default function GalleryFeature() {
      終わった回に新しい写真が混ざる事故が起きるため。 */
   const [round, setRound] = useState(CURRENT_ROUND.key);
   const [voices, setVoices] = useState<Voice[]>([]);
+  const [replies, setReplies] = useState<Reply[]>([]);
 
   const load = useCallback(async () => {
     setErr("");
@@ -822,15 +823,21 @@ export default function GalleryFeature() {
   useEffect(() => {
     if (round === CURRENT_ROUND.key) {
       setVoices([]);
+      setReplies([]);
       return;
     }
     let alive = true;
-    readVoices(round)
-      .then((v) => {
-        if (alive) setVoices(v);
+    readVoiceBoard(round)
+      .then((board) => {
+        if (!alive) return;
+        setVoices(board.voices);
+        setReplies(board.replies);
       })
       .catch(() => {
-        if (alive) setVoices([]);
+        if (alive) {
+          setVoices([]);
+          setReplies([]);
+        }
       });
     return () => {
       alive = false;
@@ -1076,6 +1083,20 @@ export default function GalleryFeature() {
               >
                 {v.text}
               </p>
+              {/* その回に付いた返信も読めるようにする（ここは読むだけ） */}
+              {replies
+                .filter((r) => r.to === v.name)
+                .map((r) => (
+                  <div key={r.id} className="mt-2 pl-3" style={{ borderLeft: `2px solid ${LINE}` }}>
+                    <p className="text-[11px] font-bold" style={{ color: DIM }}>{r.name}</p>
+                    <p
+                      className="text-sm leading-relaxed"
+                      style={{ color: INK, whiteSpace: "pre-line", wordBreak: "break-word" }}
+                    >
+                      {r.text}
+                    </p>
+                  </div>
+                ))}
             </div>
           ))}
         </div>

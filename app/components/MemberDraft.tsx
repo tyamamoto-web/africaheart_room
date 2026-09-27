@@ -136,7 +136,15 @@ import {
   type TimetableRow,
 } from "@/lib/timetable";
 import { eventTeaser, showTeaser } from "@/lib/eventTeaser";
-import { findVoice, readVoices, saveVoice, VOICE_MAX, type Voice } from "@/lib/voices";
+import {
+  findVoice,
+  readVoiceBoard,
+  saveVoice,
+  saveReply,
+  VOICE_MAX,
+  type Voice,
+  type Reply,
+} from "@/lib/voices";
 import PlanTable from "@/app/components/PlanTable";
 
 /* ── 日付まわりの小道具 ───────────────────────
@@ -1768,6 +1776,148 @@ function GalleryDialog({
      ひとことは1人1件。もう一度送れば書き替えになる。
      並びは新しいものから。書いたばかりのものが上に出るので、
      送れたかどうかが目で分かる。 */
+/* ひとこと1件にぶら下がる返信のかたまり。
+   返信は1人が何件でも書けるので、書きかけの文は返信先ごとに別々に持つ。
+   この部品の中だけで完結させ、上の画面には「送ってきた」ことだけを返す。 */
+function ReplyThread({
+  to,
+  replies,
+  names,
+  me,
+  onPickMe,
+  onSend,
+  onRemove,
+}: {
+  to: string;
+  replies: Reply[];
+  names: string[];
+  me: string;
+  onPickMe: (name: string) => void;
+  onSend: (to: string, text: string) => Promise<boolean>;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const body = text.trim();
+
+  const send = async () => {
+    if (!me || !body || sending) return;
+    setSending(true);
+    const ok = await onSend(to, body);
+    setSending(false);
+    if (ok) {
+      setText("");
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: replies.length ? 10 : 8 }}>
+      {replies.map((r) => (
+        <div
+          key={r.id}
+          style={{ marginTop: 8, paddingLeft: 12, borderLeft: `2px solid ${LINE}` }}
+        >
+          <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: SUB }}>{r.name}</span>
+            {r.name === me && <span style={{ fontSize: 11, fontWeight: 500, color: DIM }}>あなた</span>}
+          </span>
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: 14,
+              lineHeight: 1.85,
+              color: INK,
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {r.text}
+          </p>
+          {r.name === me && (
+            <button
+              type="button"
+              className="md-edit"
+              style={{ marginTop: 4, fontSize: 11 }}
+              onClick={() => {
+                if (window.confirm("この返信を取り消します。よろしいですか。")) void onRemove(r.id);
+              }}
+            >
+              取り消す
+            </button>
+          )}
+        </div>
+      ))}
+
+      {open ? (
+        <div style={{ marginTop: 10, paddingLeft: 12, borderLeft: `2px solid ${LINE}` }}>
+          <label
+            htmlFor={`md-reply-me-${to}`}
+            style={{ display: "block", fontSize: 12, fontWeight: 700, color: INK }}
+          >
+            お名前
+          </label>
+          <select
+            id={`md-reply-me-${to}`}
+            className={me ? "md-pick" : "md-pick is-empty"}
+            value={me}
+            onChange={(e) => onPickMe(e.target.value)}
+            style={{ marginTop: 6 }}
+          >
+            <option value="">名簿から選んでください</option>
+            {names.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <textarea
+            className="md-field md-field--area"
+            aria-label={`${to}さんへの返信`}
+            value={text}
+            maxLength={VOICE_MAX}
+            disabled={!me || sending}
+            placeholder={`${to}さんへ`}
+            onChange={(e) => setText(e.target.value)}
+            style={{ marginTop: 8, minHeight: 64, resize: "none" }}
+          />
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
+            <button type="button" className="md-cta" disabled={!me || !body || sending} onClick={() => void send()}>
+              {sending ? "送っています" : "返信する"}
+            </button>
+            <button
+              type="button"
+              className="md-edit"
+              disabled={sending}
+              onClick={() => {
+                setOpen(false);
+                setText("");
+              }}
+            >
+              やめる
+            </button>
+          </div>
+          {!me && (
+            <p style={{ margin: "6px 0 0", fontSize: 12, lineHeight: 1.7, color: DIM }}>
+              お名前を選ぶと、返信できます。
+            </p>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="md-edit"
+          style={{ marginTop: replies.length ? 10 : 6, fontSize: 12 }}
+          onClick={() => setOpen(true)}
+        >
+          返信する
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AfterScreen({
   currentIso,
   today,
@@ -1789,6 +1939,8 @@ function AfterScreen({
 
   /* ひとこと。null は「まだ読んでいる」。 */
   const [voices, setVoices] = useState<Voice[] | null>(null);
+  /* ひとことへの返信。ひとことと同じ置き場所から一緒に読む。 */
+  const [replies, setReplies] = useState<Reply[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [voiceError, setVoiceError] = useState("");
@@ -1814,9 +1966,11 @@ function AfterScreen({
 
   useEffect(() => {
     let alive = true;
-    readVoices(LAST_GALLERY.key)
-      .then((list) => {
-        if (alive) setVoices(list);
+    readVoiceBoard(LAST_GALLERY.key)
+      .then((board) => {
+        if (!alive) return;
+        setVoices(board.voices);
+        setReplies(board.replies);
       })
       .catch(() => {
         if (alive) setVoices([]); // 読めなくても、書くところは出す
@@ -1884,6 +2038,41 @@ function AfterScreen({
     if (!window.confirm("書いたひとことを取り消します。よろしいですか。")) return;
     void send("");
   };
+
+  /* 返信を送る。送れたら true を返す（送れていないのに欄を閉じないため）。 */
+  const sendReply = async (to: string, next: string): Promise<boolean> => {
+    if (!me) return false;
+    setVoiceError("");
+    try {
+      const board = await saveReply(LAST_GALLERY.key, to, me, next);
+      setVoices(board.voices);
+      setReplies(board.replies);
+      return true;
+    } catch (e) {
+      setVoiceError(e instanceof Error ? e.message : "送れませんでした。もう一度お試しください");
+      return false;
+    }
+  };
+
+  /* 自分が書いた返信を取り消す。返信先は消さない（人のひとことには触らない）。 */
+  const removeReply = async (id: string) => {
+    const r = replies.find((x) => x.id === id);
+    if (!r || !me) return;
+    setVoiceError("");
+    try {
+      const board = await saveReply(LAST_GALLERY.key, r.to, me, "", id);
+      setVoices(board.voices);
+      setReplies(board.replies);
+    } catch (e) {
+      setVoiceError(e instanceof Error ? e.message : "取り消せませんでした。もう一度お試しください");
+    }
+  };
+
+  /* 返信先のひとことが取り消されると、その返信だけが宙に浮く。
+     書いた人の言葉を黙って隠したくないので、下にまとめて出す。 */
+  const orphanTargets = voices
+    ? Array.from(new Set(replies.map((r) => r.to))).filter((t) => !voices.some((v) => v.name === t))
+    : [];
 
   const d = isoYmd(LAST_GALLERY.key);
   const when = d ? `${d.m}月${d.d}日` : LAST_GALLERY.key;
@@ -2042,6 +2231,46 @@ function AfterScreen({
                 >
                   {v.text}
                 </p>
+                <ReplyThread
+                  to={v.name}
+                  replies={replies.filter((r) => r.to === v.name)}
+                  names={names}
+                  me={me}
+                  onPickMe={onPickMe}
+                  onSend={sendReply}
+                  onRemove={removeReply}
+                />
+              </div>
+            ))}
+
+            {/* 返信先のひとことが取り消されたぶん。返信そのものは残して読めるようにする。 */}
+            {orphanTargets.map((t) => (
+              <div key={`orphan-${t}`} style={{ padding: "14px 0", borderTop: `1px solid ${LINE}` }}>
+                <p style={{ margin: 0, fontSize: 13, color: DIM }}>
+                  {t}さんのひとことは取り消されました
+                </p>
+                {replies
+                  .filter((r) => r.to === t)
+                  .map((r) => (
+                    <div
+                      key={r.id}
+                      style={{ marginTop: 8, paddingLeft: 12, borderLeft: `2px solid ${LINE}` }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 700, color: SUB }}>{r.name}</span>
+                      <p
+                        style={{
+                          margin: "4px 0 0",
+                          fontSize: 14,
+                          lineHeight: 1.85,
+                          color: INK,
+                          whiteSpace: "pre-wrap",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {r.text}
+                      </p>
+                    </div>
+                  ))}
               </div>
             ))}
           </div>
