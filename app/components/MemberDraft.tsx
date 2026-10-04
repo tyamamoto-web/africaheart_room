@@ -239,20 +239,23 @@ function addDays(v: Ymd, n: number): Ymd {
 }
 
 /* ── 出欠席の〆切 ─────────────────────────────
-   毎回きまって「オフ会の前の日の23:59まで」。回ごとに決め直さない
+   毎回きまって「オフ会の3日前の23:59まで」。回ごとに決め直さない
    （毎回同じなら、覚えなくてよくなる）。
-   数えるのは年月日だけ。今日が開催日より前なら受け付けていて、
-   開催日になった時点で閉じている ── これが「前日の24時で切れる」と同じことになる。
+   10/4 までは前の日までだったが、部屋割りを組むのに日数が要るので3日前にした。
+   数えるのは年月日だけ。開催日の3日前までが受付で、2日前になった時点で閉じている
+   ── これが「3日前の24時で切れる」と同じことになる。
    日にちがまだ決まっていないうちは、〆切も無い（null）。 */
+/** 開催日の何日前で締め切るか。ここを変えれば、文も開け閉めも一緒に変わる。 */
+const DEADLINE_DAYS_BEFORE = 3;
 type Deadline = { open: boolean; text: string };
 function attendanceDeadline(iso: string, today: Ymd): Deadline | null {
   const event = isoYmd(iso);
   if (!event) return null;
-  const prev = addDays(event, -1);
-  const w = WEEK[new Date(Date.UTC(prev.y, prev.m - 1, prev.d)).getUTCDay()];
+  const last = addDays(event, -DEADLINE_DAYS_BEFORE);
+  const w = WEEK[new Date(Date.UTC(last.y, last.m - 1, last.d)).getUTCDay()];
   return {
-    open: daysBetween(today, event) > 0,
-    text: `${prev.m}月${prev.d}日（${w}）23:59`,
+    open: daysBetween(today, event) >= DEADLINE_DAYS_BEFORE,
+    text: `${last.m}月${last.d}日（${w}）23:59`,
   };
 }
 
@@ -485,7 +488,7 @@ function WhenField({
      出すのは「遅れて行く」「途中で帰る」の2つで、押した側だけ時間を書ける。
      どちらも当てはまらない人の画面は、1行も増えない。
 
-   出せるのは前の日の23:59まで（attendanceDeadline）。過ぎたら3つは押せなくする。
+   出せるのは3日前の23:59まで（attendanceDeadline）。過ぎたら3つは押せなくする。
    ただし、出したものと、みんなの出欠は、そのまま見られるようにしておく
    （当日にいちばん見たいのは「誰が来るのか」なので、画面ごと閉じない）。
 
@@ -1037,7 +1040,7 @@ function BeforeScreen({
   /* ボタンの下の一行に使う。自分が出したものと、いまの参加の人数。 */
   const myStatus = me ? attendance[me] ?? null : null;
   const goingCount = countAttendance(attendance, names).going;
-  /* 出欠の〆切。毎回きまって、前の日の23:59まで。 */
+  /* 出欠の〆切。毎回きまって、3日前の23:59まで。 */
   const deadline = attendanceDeadline(draft.date, today);
 
   /* 当日の出入りの欄に添える一行。何時から何時の会なのかが分かると、書きやすい。 */
