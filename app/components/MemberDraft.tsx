@@ -148,6 +148,7 @@ import {
   type Reply,
 } from "@/lib/voices";
 import PlanTable from "@/app/components/PlanTable";
+import DownloadPlanButton, { type PlanHeading } from "@/app/components/DownloadPlanButton";
 
 /* ── 日付まわりの小道具 ───────────────────────
    場面の判定そのものは lib/eventOverview.ts（eventPhase）にある。
@@ -1234,7 +1235,7 @@ const distinctRooms = (ds: PlanDraft[]): string[] => {
   return out;
 };
 
-function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
+function RoomPlan({ attendeeCount, heading }: { attendeeCount: number; heading: PlanHeading }) {
   // null は「まだ読んでいる」。読めたら配列（0行もありうる）。
   const [rows, setRows] = useState<TimetableRow[] | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1431,6 +1432,11 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
            狭くて読みにくかったので、14pxずつ広げて名前に回している。 */
         <div style={{ marginTop: 16, marginLeft: -14, marginRight: -14 }}>
           <PlanTable rows={view} total={total} variant="day" />
+          {/* 画像にして持ち出せるようにする。当日はLINEに貼ったり、
+              会場で紙に出したりするほうが早いことがあるため。 */}
+          <div style={{ marginLeft: 14, marginRight: 14, textAlign: "right" }}>
+            <DownloadPlanButton rows={rows ?? []} total={total} heading={heading} />
+          </div>
         </div>
       )}
     </div>
@@ -1438,12 +1444,12 @@ function RoomPlan({ attendeeCount }: { attendeeCount: number }) {
 }
 
 /* ── 当日の画面 ─────────────────────────────── */
-function DayScreen({ attendeeCount }: { attendeeCount: number }) {
+function DayScreen({ attendeeCount, heading }: { attendeeCount: number; heading: PlanHeading }) {
   return (
     <>
       {/* 部屋割と当日の流れは一体なので、ひとつの表にまとめてある。
           次のコマも表に載るので、「このあと」のような別の欄は置かない。 */}
-      <RoomPlan attendeeCount={attendeeCount} />
+      <RoomPlan attendeeCount={attendeeCount} heading={heading} />
     </>
   );
 }
@@ -2762,7 +2768,18 @@ export default function MemberDraft({
             />
           )}
           {/* 当日の部屋割の人数は、参加と出した人だけを数える。 */}
-          {phase === "day"    && <DayScreen attendeeCount={countAttendance(attendance, names).going} />}
+          {phase === "day" && (
+            <DayScreen
+              attendeeCount={countAttendance(attendance, names).going}
+              heading={{
+                title: "アフリカハート カラオケオフ会 部屋割り",
+                when: [formatDate(draft.date) ?? "", draft.start && draft.end ? `${draft.start} 〜 ${draft.end}` : draft.start]
+                  .filter(Boolean)
+                  .join("　"),
+                place: draft.place,
+              }}
+            />
+          )}
           {phase === "after" && (
             <AfterScreen
               currentIso={draft.date}
