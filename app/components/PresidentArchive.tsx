@@ -8,9 +8,12 @@
    見出しの行を押すと、その回の中身が開いたり閉じたりする。
 
    【中身】
-     lib/eventArchive.ts の archiveEvents。過去の凍結コピー（lib/archive.ts）と
-     前回の部屋割り表（lib/data.ts）から組み立てているので、名前はここには無い。
-     回を足すときも lib/eventArchive.ts に書く。この画面は表示だけ。
+     2つを合わせて並べる（lib/eventArchive.ts の mergeArchive）。
+       ・6/27・7/26・8/22 … リポジトリの凍結コピー（lib/archive.ts と lib/data.ts）
+       ・9/26 から先      … Supabase に残した記録（lib/roundArchive.ts）
+     このリポジトリは公開しているので、呼び名を含む記録はソースに書かず、
+     開いたときに Supabase から読む。この画面は表示だけ。
+     読めなかったときは、凍結してある3回だけを出す（画面を止めない）。
 
    【色】
      白を地にして、グレーだけで組む（設定の他の画面と同じ）。
@@ -28,9 +31,10 @@
      回によって呼び名の書き方が違う人がいて、名前だけでは数えられないので出さない。
    ============================================================ */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PlanTable from "@/app/components/PlanTable";
-import { archiveEvents } from "@/lib/eventArchive";
+import { archiveEvents, mergeArchive } from "@/lib/eventArchive";
+import { readRoundArchive, type RoundRecord } from "@/lib/roundArchive";
 
 const INK = "#1B1C1E"; // 主要テキスト
 const SUB = "#63666C"; // 補助テキスト
@@ -62,10 +66,38 @@ function Stat({ n, unit, label }: { n: number; unit: string; label: string }) {
 }
 
 export default function PresidentArchive() {
-  const events = archiveEvents; // 新しいほうが先に並んでいる
-  const [open, setOpen] = useState<string[]>(events.length ? [events[0].key] : []);
-  const toggle = (key: string) =>
+  // Supabase に残した回。読み終わるまでは凍結してある3回だけを出す。
+  const [stored, setStored] = useState<RoundRecord[] | null>(null);
+  const events = useMemo(() => (stored ? mergeArchive(stored) : archiveEvents), [stored]);
+  const [open, setOpen] = useState<string[]>([]);
+  /* いちばん新しい回だけ開いた状態で始めたい。読み込みが終わると並びの先頭が変わるので、
+     先頭に合わせるのは読み終わったときの1回だけにする（読んでいる途中の回が勝手に閉じない）。 */
+  const [opened, setOpened] = useState(false);
+  const toggle = (key: string) => {
+    setOpened(true);
     setOpen((o) => (o.includes(key) ? o.filter((k) => k !== key) : [...o, key]));
+  };
+
+  useEffect(() => {
+    let alive = true;
+    readRoundArchive()
+      .then((list) => {
+        if (alive) setStored(list);
+      })
+      .catch(() => {
+        if (alive) setStored([]); // 読めなくても、凍結してある3回は出す
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const first = events[0]?.key ?? "";
+  useEffect(() => {
+    if (stored === null || opened || !first) return;
+    setOpened(true);
+    setOpen([first]);
+  }, [stored, opened, first]);
 
   const totalSeats = events.reduce((s, e) => s + e.participants.length, 0);
 

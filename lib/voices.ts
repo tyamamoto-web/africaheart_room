@@ -184,6 +184,17 @@ export async function readVoices(eventDate: string): Promise<Voice[]> {
   return pick(decodeAll(await readSharedLenient(SHARED_ROW.voices)), eventDate);
 }
 
+/**
+ * ひとことが1件でも書かれた回の開催日（新しい回が先）。
+ * 「どの回があったか」を数えるのに使う（lib/currentRound.ts）。
+ * 写真が1枚も入らなかった回も、ここでなら拾える。
+ */
+export async function readVoiceDates(): Promise<string[]> {
+  const seen = new Set<string>();
+  for (const e of decodeAll(await readSharedLenient(SHARED_ROW.voices))) seen.add(e.d);
+  return Array.from(seen).sort().reverse();
+}
+
 /** その回のひとことと返信をまとめて読む。 */
 export async function readVoiceBoard(eventDate: string): Promise<VoiceBoard> {
   const all = decodeAll(await readSharedLenient(SHARED_ROW.voices));

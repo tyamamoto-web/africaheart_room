@@ -45,6 +45,7 @@ export const SHARED_ROW = {
   timetable: 12, // 社長室：当日のタイムテーブル（時間・企画名）
   voices: 13, // ふりかえり：オフ会の感想（ひとこと）
   attendanceTimes: 14, // 出欠席：来る時間・帰る時間（出欠そのものは 11。形を変えられないので別の行にした）
+  roundArchive: 15, // 終わった回の記録（部屋割り・概要・参加者）。lib/roundArchive.ts
 } as const;
 
 /** 1回に送れる大きさの目安。これを超えたら書かずに知らせる。 */
@@ -96,6 +97,16 @@ export async function readSharedLenient(rowId: number): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * 厳密な読み取り。読めなければ例外を投げる。
+ * 「読めなかった」と「まだ何も入っていない」を取り違えると困るところで使う
+ * （例：記録がもう在るかを確かめてから書く、lib/roundArchive.ts）。
+ * 画面に出すだけなら readSharedLenient でよい。
+ */
+export async function readSharedStrict(rowId: number): Promise<string[]> {
+  return (await readSnapshot(rowId)).raw;
 }
 
 // 書き込みの土台に使う厳密版。読めなければ例外（空を土台にして全消しする事故を防ぐ）。

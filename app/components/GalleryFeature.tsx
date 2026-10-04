@@ -16,17 +16,16 @@ import {
   uploadToGallery,
   deleteFromGallery,
   GallerySetupError,
-  GALLERY_EVENT,
-  SCENES,
   sceneLabel,
   type GalleryItem,
 } from "@/lib/gallery";
-import { ROUNDS, CURRENT_ROUND, roundWhen } from "@/lib/eventRound";
+import { roundWhen, type Round } from "@/lib/eventRound";
+import { useCurrentRound } from "@/lib/currentRound";
 import { readVoiceBoard, groupReplies, type Voice, type Reply } from "@/lib/voices";
 
 /** その1件がどの回のものか。置き場所は <回>/<シーン>/<名前> なので、先頭を見る。 */
 function roundKeyOf(item: GalleryItem): string {
-  return item.path.split("/")[0] || GALLERY_EVENT;
+  return item.path.split("/")[0] || "";
 }
 import {
   prepareFile,
@@ -361,11 +360,28 @@ const STATUS_LABEL: Record<PendStatus, string> = {
   error: "失敗",
 };
 
-function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function UploadPanel({
+  round,
+  onClose,
+  onDone,
+}: {
+  /** 入れ先の回。画面の上で選んでいる回ではなく、いまの回だけがここに来る。 */
+  round: Round;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const scenes = round.scenes;
   const [unlocked, setUnlocked] = useState(false);
+  /* 入れている途中でも撮影シーンは選び直せる。1件ごとに選び直したいことがあるので、
+     押した時点の値で固めず、そのつど画面に出ているほうを見る。 */
+  const sceneRef = useRef(scenes[0]?.id ?? "other");
   const [code, setCode] = useState("");
   const [codeErr, setCodeErr] = useState("");
-  const [scene, setScene] = useState(SCENES[0]?.id ?? "other");
+  const [scene, setScene] = useState(scenes[0]?.id ?? "other");
+  const pickScene = (id: string) => {
+    sceneRef.current = id;
+    setScene(id);
+  };
   const [pend, setPend] = useState<Pending[]>([]);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState("");
@@ -537,11 +553,12 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
           }
           await uploadToGallery(
             {
+              eventKey: round.key,
               blob: prep.blob,
               ext: prep.ext,
               contentType: prep.contentType,
               takenAt: prep.takenAt,
-              sceneId: scene,
+              sceneId: sceneRef.current,
               thumb: prep.thumb,
             },
             (r) => patch(p.key, { progress: r })
@@ -624,11 +641,11 @@ function UploadPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <label className="block text-xs mt-4 mb-1" style={{ color: SUB }}>撮影シーン</label>
       <select
         value={scene}
-        onChange={(e) => setScene(e.target.value)}
+        onChange={(e) => pickScene(e.target.value)}
         className="w-full px-3 py-2 text-sm"
         style={{ border: `1px solid ${LINE}`, borderRadius: 8, background: "#fff", color: INK }}
       >
-        {SCENES.map((s) => (
+        {scenes.map((s) => (
           <option key={s.id} value={s.id}>{s.label}</option>
         ))}
       </select>
@@ -786,23 +803,36 @@ export default function GalleryFeature() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [reloading, setReloading] = useState(false);
-  /* 見ている回。はじめはいまの回。前の回に切り替えると、そのフォルダを読む。
+  /* いまの回は開催の概要から決まる（lib/currentRound.ts）。
+     ready になるまでは、どのフォルダを読むかが決まっていないので読みにいかない。 */
+  const { round: current, rounds, ready } = useCurrentRound();
+  /* 見ている回。空なら、いまの回。前の回に切り替えると、そのフォルダを読む。
      前の回は見るだけ（追加はできない）にしてある。入れ先を選べるようにすると、
      終わった回に新しい写真が混ざる事故が起きるため。 */
-  const [round, setRound] = useState(CURRENT_ROUND.key);
+  const [chosen, setChosen] = useState("");
+  const round = chosen || current.key;
   const [voices, setVoices] = useState<Voice[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
 
+  /* 回を続けて切り替えると、前の回の一覧があとから届くことがある。
+     いちばん新しい読み出しの番号だけを採り、追い越されたぶんは捨てる
+     （捨てないと、画面は新しい回なのに中身が前の回、という食い違いが起きる）。 */
+  const turn = useRef(0);
   const load = useCallback(async () => {
+    if (!ready) return;
+    const mine = ++turn.current;
     setErr("");
     try {
-      setItems(await listGalleryFor(round));
+      const list = await listGalleryFor(round);
+      if (mine !== turn.current) return;
+      setItems(list);
     } catch (e) {
+      if (mine !== turn.current) return;
       setErr(errText(e));
     } finally {
-      setLoading(false);
+      if (mine === turn.current) setLoading(false);
     }
-  }, [round]);
+  }, [round, ready]);
 
   // 運営があとから足したぶんを、開いたまま取り直す。
   // 常時ポーリングにしないのは、画像の一覧は1回が重く、当日以外はまず増えないから。
@@ -821,7 +851,7 @@ export default function GalleryFeature() {
      いまの回のひとことは「ふりかえり」の画面にあるので、ここでは重ねない。
      読めなくても写真の一覧は出したいので、失敗は黙って無いものとして扱う。 */
   useEffect(() => {
-    if (round === CURRENT_ROUND.key) {
+    if (!ready || round === current.key) {
       setVoices([]);
       setReplies([]);
       return;
@@ -842,7 +872,7 @@ export default function GalleryFeature() {
     return () => {
       alive = false;
     };
-  }, [round]);
+  }, [round, ready, current.key]);
 
   /* 回を切り替える。前の回のものを選んだまま残すと、数と中身が食い違うので捨てる。 */
   const pickRound = (key: string) => {
@@ -853,9 +883,9 @@ export default function GalleryFeature() {
     setPicked([]);
     setSaveMsg("");
     setViewIdx(null);
-    setRound(key);
+    setChosen(key);
   };
-  const isCurrent = round === CURRENT_ROUND.key;
+  const isCurrent = round === current.key;
   // 返信先のひとことが取り消されたぶんも読めるように（ふりかえりの画面と同じ扱い）
   const voiceGroups = groupReplies(voices, replies);
 
@@ -911,18 +941,22 @@ export default function GalleryFeature() {
   /* 回の選び分け。回が1つしか無いうちは出さない。
      読み込み中も出しておく（切り替えた直後に消えると、戻る手が無くなるため）。 */
   const roundBar =
-    ROUNDS.length < 2 ? null : (
-      <div className="flex gap-1 mb-3" role="group" aria-label="どの回を見るか">
-        {ROUNDS.map((r) => {
+    rounds.length < 2 ? null : (
+      <div className="flex gap-1 mb-3 flex-wrap" role="group" aria-label="どの回を見るか">
+        {rounds.map((r) => {
           const on = r.key === round;
           return (
             <button
               key={r.key}
               type="button"
               onClick={() => pickRound(r.key)}
+              disabled={!ready}
               aria-pressed={on}
-              className="flex-1 py-1.5 text-xs font-bold"
+              className="py-1.5 px-2 text-xs font-bold"
               style={{
+                // 回が増えても字が割れないよう、狭くなりすぎたら次の行に送る
+                flex: "1 1 auto",
+                minWidth: 104,
                 background: on ? FACE : "transparent",
                 color: on ? INK : DIM,
                 border: `1px solid ${on ? "transparent" : LINE}`,
@@ -948,6 +982,7 @@ export default function GalleryFeature() {
   if (panel === "upload") {
     return (
       <UploadPanel
+        round={current}
         onClose={() => {
           setPanel("view");
           setOfficer(isOfficerUnlocked());
@@ -1151,7 +1186,9 @@ export default function GalleryFeature() {
         <Lightbox
           items={shown}
           index={viewIdx}
-          canDelete={officer}
+          // 消せるのもいまの回だけ。終わった回は読むだけにして、
+          // 前の回の写真を押し間違いで消せないようにする（追加と同じ決め方）。
+          canDelete={officer && isCurrent}
           onIndex={setViewIdx}
           onClose={() => setViewIdx(null)}
           onDeleted={() => {

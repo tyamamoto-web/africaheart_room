@@ -125,7 +125,8 @@ import {
 import { resolveMe, saveMe } from "@/lib/me";
 import { readRoster, rosterNames } from "@/lib/roster";
 import { listGalleryFor, sceneLabel, type GalleryItem } from "@/lib/gallery";
-import { CURRENT_ROUND } from "@/lib/eventRound";
+import { useCurrentRound, todayKey } from "@/lib/currentRound";
+import { archiveBeforeRollover } from "@/lib/roundArchive";
 import { downloadFile, isIOS } from "@/lib/media";
 import {
   blankTimetableRow,
@@ -1447,8 +1448,9 @@ function DayScreen({ attendeeCount }: { attendeeCount: number }) {
 /* ── 前回の写真と動画 ─────────────────────────
    ふりかえりの画面に出す写真と動画。いま終わったばかりの回のぶんを、
    Supabase Storage の gallery/<開催日>/ から読む（lib/gallery.ts）。
-   どの回かは lib/eventRound.ts の CURRENT_ROUND ひとつで決まる。運営が写真を
-   入れる先（ギャラリーの画面）も同じ値を見ているので、入れ先と読み先がずれない。
+   どの回かは開催の概要（開催日）から決まる（lib/currentRound.ts）。運営が写真を
+   入れる先（ギャラリーの画面）も同じ決め方を見ているので、入れ先と読み先がずれない。
+   次の回の開催日を入れても、その日が来るまではここは前の回のままでいる。
    前の回のぶんは別のフォルダに残っていて、ギャラリーの画面で回を選べば見られる。
 
    一覧用の小さい画像は、写真には作られるが、動画には無いことがある
@@ -1456,8 +1458,13 @@ function DayScreen({ attendeeCount }: { attendeeCount: number }) {
    だから動画のマスは、暗い面に再生の印を置くだけにしている。
    9マスの見本には写真を先に出し、動画はそのあとに回す。暗いマスが
    並ぶより、その日の様子が一目で伝わるほうを取った。 */
-const LAST_GALLERY = { key: CURRENT_ROUND.key, place: CURRENT_ROUND.place };
 const PREVIEW_COUNT = 9; // 見本のマスの数（3列×3段）
+
+/** その1件がどの回のものか。置き場所は <回>/<シーン>/<名前> なので、先頭を見る。
+    見出し（シーンの名前）は回ごとに違うので、1件ずつここから引く。 */
+function roundKeyOf(item: GalleryItem): string {
+  return item.path.split("/")[0] || "";
+}
 
 function PlayMark({ size = 24 }: { size?: number }) {
   return (
@@ -1550,8 +1557,7 @@ function MediaViewer({
     setSaveMsg("");
     try {
       const ext = item.name.split(".").pop() || "mp4";
-      const round = item.path.split("/")[0] || LAST_GALLERY.key;
-      await downloadFile(item.url, `africaheart-${round}-${item.sceneId}-${index + 1}.${ext}`);
+      await downloadFile(item.url, `africaheart-${roundKeyOf(item)}-${item.sceneId}-${index + 1}.${ext}`);
       setSaveMsg(isIOS() ? "「ファイル」アプリに保存しました" : "保存しました");
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : "保存できませんでした");
@@ -1616,7 +1622,7 @@ function MediaViewer({
           </svg>
         </button>
         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", opacity: 0.85 }}>
-          {sceneLabel(item.sceneId)}
+          {sceneLabel(item.sceneId, roundKeyOf(item))}
         </p>
         <span style={{ minWidth: 44, textAlign: "right", fontSize: 13, opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>
           {index + 1} / {items.length}
@@ -1748,7 +1754,7 @@ function GalleryDialog({
         <div className="md-dialog-body">
           {groups.map((g) => (
             <div key={g.sceneId} style={{ marginTop: 18 }}>
-              <Label>{sceneLabel(g.sceneId)}</Label>
+              <Label>{sceneLabel(g.sceneId, g.items[0] ? roundKeyOf(g.items[0]) : "")}</Label>
               <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                 {g.items.map((it) => (
                   <MediaTile key={it.path} item={it} onClick={() => onOpen(items.indexOf(it))} />
@@ -1956,6 +1962,10 @@ function AfterScreen({
   me: string;
   onPickMe: (name: string) => void;
 }) {
+  /* どの回を出すかは、開催の概要から決まる（lib/currentRound.ts）。
+     開催日がまだ先のあいだは、いちばん新しい「終わった回」が返る。
+     ready になるまでは読みにいかない（前の回を一瞬だけ出してしまわないように）。 */
+  const { round: last, ready } = useCurrentRound();
   // null は「まだ読んでいる」。読めたら配列（0件もありうる）。
   const [items, setItems] = useState<GalleryItem[] | null>(null);
   const [error, setError] = useState("");
@@ -1974,8 +1984,9 @@ function AfterScreen({
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    if (!ready) return;
     let alive = true;
-    listGalleryFor(LAST_GALLERY.key)
+    listGalleryFor(last.key)
       .then((list) => {
         if (alive) setItems(list);
       })
@@ -1987,11 +1998,12 @@ function AfterScreen({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [last.key, ready]);
 
   useEffect(() => {
+    if (!ready) return;
     let alive = true;
-    readVoiceBoard(LAST_GALLERY.key)
+    readVoiceBoard(last.key)
       .then((board) => {
         if (!alive) return;
         setVoices(board.voices);
@@ -2003,7 +2015,7 @@ function AfterScreen({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [last.key, ready]);
 
   /* 自分がもう書いていたら、その文を欄に出す（書き直せるように）。
      同じ名前のあいだは入れ直さないので、打っている途中の文は消えない。 */
@@ -2042,15 +2054,18 @@ function AfterScreen({
 
   const mine = voices && me ? findVoice(voices, me) : null;
   const body = text.trim();
-  const canSend = !!me && !!body && !sending && body !== (mine?.text ?? "");
+  /* どの回に書くかが決まるまでは、書かせない（ready）。
+     決まる前の last は前の回を指しているので、待たずに送ると
+     前の回に書いてある自分のひとことを上から消してしまう。 */
+  const canSend = ready && !!me && !!body && !sending && body !== (mine?.text ?? "");
 
   /* 送る。空にして送ることはできないので、取り消しは下の「取り消す」で受ける。 */
   const send = async (next: string) => {
-    if (!me || sending) return;
+    if (!ready || !me || sending) return;
     setSending(true);
     setVoiceError("");
     try {
-      setVoices(await saveVoice(LAST_GALLERY.key, me, next));
+      setVoices(await saveVoice(last.key, me, next));
       setText(next);
     } catch (e) {
       setVoiceError(e instanceof Error ? e.message : "送れませんでした。もう一度お試しください");
@@ -2066,9 +2081,10 @@ function AfterScreen({
 
   /* 返信を送る。送れたら空文字、だめならその理由を返す（返信欄のそばに出すため）。 */
   const sendReply = async (to: string, toName: string, next: string, id: string): Promise<string> => {
+    if (!ready) return "読み込み中です。少し待ってからお試しください";
     if (!me) return "お名前を選んでください";
     try {
-      const board = await saveReply(LAST_GALLERY.key, to, toName, me, next, id);
+      const board = await saveReply(last.key, to, toName, me, next, id);
       setVoices(board.voices);
       setReplies(board.replies);
       return "";
@@ -2080,10 +2096,10 @@ function AfterScreen({
   /* 自分が書いた返信を取り消す。返信先は消さない（人のひとことには触らない）。 */
   const removeReply = async (id: string) => {
     const r = replies.find((x) => x.id === id);
-    if (!r || !me) return;
+    if (!ready || !r || !me) return;
     setVoiceError("");
     try {
-      const board = await saveReply(LAST_GALLERY.key, r.to, r.toName, me, "", id);
+      const board = await saveReply(last.key, r.to, r.toName, me, "", id);
       setVoices(board.voices);
       setReplies(board.replies);
     } catch (e) {
@@ -2095,8 +2111,10 @@ function AfterScreen({
      書いた人の言葉を黙って隠したくないので、下にまとめて出す（lib/voices.ts と共通）。 */
   const grouped = groupReplies(voices ?? [], replies);
 
-  const d = isoYmd(LAST_GALLERY.key);
-  const when = d ? `${d.m}月${d.d}日` : LAST_GALLERY.key;
+  /* どの回かが決まるまでは日付を出さない（決まる前は前の回を指しているので、
+     「9月26日はおつかれさまでした」と出したまま10月の文を受けてしまう）。 */
+  const d = ready ? isoYmd(last.key) : null;
+  const when = d ? `${d.m}月${d.d}日` : "";
 
   return (
     <>
@@ -2132,7 +2150,7 @@ function AfterScreen({
             {moreTile && <MediaTile key="more" item={moreTile} more={rest} onClick={() => setShowAll(true)} />}
           </div>
           <p style={{ margin: "12px 0 0", fontSize: 13, color: DIM }}>
-            {when} {LAST_GALLERY.place} ・ 写真 {photos}枚 ・ 動画 {total - photos}本
+            {when} {ready ? last.place : ""} ・ 写真 {photos}枚 ・ 動画 {total - photos}本
           </p>
         </>
       )}
@@ -2140,7 +2158,7 @@ function AfterScreen({
       <div style={{ marginTop: 40 }}>
         <Label>ひとこと</Label>
         <p style={{ margin: "10px 0 0", fontSize: 14, lineHeight: 1.9, color: SUB }}>
-          {when}はおつかれさまでした。よかったら一言、書いていってください。
+          {when ? `${when}は` : ""}おつかれさまでした。よかったら一言、書いていってください。
         </p>
 
         <div style={{ marginTop: 18 }}>
@@ -2172,7 +2190,7 @@ function AfterScreen({
           aria-label="ひとこと"
           value={text}
           maxLength={VOICE_MAX}
-          disabled={!me || sending}
+          disabled={!ready || !me || sending}
           placeholder="たのしかったこと、次にやってみたいこと など"
           onChange={(e) => setText(e.target.value)}
           style={{ marginTop: 14, minHeight: 88, overflow: "hidden", resize: "none" }}
@@ -2429,6 +2447,16 @@ export default function MemberDraft({
     setSaving(true);
     setSaveError("");
     try {
+      /* 開催日を次の回に進めるときは、その前にいまの回を記録へ写す。
+         当日の部屋割りは回ごとに分かれていないので、次の回を組み始めると消えるため。
+         写すのは、前の開催日がもう過ぎていて、まだ記録が無いときだけ。
+         失敗しても概要の保存は止めない（記録はあとからでも残せる）。 */
+      if (draft.date && next.date !== draft.date) {
+        await archiveBeforeRollover(draft, todayKey(), readTimetable, async (key) => {
+          const map = await readAttendance(key);
+          return Object.keys(map).filter((n) => map[n] === "going");
+        });
+      }
       setDraft(await saveEventOverview(next));
       return true;
     } catch (e) {

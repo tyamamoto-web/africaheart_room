@@ -26,7 +26,7 @@
    ※ 公開バケットなので、URLを知っていれば誰でも見られる。人に見せたくないものは置かない。
    ============================================================ */
 
-import { CURRENT_ROUND, scenesOf, type Scene } from "./eventRound";
+import { scenesOf, type Scene } from "./eventRound";
 
 const SUPA_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gdajpgbfngvigrdbiwsw.supabase.co";
@@ -45,23 +45,18 @@ export function isGalleryConfigured(): boolean {
 
 /* ── 回（イベント）ごとのフォルダ ───────────────────── */
 
-// 回のフォルダ名は lib/eventRound.ts が持つ（入れ先と読み先を1か所にそろえるため）。
-// 以前は lib/data.ts の nextEvent.date から作っていたが、ふりかえり側の直書きと
-// ずれると「入れたのに出てこない」が起きるので、出どころをひとつにした。
-export const GALLERY_EVENT = CURRENT_ROUND.key;
+/* どの回を読み書きするかは、このファイルでは決めない。必ず呼ぶ側が開催日を渡す。
+   以前はモジュールの定数（GALLERY_EVENT）で持っていたが、
+   いまの回は開催の概要から実行時に決まる（lib/currentRound.ts）ので、
+   定数にしておくと「読むのは今月・入れるのは先月」のような食い違いが起きる。
+   既定値も置かない（置くと、渡し忘れを TypeScript が見つけられなくなる）。 */
 
 /* ── 撮影シーン（一覧の見出し＝フォルダ）───────────── */
 
 export type { Scene };
 
-/**
- * いまの回の撮影シーン。並び順がそのまま一覧の並び順になる。
- * 過去の回は中身が違うので、回を指定して読むときは scenesOf(eventKey) を使う。
- */
-export const SCENES: Scene[] = CURRENT_ROUND.scenes;
-
-/** シーンの見出し。回を渡さなければ、いまの回の読み方で引く。 */
-export function sceneLabel(id: string, eventKey: string = GALLERY_EVENT): string {
+/** シーンの見出し。その回のシーンに無いものは「その他」。 */
+export function sceneLabel(id: string, eventKey: string): string {
   return scenesOf(eventKey).find((s) => s.id === id)?.label ?? "その他";
 }
 
@@ -112,7 +107,7 @@ export function publicUrl(path: string): string {
  * 動画も1コマ取り出して同じところに置くので、一覧では写真も動画も同じ扱いで並べられる。
  * thumbs はフォルダなので、一覧を読むときは自動で除かれる（フォルダは id=null で返るため）。
  */
-function thumbPathFor(sceneId: string, name: string, eventKey: string = GALLERY_EVENT): string {
+function thumbPathFor(eventKey: string, sceneId: string, name: string): string {
   const base = name.replace(/\.[^.]+$/, "");
   return `${eventKey}/${sceneId}/thumbs/${base}.jpg`;
 }
@@ -158,7 +153,7 @@ async function listPrefix(prefix: string): Promise<ListRow[]> {
   return Array.isArray(body) ? (body as ListRow[]) : [];
 }
 
-function toItem(sceneId: string, row: ListRow, eventKey: string = GALLERY_EVENT): GalleryItem {
+function toItem(eventKey: string, sceneId: string, row: ListRow): GalleryItem {
   const ext = (row.name.split(".").pop() || "").toLowerCase();
   const mime = row.metadata?.mimetype || "";
   const kind: GalleryItem["kind"] =
@@ -171,7 +166,7 @@ function toItem(sceneId: string, row: ListRow, eventKey: string = GALLERY_EVENT)
     sceneId,
     kind,
     url: publicUrl(path),
-    thumbUrl: publicUrl(thumbPathFor(sceneId, row.name, eventKey)),
+    thumbUrl: publicUrl(thumbPathFor(eventKey, sceneId, row.name)),
     takenAt: Number.isFinite(ts) && ts > 0 ? ts : 0,
     size: row.metadata?.size ?? 0,
   };
@@ -212,7 +207,7 @@ export async function listGalleryFor(eventKey: string): Promise<GalleryItem[]> {
       // Supabaseが空フォルダを保つために置く .emptyFolderPlaceholder は除く
       return rows
         .filter((r) => r.id !== null && !r.name.startsWith("."))
-        .map((r) => toItem(sid, r, eventKey));
+        .map((r) => toItem(eventKey, sid, r));
     })
   );
   const items = chunks.flat();
@@ -223,9 +218,21 @@ export async function listGalleryFor(eventKey: string): Promise<GalleryItem[]> {
   });
 }
 
-/** いまの回（lib/eventRound.ts の CURRENT_ROUND のフォルダ）のぶんを全部読む。 */
-export function listGallery(): Promise<GalleryItem[]> {
-  return listGalleryFor(GALLERY_EVENT);
+/**
+ * これまでに写真・動画が1件でも入った回の開催日（＝バケット直下のフォルダ名）。
+ * どの回があるかを数えるのに使う。読めなければ空で返す（画面を止めない）。
+ * 1件も入っていない回はここに出ないので、呼ぶ側はほかの手がかりと合わせて使うこと
+ * （lib/currentRound.ts は、記録に残した回とこのファイルの ROUNDS も混ぜている）。
+ */
+export async function listRoundKeys(): Promise<string[]> {
+  try {
+    const rows = await listPrefix("");
+    return rows
+      .filter((r) => r.id === null && /^\d{4}-\d{2}-\d{2}$/.test(r.name))
+      .map((r) => r.name);
+  } catch {
+    return [];
+  }
 }
 
 /* ── 書く ───────────────────────────────────────── */
@@ -238,6 +245,7 @@ function randomTag(): string {
 }
 
 export type UploadInput = {
+  eventKey: string; // どの回に入れるか（"2026-09-26"）。入れ先はこれだけで決まる
   blob: Blob;
   ext: string; // 拡張子（ドット無し）
   contentType: string; // 配信時のMIME。動画は video/mp4 にそろえる（下の説明を参照）
@@ -414,17 +422,22 @@ export async function uploadToGallery(
   input: UploadInput,
   onProgress?: (ratio: number) => void
 ): Promise<GalleryItem> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.eventKey)) {
+    throw new Error("入れ先の回が決まっていません（開催日を確かめてください）");
+  }
   const name = `${input.takenAt}-${randomTag()}.${input.ext}`;
-  const path = `${GALLERY_EVENT}/${input.sceneId}/${name}`;
+  const path = `${input.eventKey}/${input.sceneId}/${name}`;
   // 小さいものは1回で、大きいものは分けて送る（途中で切れても続きから送れる）
   if (input.blob.size > RESUMABLE_MIN) {
     await putObjectResumable(path, input.blob, input.contentType, onProgress);
   } else {
     await putObject(path, input.blob, input.contentType, onProgress);
   }
+  // 本体とサムネは必ず同じ回に置く（別々の回に散らないよう、同じ eventKey から組む）
+  const thumbPath = thumbPathFor(input.eventKey, input.sceneId, name);
   if (input.thumb) {
     try {
-      await putObject(thumbPathFor(input.sceneId, name), input.thumb, "image/jpeg");
+      await putObject(thumbPath, input.thumb, "image/jpeg");
     } catch {
       /* 小さい画像だけ失敗しても、本体は入っているので続行 */
     }
@@ -435,7 +448,7 @@ export async function uploadToGallery(
     sceneId: input.sceneId,
     kind: input.contentType.startsWith("video/") ? "video" : "photo",
     url: publicUrl(path),
-    thumbUrl: publicUrl(thumbPathFor(input.sceneId, name)),
+    thumbUrl: publicUrl(thumbPath),
     takenAt: input.takenAt,
     size: input.blob.size,
   };
@@ -456,10 +469,11 @@ export async function deleteFromGallery(item: GalleryItem): Promise<void> {
     if (looksMissingBucket(txt)) throw new GallerySetupError();
     throw new Error(`削除に失敗しました (${res.status})`);
   }
+  // どの回のものかは path の先頭にある（前の回のものを消すときも、その回の thumbs を消す）
+  const eventKey = item.path.split("/")[0];
+  if (!eventKey) return;
   try {
-    // どの回のものかは path の先頭にある（今回の回でないものを消すときも、その回の thumbs を消す）
-    const eventKey = item.path.split("/")[0] || GALLERY_EVENT;
-    await removeObject(thumbPathFor(item.sceneId, item.name, eventKey));
+    await removeObject(thumbPathFor(eventKey, item.sceneId, item.name));
   } catch {
     /* 小さい画像が残っても表示には出ない */
   }

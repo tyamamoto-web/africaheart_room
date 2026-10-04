@@ -26,12 +26,16 @@
        6/27 … 記録が無いので記号だけ
      全員で集まる枠は A（広いほう。過去の表と同じ決め方）。
 
-   次の回が終わったら、ここに1件足す（当日の部屋割 lib/timetable.ts の中身を
-   その回の記録として写す。名前の書き方は当日の表のまま）。
+   【9/26 から先の回】
+     ここには書かない。いまの名簿には、公開しているこのリポジトリに書けない呼び名が
+     あるので、呼び名を含む記録は Supabase にだけ置く（lib/roundArchive.ts）。
+     画面に出すときは、この3回のぶんと Supabase のぶんを mergeArchive で合わせて並べる。
+     当日の部屋割りを次の回で書き換える前に、記録へ写しておくこと。
    ============================================================ */
 
 import { archivedEvents, type ArchivedEvent } from "./archive";
 import { karaokeRooms } from "./data";
+import { namesInRows, type RoundRecord } from "./roundArchive";
 import type { PlanRow } from "./timetable";
 
 /** 1回ぶんの記録。key は開催日（"2026-08-22"）で、並び順と見出しに使う。 */
@@ -108,7 +112,48 @@ const suwa: ArchiveEvent = {
   }),
 };
 
-/** すべての回。新しいほうが先。 */
+/** リポジトリに凍結してある回（6/27・7/26・8/22）。新しいほうが先。 */
 export const archiveEvents: ArchiveEvent[] = [suwa, ...archivedEvents.map(fromFrozen)].sort((a, b) =>
   a.key < b.key ? 1 : a.key > b.key ? -1 : 0
 );
+
+/** 「11:00〜19:00 ／ 2部屋 ／ 会費1380円」のような1行。入っている項目だけを並べる。 */
+function overviewLine(rec: RoundRecord): string {
+  const bits: string[] = [];
+  const start = rec.start.trim();
+  const end = rec.end.trim();
+  const rooms = rec.rooms.trim();
+  const fee = Number(rec.fee.trim());
+  if (start && end) bits.push(`${start}〜${end}`);
+  else if (start) bits.push(`${start}〜`);
+  if (rooms) bits.push(`${rooms}部屋`);
+  // 数として読めないものは出さない（手で直したときに「会費NaN円」と出ないように）
+  if (rec.fee.trim() !== "" && Number.isFinite(fee)) bits.push(`会費${fee.toLocaleString("ja-JP")}円`);
+  return bits.join(" ／ ");
+}
+
+/** Supabase に残した1回ぶんを、この画面の形にする。 */
+export function fromRecord(rec: RoundRecord): ArchiveEvent {
+  const head = overviewLine(rec);
+  const note = [head, rec.note].filter((t) => t.trim() !== "").join("　");
+  return {
+    key: rec.key,
+    place: rec.place,
+    note: note || undefined,
+    rows: rec.rows,
+    // 出欠を残していない回は、部屋割りに出てくる名前を参加者とみなす
+    participants: rec.participants.length > 0 ? rec.participants : namesInRows(rec.rows),
+  };
+}
+
+/**
+ * リポジトリの3回と、Supabase に残した回を合わせて並べる（新しいほうが先）。
+ * 同じ開催日が両方にあるときは Supabase のほうを採る（あとから直せるのはそちらなので）。
+ */
+export function mergeArchive(stored: RoundRecord[]): ArchiveEvent[] {
+  const fromDb = stored.map(fromRecord);
+  const keys = new Set(fromDb.map((e) => e.key));
+  return [...fromDb, ...archiveEvents.filter((e) => !keys.has(e.key))].sort((a, b) =>
+    a.key < b.key ? 1 : a.key > b.key ? -1 : 0
+  );
+}
