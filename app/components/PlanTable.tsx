@@ -150,6 +150,7 @@ export default function PlanTable({
   variant,
   minWidth = 248, // 幅375pxのスマホでも横に流さずに収まる大きさ。設定の画面ではもっと広く渡す
   onPickNames,
+  peopleFor,
 }: {
   rows: PlanRow[];
   /** 全員の人数。「全員（9名）」と出すのに使う。0なら人数は出さない。 */
@@ -159,6 +160,11 @@ export default function PlanTable({
   /** 渡すと、名前のマスが押せるようになる（当日の部屋割りで、誰がいるかを選ぶため）。
       中身の無い行は押せない。渡さなければ、これまでどおり出すだけ。 */
   onPickNames?: (index: number) => void;
+  /** 「全員」の行に、誰がいるのかを名前で出すために渡す。
+      その行の時間にいる人を返す（出欠と来る帰る時間から決まる。lib/attendanceTime.ts）。
+      空を返すか、渡さなければ、これまでどおり「全員（◯名）」とだけ出す。
+      ※ 行そのものは名前を持たないまま（空＝全員）。ここは出し方だけの話。 */
+  peopleFor?: (r: PlanRow, index: number) => string[];
 }) {
   const T = TONES[variant];
   const hair = `1px solid ${T.line}`;
@@ -208,6 +214,51 @@ export default function PlanTable({
   };
 
   const spans = spansOf(rows);
+
+  /* 名前のマスの中身。
+     名前の入っている行は、その人たち。
+     「全員」の行（名前が空）は、peopleFor がその時間にいる人を返せばその人たち、
+     返せなければ「全員（◯名）」の1行だけ。どちらの場合も、下に小さく人数を添える。 */
+  const nameCell = (r: PlanRow, i: number, all: boolean, rt: RoomTone | undefined): React.ReactNode => {
+    const shown = all ? peopleFor?.(r, i) ?? [] : r.names;
+    if (shown.length === 0) {
+      return (
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, textAlign: "center", color: T.ink }}>
+          全員{total > 0 ? `（${total}名）` : ""}
+        </p>
+      );
+    }
+    return (
+      <>
+        {/* 名前は「・」で区切って続けて出す。1人ぶんを nowrap にしてあるので、
+            長い呼び名が「あいう」「えお」のように途中で割れない。
+            9/25 まではすきま（gap）だけで区切っていたが、2人が1行に並ぶと
+            どこまでが1人の名前か読み取りにくかった。 */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1px 0" }}>
+          {shown.map((n, k) => (
+            <span
+              key={`${n}-${k}`}
+              style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, color: T.ink, whiteSpace: "nowrap" }}
+            >
+              {n}
+              {k < shown.length - 1 ? <span style={{ color: T.dim, fontWeight: 400 }}>・</span> : null}
+            </span>
+          ))}
+        </div>
+        <p
+          style={{
+            margin: "4px 0 0",
+            fontSize: 10,
+            fontWeight: 700,
+            textAlign: "center",
+            color: all ? T.all.fg : rt?.fg ?? T.dim,
+          }}
+        >
+          {all ? `全員（${shown.length}名）` : `${shown.length}名`}
+        </p>
+      </>
+    );
+  };
 
   /* 名前のマスの中身。押せるときはボタンで包む。
      押したら、その行が何行目かを呼び出し元へ返す（名前を選ぶ画面を出すのは向こうの役目）。 */
@@ -338,38 +389,7 @@ export default function PlanTable({
                       ...allEdge(all, "right", !noteBelow),
                     }}
                   >
-                    {empty ? null : pickWrap(
-                      i,
-                      r,
-                      all ? (
-                        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, textAlign: "center", color: T.ink }}>
-                          全員{total > 0 ? `（${total}名）` : ""}
-                        </p>
-                      ) : (
-                        <>
-                          {/* 名前は「・」で区切って続けて出す。1人ぶんを nowrap にしてあるので、
-                              長い呼び名が「あいう」「えお」のように途中で割れない。
-                              9/25 まではすきま（gap）だけで区切っていたが、2人が1行に並ぶと
-                              どこまでが1人の名前か読み取りにくかった。 */}
-                          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1px 0" }}>
-                            {r.names.map((n, k) => (
-                              <span
-                                key={`${n}-${k}`}
-                                style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, color: T.ink, whiteSpace: "nowrap" }}
-                              >
-                                {n}
-                                {k < r.names.length - 1 ? (
-                                  <span style={{ color: T.dim, fontWeight: 400 }}>・</span>
-                                ) : null}
-                              </span>
-                            ))}
-                          </div>
-                          <p style={{ margin: "4px 0 0", fontSize: 10, fontWeight: 700, textAlign: "center", color: rt?.fg ?? T.dim }}>
-                            {r.names.length}名
-                          </p>
-                        </>
-                      )
-                    )}
+                    {empty ? null : pickWrap(i, r, nameCell(r, i, all, rt))}
                     {noteInCell && (
                       <p style={{ margin: "4px 0 0", fontSize: 11, lineHeight: 1.5, textAlign: "center", color: T.sub, whiteSpace: "pre-line", wordBreak: "break-word" }}>
                         {note}

@@ -149,7 +149,12 @@ export type PlanHeading = {
   place: string;
 };
 
-function buildAndDownload(rows: PlanRow[], total: number, heading: PlanHeading): void {
+function buildAndDownload(
+  rows: PlanRow[],
+  total: number,
+  heading: PlanHeading,
+  peopleFor?: (r: PlanRow, index: number) => string[]
+): void {
   // ── レイアウト寸法（論理px）──
   const W = 900;
   const padX = 28;
@@ -176,14 +181,16 @@ function buildAndDownload(rows: PlanRow[], total: number, heading: PlanHeading):
     meas.font = titleFont;
     const titleLines = wrapText(meas, stripEmoji(r.title), colW[2] - 20);
     const all = r.names.length === 0;
+    // 全員の行は、その時間にいる人が分かればその名前を描く（分からなければ「全員（◯名）」）
+    const shown = all ? peopleFor?.(r, i) ?? [] : r.names;
     meas.font = nameFont;
-    const nameLines = all
-      ? [total > 0 ? `全員（${total}名）` : "全員"]
-      : wrapJoined(meas, r.names.map(stripEmoji), colW[3] - 20);
+    const nameLines = shown.length
+      ? wrapJoined(meas, shown.map(stripEmoji), colW[3] - 20)
+      : [total > 0 ? `全員（${total}名）` : "全員"];
     meas.font = noteFont;
     const noteLines = r.note ? wrapText(meas, stripEmoji(r.note), tableW - 40) : [];
 
-    const nameBlock = nameLines.length * 25 + (all ? 0 : 20); // 人数の1行ぶん
+    const nameBlock = nameLines.length * 25 + (shown.length ? 20 : 0); // 人数の1行ぶん
     const titleBlock = spans[i].title > 0 ? titleLines.length * 23 : 0;
     const noteBlock = noteLines.length ? 8 + noteLines.length * 19 : 0;
     return {
@@ -191,6 +198,7 @@ function buildAndDownload(rows: PlanRow[], total: number, heading: PlanHeading):
       start,
       end,
       all,
+      shown,
       titleLines,
       nameLines,
       noteLines,
@@ -338,13 +346,22 @@ function buildAndDownload(rows: PlanRow[], total: number, heading: PlanHeading):
     // 名前（全員の行は「全員（◯名）」、分かれる行は名前と人数）
     {
       const cx = colX[3] + colW[3] / 2;
-      const block = b.nameLines.length * 25 + (b.all ? 0 : 20);
+      const block = b.nameLines.length * 25 + (b.shown.length ? 20 : 0);
       let ny = mid - block / 2 + 12;
       for (const ln of b.nameLines) {
-        haloText(ln, cx, ny, b.all ? `800 20px ${FONT}` : nameFont, INK);
+        // 名前を1つも出せない「全員」の行だけ、大きめの字で1行だけ描く
+        haloText(ln, cx, ny, b.shown.length === 0 ? `800 20px ${FONT}` : nameFont, INK);
         ny += 25;
       }
-      if (!b.all) haloText(`${b.row.names.length}名`, cx, ny + 2, `700 13px ${FONT}`, SUB);
+      if (b.shown.length) {
+        haloText(
+          b.all ? `全員（${b.shown.length}名）` : `${b.shown.length}名`,
+          cx,
+          ny + 2,
+          `700 13px ${FONT}`,
+          SUB
+        );
+      }
     }
 
     // 行に付いた補足は、その行の下に横いっぱいで小さく
@@ -452,11 +469,14 @@ export default function DownloadPlanButton({
   rows,
   total,
   heading,
+  peopleFor,
 }: {
   rows: PlanRow[];
   /** 全員の人数。「全員（13名）」と出すのに使う。0なら人数は出さない */
   total: number;
   heading: PlanHeading;
+  /** 「全員」の行に名前を描くために渡す。画面の表（PlanTable）と同じものを渡すこと。 */
+  peopleFor?: (r: PlanRow, index: number) => string[];
 }) {
   const [busy, setBusy] = useState(false);
   // 中身の無い表を画像にしても意味がないので、1行でも入っていなければ出さない
@@ -472,7 +492,7 @@ export default function DownloadPlanButton({
           if (busy) return;
           setBusy(true);
           try {
-            buildAndDownload(rows, total, heading);
+            buildAndDownload(rows, total, heading, peopleFor);
           } finally {
             setTimeout(() => setBusy(false), 600);
           }

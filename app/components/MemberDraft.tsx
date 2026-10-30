@@ -1437,6 +1437,14 @@ function RoomPlan({
   const removeRow = (i: number) => setEdit((ds) => ds.filter((_, n) => n !== i));
   const addRow = () => setEdit((ds) => [...ds, blankDraft()]);
 
+  /* その行の時間にいる人。「全員」の行（名前が空）に、誰がいるのかを名前で出すのに使う。
+     表にも、画像で保存にも、同じものを渡す（2つで食い違わないように）。
+     時間が読めない行は絞り込まない（絞って人を隠すより安全）。 */
+  const peopleFor = (r: { time: string }): string[] => {
+    const span = parseSpanHours(r.time);
+    return span ? attendees.filter((n) => isHereDuring(span, times[n])) : attendees;
+  };
+
   /* 表の名前のマスを押したとき。その行の、いま入っている名前を下敷きにする。 */
   const openPick = (i: number) => {
     const r = (rows ?? [])[i];
@@ -1625,11 +1633,12 @@ function RoomPlan({
             total={total}
             variant="day"
             onPickNames={rows && rows.length ? openPick : undefined}
+            peopleFor={peopleFor}
           />
           {/* 画像にして持ち出せるようにする。当日はLINEに貼ったり、
               会場で紙に出したりするほうが早いことがあるため。 */}
           <div style={{ marginLeft: 14, marginRight: 14, textAlign: "right" }}>
-            <DownloadPlanButton rows={rows ?? []} total={total} heading={heading} />
+            <DownloadPlanButton rows={rows ?? []} total={total} heading={heading} peopleFor={peopleFor} />
           </div>
         </div>
       )}
