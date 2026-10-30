@@ -50,6 +50,24 @@ const NO_LINE_END = "（(｛{「『【〔〈《＜<‘“";
 
 // 日本語向け：改行(\n)を尊重しつつ幅に合わせて文字単位で折り返す。
 // 「、」や「）」が行あたまに落ちないよう、その1文字ぶんだけはみ出させる（簡易の禁則処理）。
+/* 企画の行。「・」「／」で区切って2つ以上あれば、箇条書きにする（画面の表と同じ）。
+   折り返した続きは、頭の「・」のぶんだけ字下げしてぶら下げる。
+   1つだけのときは、これまでどおりそのまま折り返す。 */
+function wrapTitle(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const parts = text
+    .split(/[・／/]/)
+    .map((t) => t.trim())
+    .filter((t) => t !== "");
+  if (parts.length < 2) return wrapText(ctx, text, maxWidth);
+  const indent = "\u3000"; // 全角の空白1つ。「・」のぶんの字下げ
+  const out: string[] = [];
+  for (const part of parts) {
+    const lines = wrapText(ctx, part, maxWidth - ctx.measureText("\u30fb").width);
+    lines.forEach((ln, i) => out.push((i === 0 ? "\u30fb" : indent) + ln));
+  }
+  return out;
+}
+
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = [];
   for (const segment of text.split("\n")) {
@@ -179,7 +197,7 @@ function buildAndDownload(
   const built = rows.map((r, i) => {
     const [start, end] = splitTime(r.time);
     meas.font = titleFont;
-    const titleLines = wrapText(meas, stripEmoji(r.title), colW[2] - 20);
+    const titleLines = wrapTitle(meas, stripEmoji(r.title), colW[2] - 20);
     const all = r.names.length === 0;
     // 全員の行は、その時間にいる人が分かればその名前を描く（分からなければ「全員（◯名）」）
     const shown = all ? peopleFor?.(r, i) ?? [] : r.names;
@@ -335,10 +353,12 @@ function buildAndDownload(
     if (spans[idx].title > 0 && b.row.title.trim()) {
       let spanH = 0;
       for (let k = idx; k < idx + spans[idx].title; k++) spanH += built[k].height;
-      const cx = colX[2] + colW[2] / 2;
+      // 箇条書きのときは左ぞろえ（中央ぞろえだと行ごとに「・」の位置がずれる）
+      const bullets = b.titleLines.some((ln) => ln.startsWith("\u30fb"));
+      const tx = bullets ? colX[2] + 10 : colX[2] + colW[2] / 2;
       let ty = y + spanH / 2 - ((b.titleLines.length - 1) * 23) / 2;
       for (const ln of b.titleLines) {
-        haloText(ln, cx, ty, titleFont, INK);
+        haloText(ln, tx, ty, titleFont, INK, bullets ? "left" : "center");
         ty += 23;
       }
     }

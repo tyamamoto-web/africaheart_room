@@ -83,24 +83,33 @@ const TONES: Record<"day" | "archive", Tone> = {
  * （そうしないと「自己紹介・課題」「曲」のように言葉の途中で割れる）。
  * 区切りが無い言葉は、はみ出すときだけ overflowWrap: anywhere で折れる。
  */
+function titleParts(title: string): string[] {
+  return title
+    .split(/[・／/]/)
+    .map((t) => t.trim())
+    .filter((t) => t !== "");
+}
+
 function breakableTitle(title: string): React.ReactNode {
-  const parts: string[] = [];
-  let buf = "";
-  for (const ch of title) {
-    buf += ch;
-    if (ch === "・" || ch === "／" || ch === "/") {
-      parts.push(buf);
-      buf = "";
-    }
-  }
-  if (buf) parts.push(buf);
+  const parts = titleParts(title);
   if (parts.length < 2) return title;
-  return parts.map((p, i) => (
-    <Fragment key={i}>
-      {p}
-      {i < parts.length - 1 ? <wbr /> : null}
-    </Fragment>
-  ));
+  /* 2つ以上あるときは箇条書きにする（10/30）。
+     それまでは「・」のうしろで折れるだけの1行の文にしていたが、
+     「トリックオアトリート・自己紹介・課題曲発表（リノ）」のように
+     いくつも入る枠が出てきて、どこまでが1つの企画か読み取れなくなった。
+     長い企画が折り返しても頭の「・」とそろうよう、ぶら下げて字下げする。 */
+  /* 「・」と中身を別の箱に分ける。ひとつの文字列にすると、中黒のうしろは
+     折ってよい場所なので、狭いマスでは「・」だけが1行目に取り残される。 */
+  return (
+    <span style={{ display: "inline-block", textAlign: "left" }}>
+      {parts.map((p, i) => (
+        <span key={i} style={{ display: "flex", alignItems: "baseline" }}>
+          <span style={{ flex: "0 0 auto" }}>・</span>
+          <span style={{ flex: "1 1 auto", minWidth: 0 }}>{p}</span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 /** 「13:20〜14:20」を開始と終了に分ける。区切りが無ければ全部を開始として出す。 */
