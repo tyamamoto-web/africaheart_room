@@ -133,6 +133,7 @@ import {
   blankTimetableRow,
   parseSpanHours,
   readTimetable,
+  saveRowNames,
   saveTimetable,
   splitNames,
   type TimetableRow,
@@ -1279,7 +1280,10 @@ function PlanNames({
 
   const span = parseSpanHours(time);
   // 時間が読めない行は、絞り込まずに全員を出す（絞って人を隠すより安全）
-  const here = span ? attendees.filter((n) => isHereDuring(span, times[n])) : attendees;
+  const inRange = span ? attendees.filter((n) => isHereDuring(span, times[n])) : attendees;
+  /* その時間にいなくても、もう選んである人は必ず出す。
+     たたんだ中に隠れると、入っていることに気づけないまま保存してしまうため。 */
+  const here = attendees.filter((n) => inRange.includes(n) || names.includes(n));
   const away = attendees.filter((n) => !here.includes(n));
   // 出欠に出ていないのに、もう入っている名前（ゲストなど）。消さずに必ず出す。
   const extra = names.filter((n) => !attendees.includes(n));
@@ -1365,6 +1369,9 @@ function PlanNames({
           placeholder="一覧に無い人を足す"
           aria-label={`${label}に、一覧に無い人を足す`}
           onChange={(e) => setAdding(e.target.value)}
+          /* 「足す」を押さずに「決定」へ行っても消えないように、欄を離れたときに入れる。
+             「足す」を押したときは、先にこちらが入り、続くクリックの add() は空なので何もしない。 */
+          onBlur={add}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -1400,6 +1407,8 @@ function RoomPlan({
   /* 表の名前のマスを押したときに出す窓。picking は何行目かで、null なら出さない。
      窓の中の直しは pickNames に溜めて、「決定」で初めて保存する
      （押すたびに書くと、同じ行を何度も触るあいだ保存が走り続けるため）。 */
+  /* 表そのものが読めなかった（通信など）。rows の null（読んでいる途中）とは分けて持つ。 */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [picking, setPicking] = useState<number | null>(null);
   const [pickNames, setPickNames] = useState<string[]>([]);
   const [pickSaving, setPickSaving] = useState(false);
@@ -1412,7 +1421,9 @@ function RoomPlan({
         if (alive) setRows(r);
       })
       .catch(() => {
-        if (alive) setRows([]);
+        /* 読めなかったときは、空とは別に持つ。
+           空のつもりで編集して保存すると、本番の表がまるごと消えるため。 */
+        if (alive) setLoadFailed(true);
       });
     return () => {
       alive = false;
@@ -1460,10 +1471,14 @@ function RoomPlan({
   };
   const savePick = async () => {
     if (picking === null || !rows) return;
+    const target = rows[picking];
+    if (!target) return;
     setPickSaving(true);
     setPickError("");
     try {
-      setRows(await saveTimetable(rows.map((r, n) => (n === picking ? { ...r, names: pickNames } : r))));
+      /* 手元の表ごと書き戻さない。開きっぱなしの端末から押したときに、
+         そのあいだに別の端末が入れた名前まで巻き戻してしまうため（lib/timetable.ts）。 */
+      setRows(await saveRowNames(target.time, target.room, pickNames));
       setPicking(null);
     } catch (e) {
       setPickError(e instanceof Error ? e.message : "保存に失敗しました");
@@ -1514,7 +1529,7 @@ function RoomPlan({
           aria-expanded={editing}
           // 保存している間は閉じられないようにする。閉じたあとに保存が失敗すると、
           // 失敗したことがどこにも出ないまま直しだけが消えてしまうため。
-          disabled={rows === null || saving}
+          disabled={rows === null || loadFailed || saving}
           onClick={() => (editing ? setEditing(false) : startEdit())}
         >
           {editing ? "やめる" : "編集"}
@@ -1626,6 +1641,19 @@ function RoomPlan({
         /* 表だけは枠の余白（左右28px）に少しはみ出させる。名前のマスがいちばん
            狭くて読みにくかったので、14pxずつ広げて名前に回している。 */
         <div style={{ marginTop: 16, marginLeft: -14, marginRight: -14 }}>
+          {loadFailed && (
+            <p
+              style={{
+                margin: "0 14px 12px",
+                fontSize: 12,
+                lineHeight: 1.8,
+                color: ACC_TEXT,
+              }}
+            >
+              部屋割りを読み込めませんでした。通信を確かめて、画面を開き直してください。
+              （ここで編集すると、入っているものを消してしまうおそれがあるため、編集は止めてあります）
+            </p>
+          )}
           {/* 行があるときだけ、名前のマスを押して選べるようにする
               （中身の無い仮の行を押しても、入れる先が無いため）。 */}
           <PlanTable

@@ -149,3 +149,36 @@ export function parseSpanHours(time: string): [number, number] | null {
   // 「21:00〜翌1:00」のように後ろが小さいときは、またいだものとして1日足す
   return [a, b < a ? b + 24 : b];
 }
+
+/**
+ * 1行の名前だけを差し替える。表のほかの行には触らない。
+ *
+ * saveTimetable は手元の配列で丸ごと置き換える。表の形そのものを直す「編集」には
+ * それでよいが、当日に名前を選ぶ窓から使うと困る ── 画面は開いたときに1度読むだけなので、
+ * 開きっぱなしの端末から1行保存すると、そのあいだに別の端末が入れた名前まで
+ * 開いた時点へ巻き戻ってしまう（版くらべは「読んでから書くまで」しか守らない）。
+ *
+ * そこで、ここでは必ず最新を土台にして、その1行だけを差し替える。
+ * どの行かは「時間＋部屋」で引く（何行目かは端末ごとにずれるため）。
+ * 同じ時間に同じ部屋の行が2つあるときは、先に出てきたほうを直す。
+ * 行が見つからなければ、何も書かずに例外を投げる（別の行を書き換えないため）。
+ */
+export async function saveRowNames(
+  time: string,
+  room: string,
+  names: string[]
+): Promise<TimetableRow[]> {
+  const t = time.trim();
+  const m = room.trim();
+  return decode(
+    await writeSharedRow(SHARED_ROW.timetable, (raw) => {
+      // 再試行で何度も呼ばれるので、渡された raw だけから組み立てること
+      const rows = decode(raw);
+      const at = rows.findIndex((r) => r.time.trim() === t && r.room.trim() === m);
+      if (at < 0) {
+        throw new Error("この行が見つかりません。ほかの人が表を直したようです。画面を開き直してください");
+      }
+      return encode(rows.map((r, i) => (i === at ? { ...r, names } : r)));
+    })
+  );
+}
