@@ -1257,15 +1257,18 @@ const distinctRooms = (ds: PlanDraft[]): string[] => {
      ・いちばん下の入力欄      … 名簿にも出欠にも無い人を足せる
    すでに入っている名前は、どちらにも当てはまらなくても必ず出す（消えないように）。 */
 function PlanNames({
-  index,
-  draft,
+  label,
+  time,
+  names,
   attendees,
   times,
   onToggle,
   onAdd,
 }: {
-  index: number;
-  draft: PlanDraft;
+  /** 読み上げのための名前（「15:00〜16:00 A室」など）。 */
+  label: string;
+  time: string;
+  names: string[];
   attendees: string[];
   times: AttendanceTimeMap;
   onToggle: (name: string) => void;
@@ -1274,15 +1277,15 @@ function PlanNames({
   const [showAway, setShowAway] = useState(false);
   const [adding, setAdding] = useState("");
 
-  const span = parseSpanHours(draft.time);
+  const span = parseSpanHours(time);
   // 時間が読めない行は、絞り込まずに全員を出す（絞って人を隠すより安全）
   const here = span ? attendees.filter((n) => isHereDuring(span, times[n])) : attendees;
   const away = attendees.filter((n) => !here.includes(n));
   // 出欠に出ていないのに、もう入っている名前（ゲストなど）。消さずに必ず出す。
-  const extra = draft.names.filter((n) => !attendees.includes(n));
+  const extra = names.filter((n) => !attendees.includes(n));
 
   const chip = (name: string, tone: "here" | "away" | "extra") => {
-    const on = draft.names.includes(name);
+    const on = names.includes(name);
     return (
       <button
         key={name}
@@ -1321,7 +1324,7 @@ function PlanNames({
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>名前</span>
         <span style={{ fontSize: 12, color: SUB }}>
-          {draft.names.length === 0 ? "選ばなければ「全員」" : `${draft.names.length}名`}
+          {names.length === 0 ? "選ばなければ「全員」" : `${names.length}名`}
         </span>
       </div>
 
@@ -1332,7 +1335,7 @@ function PlanNames({
             : "この時間にいる人がいません。下の「この時間にいない人も出す」から選べます。"}
         </p>
       ) : (
-        <div role="group" aria-label={`${index + 1}行目の名前`} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div role="group" aria-label={`${label}の名前`} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {here.map((n) => chip(n, "here"))}
           {extra.map((n) => chip(n, "extra"))}
         </div>
@@ -1360,7 +1363,7 @@ function PlanNames({
           className="md-field"
           value={adding}
           placeholder="一覧に無い人を足す"
-          aria-label={`${index + 1}行目に、一覧に無い人を足す`}
+          aria-label={`${label}に、一覧に無い人を足す`}
           onChange={(e) => setAdding(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -1394,6 +1397,13 @@ function RoomPlan({
   const [edit, setEdit] = useState<PlanDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  /* 表の名前のマスを押したときに出す窓。picking は何行目かで、null なら出さない。
+     窓の中の直しは pickNames に溜めて、「決定」で初めて保存する
+     （押すたびに書くと、同じ行を何度も触るあいだ保存が走り続けるため）。 */
+  const [picking, setPicking] = useState<number | null>(null);
+  const [pickNames, setPickNames] = useState<string[]>([]);
+  const [pickSaving, setPickSaving] = useState(false);
+  const [pickError, setPickError] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -1424,38 +1434,35 @@ function RoomPlan({
     setEdit((ds) => ds.map((d) => (d.room.trim() === room ? { ...d, roomNo: no } : d)));
   const setField = (i: number, key: "time" | "room" | "title", v: string) =>
     setEdit((ds) => ds.map((d, n) => (n === i ? { ...d, [key]: v } : d)));
-  /* 名前のチェックを付け外しする。並びは出欠（＝名簿）の順にそろえる。 */
-  const toggleName = (i: number, name: string) =>
-    setEdit((ds) =>
-      ds.map((d, n) =>
-        n !== i
-          ? d
-          : {
-              ...d,
-              names: orderNames(
-                d.names.includes(name) ? d.names.filter((x) => x !== name) : [...d.names, name],
-                attendees
-              ),
-            }
-      )
-    );
-  /* 一覧に無い人を足す。「、」で区切れば一度に何人でも。すでに入っている名前は増やさない。 */
-  const addNames = (i: number, text: string) =>
-    setEdit((ds) =>
-      ds.map((d, n) =>
-        n !== i
-          ? d
-          : {
-              ...d,
-              names: orderNames(
-                [...d.names, ...splitNames(text).filter((x) => !d.names.includes(x))],
-                attendees
-              ),
-            }
-      )
-    );
   const removeRow = (i: number) => setEdit((ds) => ds.filter((_, n) => n !== i));
   const addRow = () => setEdit((ds) => [...ds, blankDraft()]);
+
+  /* 表の名前のマスを押したとき。その行の、いま入っている名前を下敷きにする。 */
+  const openPick = (i: number) => {
+    const r = (rows ?? [])[i];
+    if (!r) return;
+    setPickNames([...r.names]);
+    setPickError("");
+    setPicking(i);
+  };
+  const closePick = () => {
+    if (pickSaving) return; // 保存の途中で閉じると、失敗がどこにも出ないまま消える
+    setPicking(null);
+    setPickError("");
+  };
+  const savePick = async () => {
+    if (picking === null || !rows) return;
+    setPickSaving(true);
+    setPickError("");
+    try {
+      setRows(await saveTimetable(rows.map((r, n) => (n === picking ? { ...r, names: pickNames } : r))));
+      setPicking(null);
+    } catch (e) {
+      setPickError(e instanceof Error ? e.message : "保存に失敗しました");
+    } finally {
+      setPickSaving(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -1584,14 +1591,11 @@ function RoomPlan({
                 aria-label={`${i + 1}行目の企画`}
                 onChange={(e) => setField(i, "title", e.target.value)}
               />
-              <PlanNames
-                index={i}
-                draft={d}
-                attendees={attendees}
-                times={times}
-                onToggle={(n) => toggleName(i, n)}
-                onAdd={(t) => addNames(i, t)}
-              />
+              {/* 名前はここでは選ばない。表の「名前」のマスを押すと、その行にいる人が出る
+                  （10/30 にここから移した。打ち込む欄が縦に長くなりすぎたため）。 */}
+              <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
+                名前　{d.names.length === 0 ? "選んでいません（表では「全員」）" : `${d.names.length}名　${d.names.join("・")}`}
+              </p>
             </div>
           ))}
           <button type="button" className="md-addrow" onClick={addRow}>
@@ -1604,7 +1608,7 @@ function RoomPlan({
             <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>{error}</p>
           ) : (
             <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
-              名前は、その時間にいる人だけを出しています（出欠席の「来る時間・帰る時間」から決めています）。
+              名前は、この画面を閉じてから、表の「名前」のマスを押して選びます。
               誰も選ばなければ「全員」として出ます。同じ時間の行は、表では1つの時間にまとまります。
               何も入っていない行は残りません。保存すると、会員それぞれの端末から同じものが見られます。
             </p>
@@ -1614,11 +1618,106 @@ function RoomPlan({
         /* 表だけは枠の余白（左右28px）に少しはみ出させる。名前のマスがいちばん
            狭くて読みにくかったので、14pxずつ広げて名前に回している。 */
         <div style={{ marginTop: 16, marginLeft: -14, marginRight: -14 }}>
-          <PlanTable rows={view} total={total} variant="day" />
+          {/* 行があるときだけ、名前のマスを押して選べるようにする
+              （中身の無い仮の行を押しても、入れる先が無いため）。 */}
+          <PlanTable
+            rows={view}
+            total={total}
+            variant="day"
+            onPickNames={rows && rows.length ? openPick : undefined}
+          />
           {/* 画像にして持ち出せるようにする。当日はLINEに貼ったり、
               会場で紙に出したりするほうが早いことがあるため。 */}
           <div style={{ marginLeft: 14, marginRight: 14, textAlign: "right" }}>
             <DownloadPlanButton rows={rows ?? []} total={total} heading={heading} />
+          </div>
+        </div>
+      )}
+
+      {/* 名前を選ぶ窓。表の名前のマスを押すと出る。
+          背の高い一覧になることがあるので、中だけ縦に流して、下に決定を貼り付ける。 */}
+      {picking !== null && rows?.[picking] && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${[rows[picking].time, rows[picking].room && `${rows[picking].room}室`].filter(Boolean).join(" ")}にいる人を選ぶ`}
+          onClick={closePick}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") closePick();
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            background: "rgba(27,28,30,0.38)",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            padding: 12,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              maxHeight: "86vh",
+              display: "flex",
+              flexDirection: "column",
+              background: "#FFFFFF",
+              border: HAIR,
+              borderRadius: 18,
+              boxShadow: "0 18px 44px -20px rgba(27,28,30,0.45)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "16px 18px",
+                borderBottom: HAIR,
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>
+                {[rows[picking].time, rows[picking].room && `${rows[picking].room}室`].filter(Boolean).join("　") ||
+                  `${picking + 1}行目`}
+              </span>
+              <button type="button" className="md-edit" disabled={pickSaving} onClick={closePick}>
+                やめる
+              </button>
+            </div>
+
+            <div style={{ padding: 18, overflowY: "auto" }}>
+              <PlanNames
+                label={[rows[picking].time, rows[picking].room && `${rows[picking].room}室`].filter(Boolean).join(" ")}
+                time={rows[picking].time}
+                names={pickNames}
+                attendees={attendees}
+                times={times}
+                onToggle={(n) =>
+                  setPickNames((ns) =>
+                    orderNames(ns.includes(n) ? ns.filter((x) => x !== n) : [...ns, n], attendees)
+                  )
+                }
+                onAdd={(t) =>
+                  setPickNames((ns) =>
+                    orderNames([...ns, ...splitNames(t).filter((x) => !ns.includes(x))], attendees)
+                  )
+                }
+              />
+            </div>
+
+            <div style={{ padding: 18, borderTop: HAIR, display: "grid", gap: 8 }}>
+              {pickError && (
+                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>{pickError}</p>
+              )}
+              <button type="button" className="md-save" disabled={pickSaving} onClick={savePick}>
+                {pickSaving ? "保存しています" : "決定"}
+              </button>
+            </div>
           </div>
         </div>
       )}

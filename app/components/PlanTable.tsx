@@ -134,17 +134,31 @@ function spansOf(rows: PlanRow[]): Span[] {
   return out;
 }
 
+/* 名前のマスを押せるようにしたときの見た目。インラインstyleでは :hover が書けないので、
+   この表の中（.pt-pick）だけに効く短いCSSを1つ置く。押せることは、下の点線と
+   指のかたちのカーソルで示す（地を塗ると「全員」の行の囲みとぶつかる）。 */
+const PICK_CSS = `
+.pt-pick { display:block; width:100%; padding:0; border:none; background:transparent;
+  font:inherit; color:inherit; text-align:inherit; cursor:pointer; border-radius:6px; }
+.pt-pick:hover { background:rgba(0,0,0,0.035); }
+.pt-pick:focus-visible { outline:2px solid #8B8E94; outline-offset:2px; }
+`;
+
 export default function PlanTable({
   rows,
   total,
   variant,
   minWidth = 248, // 幅375pxのスマホでも横に流さずに収まる大きさ。設定の画面ではもっと広く渡す
+  onPickNames,
 }: {
   rows: PlanRow[];
   /** 全員の人数。「全員（9名）」と出すのに使う。0なら人数は出さない。 */
   total: number;
   variant: "day" | "archive";
   minWidth?: number;
+  /** 渡すと、名前のマスが押せるようになる（当日の部屋割りで、誰がいるかを選ぶため）。
+      中身の無い行は押せない。渡さなければ、これまでどおり出すだけ。 */
+  onPickNames?: (index: number) => void;
 }) {
   const T = TONES[variant];
   const hair = `1px solid ${T.line}`;
@@ -195,9 +209,27 @@ export default function PlanTable({
 
   const spans = spansOf(rows);
 
+  /* 名前のマスの中身。押せるときはボタンで包む。
+     押したら、その行が何行目かを呼び出し元へ返す（名前を選ぶ画面を出すのは向こうの役目）。 */
+  const pickWrap = (i: number, r: PlanRow, inner: React.ReactNode): React.ReactNode => {
+    if (!onPickNames) return inner;
+    const where = [r.time.trim(), r.room.trim() ? `${r.room.trim()}室` : ""].filter(Boolean).join(" ");
+    return (
+      <button
+        type="button"
+        className="pt-pick"
+        aria-label={`${where || `${i + 1}行目`}にいる人を選ぶ`}
+        onClick={() => onPickNames(i)}
+      >
+        {inner}
+      </button>
+    );
+  };
+
   return (
     /* 狭い画面でも本文を横に押し出さないよう、この中だけで横に流す */
     <div style={{ overflowX: "auto" }}>
+      {onPickNames && <style>{PICK_CSS}</style>}
       <div style={{ border: hair, borderRadius: 10, overflow: "hidden", minWidth }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           {/* 幅の配り方（9/25 に見直した）。部屋番号のマスは「A」や「26」しか入らないのに
@@ -306,33 +338,37 @@ export default function PlanTable({
                       ...allEdge(all, "right", !noteBelow),
                     }}
                   >
-                    {empty ? null : all ? (
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, textAlign: "center", color: T.ink }}>
-                        全員{total > 0 ? `（${total}名）` : ""}
-                      </p>
-                    ) : (
-                      <>
-                        {/* 名前は「・」で区切って続けて出す。1人ぶんを nowrap にしてあるので、
-                            長い呼び名が「あいう」「えお」のように途中で割れない。
-                            9/25 まではすきま（gap）だけで区切っていたが、2人が1行に並ぶと
-                            どこまでが1人の名前か読み取りにくかった。 */}
-                        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1px 0" }}>
-                          {r.names.map((n, k) => (
-                            <span
-                              key={`${n}-${k}`}
-                              style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, color: T.ink, whiteSpace: "nowrap" }}
-                            >
-                              {n}
-                              {k < r.names.length - 1 ? (
-                                <span style={{ color: T.dim, fontWeight: 400 }}>・</span>
-                              ) : null}
-                            </span>
-                          ))}
-                        </div>
-                        <p style={{ margin: "4px 0 0", fontSize: 10, fontWeight: 700, textAlign: "center", color: rt?.fg ?? T.dim }}>
-                          {r.names.length}名
+                    {empty ? null : pickWrap(
+                      i,
+                      r,
+                      all ? (
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, textAlign: "center", color: T.ink }}>
+                          全員{total > 0 ? `（${total}名）` : ""}
                         </p>
-                      </>
+                      ) : (
+                        <>
+                          {/* 名前は「・」で区切って続けて出す。1人ぶんを nowrap にしてあるので、
+                              長い呼び名が「あいう」「えお」のように途中で割れない。
+                              9/25 まではすきま（gap）だけで区切っていたが、2人が1行に並ぶと
+                              どこまでが1人の名前か読み取りにくかった。 */}
+                          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1px 0" }}>
+                            {r.names.map((n, k) => (
+                              <span
+                                key={`${n}-${k}`}
+                                style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, color: T.ink, whiteSpace: "nowrap" }}
+                              >
+                                {n}
+                                {k < r.names.length - 1 ? (
+                                  <span style={{ color: T.dim, fontWeight: 400 }}>・</span>
+                                ) : null}
+                              </span>
+                            ))}
+                          </div>
+                          <p style={{ margin: "4px 0 0", fontSize: 10, fontWeight: 700, textAlign: "center", color: rt?.fg ?? T.dim }}>
+                            {r.names.length}名
+                          </p>
+                        </>
+                      )
                     )}
                     {noteInCell && (
                       <p style={{ margin: "4px 0 0", fontSize: 11, lineHeight: 1.5, textAlign: "center", color: T.sub, whiteSpace: "pre-line", wordBreak: "break-word" }}>
