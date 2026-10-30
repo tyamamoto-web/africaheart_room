@@ -125,3 +125,27 @@ export async function saveTimetable(rows: TimetableRow[]): Promise<TimetableRow[
   const body = encode(rows);
   return decode(await writeSharedRow(SHARED_ROW.timetable, () => body));
 }
+
+/* 行の「時間」から、はじまりとおわりを読む。
+   入るのは役員が打った字なので、形は決まっていない（"15:00〜16:00" "12:00" など）。
+   区切りは 〜 ～ ー - 一 のどれでも通す。読めなければ null。
+   おわりが無い行は、はじまりと同じ値を2つ返す（時刻ひとつの枠として扱う）。 */
+const HHMM = /(\d{1,2})\s*[:：時]\s*(\d{1,2})?/g;
+
+/** "15:00〜16:00" → [15, 16] ／ "12:00" → [12, 12] ／ 読めなければ null。 */
+export function parseSpanHours(time: string): [number, number] | null {
+  const s = (time ?? "").trim();
+  if (!s) return null;
+  const found: number[] = [];
+  HHMM.lastIndex = 0;
+  for (let m = HHMM.exec(s); m && found.length < 2; m = HHMM.exec(s)) {
+    const h = Number(m[1]);
+    const mi = m[2] ? Number(m[2]) : 0;
+    if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
+    found.push(h + mi / 60);
+  }
+  if (found.length === 0) return null;
+  const [a, b] = [found[0], found.length > 1 ? found[1] : found[0]];
+  // 「21:00〜翌1:00」のように後ろが小さいときは、またいだものとして1日足す
+  return [a, b < a ? b + 24 : b];
+}

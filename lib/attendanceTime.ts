@@ -210,3 +210,68 @@ export async function setAttendanceTime(
   });
   return pick(decodeAll(raw), eventDate);
 }
+
+/* ============================================================
+   本人が書いた字から、時刻を読む（できる範囲で）
+   ------------------------------------------------------------
+   ここに入るのは「13時ごろ」「15時半ころ」「19:00頃」「仕事が終わり次第」のような
+   人の言い方で、形は決まっていない。だから必ず読めるとは限らない。
+
+   読める範囲で読んで、読めなければ null を返す。
+   使う側は null を「分からない」として扱うこと。「いない」にしてはいけない
+   （読めなかっただけの人を、部屋割りの候補から落としてしまう）。
+
+   ★ 当てにしすぎないこと
+     ここは目安であって、当日の本当の出入りではない。
+     部屋割りを組むのは役員（人）で、この値はその手がかりにすぎない。
+   ============================================================ */
+
+/** 「1時間遅れます」のような長さの言い方。時刻として読むと 1:00 になってしまう。 */
+const DURATION = /時間|分間|ぐらい遅|くらい遅/;
+
+/**
+ * 時刻を「時」の小数で返す（15:30 → 15.5）。読めなければ null。
+ *   "15:00" → 15      "19:00頃" → 19     "16時頃" → 16
+ *   "15時半ころ" → 15.5                  "12時半頃" → 12.5
+ *   "未定" / "" / "仕事が終わり次第" → null
+ */
+export function parseWhenHour(v: string): number | null {
+  const s = (v ?? "").trim();
+  if (!s || s === TIME_UNKNOWN) return null;
+  if (DURATION.test(s)) return null;
+
+  // 15:30 / 15：30
+  const colon = s.match(/(\d{1,2})\s*[:：]\s*(\d{1,2})/);
+  if (colon) return hour(Number(colon[1]), Number(colon[2]));
+
+  // 15時半
+  const half = s.match(/(\d{1,2})\s*時\s*半/);
+  if (half) return hour(Number(half[1]), 30);
+
+  // 15時 / 15時30分
+  const ji = s.match(/(\d{1,2})\s*時\s*(\d{1,2})?\s*分?/);
+  if (ji) return hour(Number(ji[1]), ji[2] ? Number(ji[2]) : 0);
+
+  return null;
+}
+
+function hour(h: number, m: number): number | null {
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h + m / 60;
+}
+
+/**
+ * その人が、ある時間の枠にいるか。
+ *   span   … 枠の [はじまり, おわり]（時の小数）。おわりが無い枠は2つとも同じ値で渡す。
+ *   t      … その人の来る時間・帰る時間。読めない値は「分からない」として広くとる。
+ * 分からないほうへは倒さない ── 読めなければ「いる」とする。
+ * 落とすのは、はっきり「その枠より後に来る」「その枠より前に帰る」と読めたときだけ。
+ */
+export function isHereDuring(span: [number, number], t: AttendanceTime | null | undefined): boolean {
+  const [s, e] = span;
+  const arrive = parseWhenHour(t?.in ?? "") ?? Number.NEGATIVE_INFINITY;
+  const leave = parseWhenHour(t?.out ?? "") ?? Number.POSITIVE_INFINITY;
+  // おわりのある枠は重なりで見る。時刻ひとつの枠は、その時刻にいるかで見る。
+  return e > s ? arrive < e && leave > s : arrive <= s && leave > s;
+}

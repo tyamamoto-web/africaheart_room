@@ -114,6 +114,7 @@ import {
   EMPTY_TIME,
   TIME_UNKNOWN,
   countAttendanceTimes,
+  isHereDuring,
   formatAttendanceTime,
   isEmptyTime,
   readAttendanceTimes,
@@ -130,7 +131,7 @@ import { archiveBeforeRollover } from "@/lib/roundArchive";
 import { downloadFile, isIOS } from "@/lib/media";
 import {
   blankTimetableRow,
-  joinNames,
+  parseSpanHours,
   readTimetable,
   saveTimetable,
   splitNames,
@@ -1203,25 +1204,34 @@ function BeforeScreen({
 const HAIR = `1px solid ${LINE}`;
 const EMPTY_PLAN_ROWS = 4;
 
-/* 入力欄に出すための形。名前は「、」区切りの文字のまま持つ。
+/* 入力欄に出すための形。名前はチェックで選ぶので、配列のまま持つ
+   （10/30 までは「、」区切りの文字だった）。
    部屋は「呼び名（A・B）」と「当日の実際の番号（26・32）」の2つに分けてある。
    呼び名はLINEの告知や打ち合わせで使う言い方なので、番号を入れても消えない。 */
-type PlanDraft = { time: string; room: string; title: string; names: string; roomNo: string };
+type PlanDraft = { time: string; room: string; title: string; names: string[]; roomNo: string };
 const toDraft = (r: TimetableRow): PlanDraft => ({
   time: r.time,
   room: r.room,
   title: r.title,
-  names: joinNames(r.names),
+  names: [...r.names],
   roomNo: r.roomNo ?? "",
 });
 const fromDraft = (d: PlanDraft): TimetableRow => ({
   time: d.time,
   room: d.room,
   title: d.title,
-  names: splitNames(d.names),
+  names: d.names,
   roomNo: d.roomNo,
 });
-const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: "", roomNo: "" });
+const blankDraft = (): PlanDraft => ({ time: "", room: "", title: "", names: [], roomNo: "" });
+
+/* 名前の並びを、出欠に出ている順（＝会員名簿の順）にそろえる。
+   名簿に無い名前（当日に来たゲストなど）は、打った順のまま後ろに残す。
+   表の見た目を回ごとにそろえるためで、中身は増えも減りもしない。 */
+const orderNames = (names: string[], order: string[]): string[] => [
+  ...order.filter((n) => names.includes(n)),
+  ...names.filter((n) => !order.includes(n)),
+];
 
 /* いま出てくる部屋の呼び名（出てきた順。呼び名が空の行は数えない）。
    「部屋番号をまとめて入れる」欄の並びは、これで決まる。
@@ -1235,7 +1245,149 @@ const distinctRooms = (ds: PlanDraft[]): string[] => {
   return out;
 };
 
-function RoomPlan({ attendeeCount, heading }: { attendeeCount: number; heading: PlanHeading }) {
+/* ── 名前のチェックリスト ───────────────────────
+   その行の時間にいる人だけを出して、チェックで選ぶ。
+   いるかどうかは、出欠で「参加」と出した人の、来る時間・帰る時間から決める
+   （lib/attendanceTime.ts の isHereDuring）。本人が書いた字は形が決まっていないので、
+   読めないものは「分からない」＝いるほうに倒す。落とすのは、はっきり
+   「あとから来る」「先に帰る」と読めたときだけ。
+
+   読み違いや当日の変更に備えて、逃げ道を2つ置いてある。
+     ・「この時間にいない人も出す」… 外れた人を出して、手で入れられる
+     ・いちばん下の入力欄      … 名簿にも出欠にも無い人を足せる
+   すでに入っている名前は、どちらにも当てはまらなくても必ず出す（消えないように）。 */
+function PlanNames({
+  index,
+  draft,
+  attendees,
+  times,
+  onToggle,
+  onAdd,
+}: {
+  index: number;
+  draft: PlanDraft;
+  attendees: string[];
+  times: AttendanceTimeMap;
+  onToggle: (name: string) => void;
+  onAdd: (text: string) => void;
+}) {
+  const [showAway, setShowAway] = useState(false);
+  const [adding, setAdding] = useState("");
+
+  const span = parseSpanHours(draft.time);
+  // 時間が読めない行は、絞り込まずに全員を出す（絞って人を隠すより安全）
+  const here = span ? attendees.filter((n) => isHereDuring(span, times[n])) : attendees;
+  const away = attendees.filter((n) => !here.includes(n));
+  // 出欠に出ていないのに、もう入っている名前（ゲストなど）。消さずに必ず出す。
+  const extra = draft.names.filter((n) => !attendees.includes(n));
+
+  const chip = (name: string, tone: "here" | "away" | "extra") => {
+    const on = draft.names.includes(name);
+    return (
+      <button
+        key={name}
+        type="button"
+        role="checkbox"
+        aria-checked={on}
+        onClick={() => onToggle(name)}
+        style={{
+          padding: "7px 12px",
+          borderRadius: 999,
+          border: `1px solid ${on ? INK : LINE}`,
+          background: on ? INK : "#FFFFFF",
+          color: on ? "#FFFFFF" : tone === "here" ? INK : DIM,
+          fontSize: 13,
+          fontWeight: on ? 700 : 500,
+          lineHeight: 1.2,
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {name}
+        {tone !== "here" && !on ? "" : null}
+      </button>
+    );
+  };
+
+  const add = () => {
+    const t = adding.trim();
+    if (!t) return;
+    onAdd(t);
+    setAdding("");
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: DIM, letterSpacing: "0.06em" }}>名前</span>
+        <span style={{ fontSize: 12, color: SUB }}>
+          {draft.names.length === 0 ? "選ばなければ「全員」" : `${draft.names.length}名`}
+        </span>
+      </div>
+
+      {here.length === 0 && extra.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
+          {attendees.length === 0
+            ? "出欠席がまだ読めていません。下の欄から名前を入れられます。"
+            : "この時間にいる人がいません。下の「この時間にいない人も出す」から選べます。"}
+        </p>
+      ) : (
+        <div role="group" aria-label={`${index + 1}行目の名前`} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {here.map((n) => chip(n, "here"))}
+          {extra.map((n) => chip(n, "extra"))}
+        </div>
+      )}
+
+      {away.length > 0 && (
+        <>
+          <button
+            type="button"
+            className="md-edit"
+            aria-expanded={showAway}
+            style={{ justifySelf: "start" }}
+            onClick={() => setShowAway((v) => !v)}
+          >
+            {showAway ? "閉じる" : `この時間にいない人も出す（${away.length}名）`}
+          </button>
+          {showAway && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{away.map((n) => chip(n, "away"))}</div>
+          )}
+        </>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 6 }}>
+        <input
+          className="md-field"
+          value={adding}
+          placeholder="一覧に無い人を足す"
+          aria-label={`${index + 1}行目に、一覧に無い人を足す`}
+          onChange={(e) => setAdding(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <button type="button" className="md-addrow" style={{ padding: "0 16px" }} onClick={add}>
+          足す
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RoomPlan({
+  attendeeCount,
+  attendees,
+  times,
+  heading,
+}: {
+  attendeeCount: number;
+  attendees: string[];
+  times: AttendanceTimeMap;
+  heading: PlanHeading;
+}) {
   // null は「まだ読んでいる」。読めたら配列（0行もありうる）。
   const [rows, setRows] = useState<TimetableRow[] | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1270,8 +1422,38 @@ function RoomPlan({ attendeeCount, heading }: { attendeeCount: number; heading: 
      だから何を打っても、消しても、A室B室の区別が消えることはない。 */
   const setRoomNo = (room: string, no: string) =>
     setEdit((ds) => ds.map((d) => (d.room.trim() === room ? { ...d, roomNo: no } : d)));
-  const setField = (i: number, key: "time" | "room" | "title" | "names", v: string) =>
+  const setField = (i: number, key: "time" | "room" | "title", v: string) =>
     setEdit((ds) => ds.map((d, n) => (n === i ? { ...d, [key]: v } : d)));
+  /* 名前のチェックを付け外しする。並びは出欠（＝名簿）の順にそろえる。 */
+  const toggleName = (i: number, name: string) =>
+    setEdit((ds) =>
+      ds.map((d, n) =>
+        n !== i
+          ? d
+          : {
+              ...d,
+              names: orderNames(
+                d.names.includes(name) ? d.names.filter((x) => x !== name) : [...d.names, name],
+                attendees
+              ),
+            }
+      )
+    );
+  /* 一覧に無い人を足す。「、」で区切れば一度に何人でも。すでに入っている名前は増やさない。 */
+  const addNames = (i: number, text: string) =>
+    setEdit((ds) =>
+      ds.map((d, n) =>
+        n !== i
+          ? d
+          : {
+              ...d,
+              names: orderNames(
+                [...d.names, ...splitNames(text).filter((x) => !d.names.includes(x))],
+                attendees
+              ),
+            }
+      )
+    );
   const removeRow = (i: number) => setEdit((ds) => ds.filter((_, n) => n !== i));
   const addRow = () => setEdit((ds) => [...ds, blankDraft()]);
 
@@ -1402,13 +1584,13 @@ function RoomPlan({ attendeeCount, heading }: { attendeeCount: number; heading: 
                 aria-label={`${i + 1}行目の企画`}
                 onChange={(e) => setField(i, "title", e.target.value)}
               />
-              <textarea
-                className="md-field md-field--area"
-                value={d.names}
-                rows={2}
-                placeholder="名前（「、」で区切る。空なら全員）"
-                aria-label={`${i + 1}行目の名前`}
-                onChange={(e) => setField(i, "names", e.target.value)}
+              <PlanNames
+                index={i}
+                draft={d}
+                attendees={attendees}
+                times={times}
+                onToggle={(n) => toggleName(i, n)}
+                onAdd={(t) => addNames(i, t)}
               />
             </div>
           ))}
@@ -1422,7 +1604,8 @@ function RoomPlan({ attendeeCount, heading }: { attendeeCount: number; heading: 
             <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: ACC_TEXT }}>{error}</p>
           ) : (
             <p style={{ margin: 0, fontSize: 12, lineHeight: 1.8, color: DIM }}>
-              名前が空の行は「全員」として出ます。同じ時間の行は、表では1つの時間にまとまります。
+              名前は、その時間にいる人だけを出しています（出欠席の「来る時間・帰る時間」から決めています）。
+              誰も選ばなければ「全員」として出ます。同じ時間の行は、表では1つの時間にまとまります。
               何も入っていない行は残りません。保存すると、会員それぞれの端末から同じものが見られます。
             </p>
           )}
@@ -1444,12 +1627,22 @@ function RoomPlan({ attendeeCount, heading }: { attendeeCount: number; heading: 
 }
 
 /* ── 当日の画面 ─────────────────────────────── */
-function DayScreen({ attendeeCount, heading }: { attendeeCount: number; heading: PlanHeading }) {
+function DayScreen({
+  attendeeCount,
+  attendees,
+  times,
+  heading,
+}: {
+  attendeeCount: number;
+  attendees: string[];
+  times: AttendanceTimeMap;
+  heading: PlanHeading;
+}) {
   return (
     <>
       {/* 部屋割と当日の流れは一体なので、ひとつの表にまとめてある。
           次のコマも表に載るので、「このあと」のような別の欄は置かない。 */}
-      <RoomPlan attendeeCount={attendeeCount} heading={heading} />
+      <RoomPlan attendeeCount={attendeeCount} attendees={attendees} times={times} heading={heading} />
     </>
   );
 }
@@ -2771,6 +2964,9 @@ export default function MemberDraft({
           {phase === "day" && (
             <DayScreen
               attendeeCount={countAttendance(attendance, names).going}
+              /* 部屋割りのチェックリストに出す顔ぶれ。参加と出した人だけを、名簿の順で。 */
+              attendees={names.filter((n) => attendance[n] === "going")}
+              times={times}
               heading={{
                 title: "アフリカハート カラオケオフ会 部屋割り",
                 when: [formatDate(draft.date) ?? "", draft.start && draft.end ? `${draft.start} 〜 ${draft.end}` : draft.start]
