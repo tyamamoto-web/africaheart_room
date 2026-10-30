@@ -241,18 +241,22 @@ export default function PlanTable({
     }
     return (
       <>
-        {/* 名前は「・」で区切って続けて出す。1人ぶんを nowrap にしてあるので、
-            長い呼び名が「あいう」「えお」のように途中で割れない。
-            9/25 まではすきま（gap）だけで区切っていたが、2人が1行に並ぶと
-            どこまでが1人の名前か読み取りにくかった。 */}
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "1px 0" }}>
+        {/* 名前は1人1行の箇条書きにする（10/30）。
+            9/25 から「・」でつないで続けて出していたが、1つのマスに5人も6人も
+            入ると、どこまでが1人の名前か読み取れなくなった。企画の欄と同じ形にそろえる。
+            「・」と名前を別の箱に分けるのは、ひとつの文字列にすると中黒のうしろで
+            折れて「・」だけが行に残るため（企画の欄と同じ）。 */}
+        <div style={{ display: "inline-block", textAlign: "left" }}>
           {shown.map((n, k) => (
-            <span
-              key={`${n}-${k}`}
-              style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45, color: T.ink, whiteSpace: "nowrap" }}
-            >
-              {n}
-              {k < shown.length - 1 ? <span style={{ color: T.dim, fontWeight: 400 }}>・</span> : null}
+            <span key={`${n}-${k}`} style={{ display: "flex", alignItems: "baseline" }}>
+              <span style={{ flex: "0 0 auto", color: T.dim, fontWeight: 400, fontSize: 12, lineHeight: 1.45 }}>
+                ・
+              </span>
+              <span
+                style={{ flex: "1 1 auto", minWidth: 0, fontSize: 12, fontWeight: 600, lineHeight: 1.45, color: T.ink }}
+              >
+                {n}
+              </span>
             </span>
           ))}
         </div>

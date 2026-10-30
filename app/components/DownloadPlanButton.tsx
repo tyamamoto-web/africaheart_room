@@ -59,11 +59,19 @@ function wrapTitle(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
     .map((t) => t.trim())
     .filter((t) => t !== "");
   if (parts.length < 2) return wrapText(ctx, text, maxWidth);
+  return bulletLines(ctx, parts, maxWidth);
+}
+
+/* いくつかの言葉を、1つ1行の箇条書きにする。
+   長くて入りきらないものは文字で折り、続きは頭の「・」のぶんだけ字下げしてぶら下げる。 */
+function bulletLines(ctx: CanvasRenderingContext2D, parts: string[], maxWidth: number): string[] {
   const indent = "\u3000"; // 全角の空白1つ。「・」のぶんの字下げ
+  const w = maxWidth - ctx.measureText("\u30fb").width;
   const out: string[] = [];
-  for (const part of parts) {
-    const lines = wrapText(ctx, part, maxWidth - ctx.measureText("\u30fb").width);
-    lines.forEach((ln, i) => out.push((i === 0 ? "\u30fb" : indent) + ln));
+  for (const raw of parts) {
+    const part = raw.trim();
+    if (!part) continue;
+    wrapText(ctx, part, w).forEach((ln, i) => out.push((i === 0 ? "\u30fb" : indent) + ln));
   }
   return out;
 }
@@ -94,35 +102,6 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
     lines.push(cur);
   }
   return lines.length ? lines : [""];
-}
-
-/**
- * 名前の列は、名前の切れ目（「・」）でだけ折る。
- * 1文字ずつ折ると「あいう」「えお」のように呼び名が途中で割れて読みにくい。
- * 1つで幅に入りきらない長い名前だけは、やむをえず文字で折る。
- */
-function wrapJoined(ctx: CanvasRenderingContext2D, parts: string[], maxWidth: number): string[] {
-  const lines: string[] = [];
-  let cur = "";
-  for (const raw of parts) {
-    const part = raw.trim();
-    if (!part) continue;
-    const test = cur ? `${cur}・${part}` : part;
-    if (ctx.measureText(test).width <= maxWidth || !cur) {
-      cur = test;
-      continue;
-    }
-    lines.push(`${cur}・`); // 続きがあることが分かるよう、中黒は行の終わりに残す
-    cur = part;
-  }
-  if (cur) lines.push(cur);
-  // 1つで入りきらない名前は、ここで文字ごとに折る
-  const out: string[] = [];
-  for (const ln of lines) {
-    if (ctx.measureText(ln).width <= maxWidth) out.push(ln);
-    else out.push(...wrapText(ctx, ln, maxWidth));
-  }
-  return out.length ? out : [""];
 }
 
 /** 「13:20〜14:20」を開始と終了に分ける。区切りが無ければ全部を開始として出す。 */
@@ -202,8 +181,9 @@ function buildAndDownload(
     // 全員の行は、その時間にいる人が分かればその名前を描く（分からなければ「全員（◯名）」）
     const shown = all ? peopleFor?.(r, i) ?? [] : r.names;
     meas.font = nameFont;
+    // 名前も1人1行の箇条書きにする（画面の表と同じ。10/30）
     const nameLines = shown.length
-      ? wrapJoined(meas, shown.map(stripEmoji), colW[3] - 20)
+      ? bulletLines(meas, shown.map(stripEmoji), colW[3] - 20)
       : [total > 0 ? `全員（${total}名）` : "全員"];
     meas.font = noteFont;
     const noteLines = r.note ? wrapText(meas, stripEmoji(r.note), tableW - 40) : [];
@@ -380,18 +360,23 @@ function buildAndDownload(
       const cx = colX[3] + colW[3] / 2;
       const block = b.nameLines.length * 25 + (b.shown.length ? 20 : 0);
       let ny = mid - block / 2 + 12;
+      // 箇条書きのときは左ぞろえ（中央ぞろえだと行ごとに「・」の位置がずれる）
+      const bullets = b.nameLines.some((ln) => ln.startsWith("\u30fb"));
+      const nx = bullets ? colX[3] + 14 : cx;
       for (const ln of b.nameLines) {
         // 名前を1つも出せない「全員」の行だけ、大きめの字で1行だけ描く
-        haloText(ln, cx, ny, b.shown.length === 0 ? `800 20px ${FONT}` : nameFont, INK);
+        haloText(ln, nx, ny, b.shown.length === 0 ? `800 20px ${FONT}` : nameFont, INK, bullets ? "left" : "center");
         ny += 25;
       }
       if (b.shown.length) {
+        // 人数も、箇条書きのときは名前の頭にそろえる（中央だと名前から離れて見える）
         haloText(
           b.all ? `全員（${b.shown.length}名）` : `${b.shown.length}名`,
-          cx,
+          nx,
           ny + 2,
           `700 13px ${FONT}`,
-          SUB
+          SUB,
+          bullets ? "left" : "center"
         );
       }
     }
