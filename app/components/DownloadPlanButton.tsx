@@ -311,15 +311,27 @@ function buildAndDownload(
       ctx.restore();
     }
 
-    // 行のあいだの横線（いちばん下は外枠にまかせる）
+    /* 行のあいだの横線（いちばん下は外枠にまかせる）。
+       つないだマスの中は横切らない ── 次の行が同じ時間（または同じ企画）の続きなら、
+       その列だけ線を飛ばす。10/30 まで端から端まで引いていて、
+       画像では「15:00」と「〜16:00」のあいだに線が入ってしまっていた
+       （画面の表は、マスをつないでいるのでブラウザが自動でそうしている）。 */
     if (idx < built.length - 1) {
+      const next = spans[idx + 1];
+      const segs: [number, number][] = [];
+      if (next.time > 0) segs.push([x0, colX[1]]); // 時間
+      segs.push([colX[1], colX[2]]); // 部屋（つながない）
+      if (next.title > 0) segs.push([colX[2], colX[3]]); // 企画
+      segs.push([colX[3], x0 + tableW]); // 名前（つながない）
       ctx.save();
       ctx.strokeStyle = LINE;
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x0, y + rh);
-      ctx.lineTo(x0 + tableW, y + rh);
-      ctx.stroke();
+      for (const [a, b2] of segs) {
+        ctx.beginPath();
+        ctx.moveTo(a, y + rh);
+        ctx.lineTo(b2, y + rh);
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
