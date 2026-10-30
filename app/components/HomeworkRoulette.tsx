@@ -1,7 +1,8 @@
 "use client";
 
 /* ============================================================
-   宿題ルーレット：宿題リストからテーマを3つ抽選
+   課題ルーレット：課題リストからテーマを3つ抽選
+   （保存先のテーブル名と機能のidは homework のまま。画面の言い方だけ 10/30 に変えた）
    ------------------------------------------------------------
    もとは会員メニュー（app/test/page.tsx）の中に直接書いてあったものを、
    9/6 にこのファイルへそのまま切り出した（中身は変えていない）。
@@ -22,7 +23,7 @@ import {
   type ThemeRow,
 } from "@/lib/homework";
 
-/* ── 宿題ルーレット：宿題リストからテーマを3つ抽選 ──── */
+/* ── 課題ルーレット：課題リストからテーマを3つ抽選 ──── */
 // 候補テーマは Supabase(homework_themes) で全員共有。月ごとに区分け（1〜12月）、各月 MAX_PER_MONTH 件まで。
 // DEFAULT_THEMES は未設定時のフォールバック表示用（テーブルが無いときだけ現在の月に出す）。
 const HW_RESULT_KEY = "africaheart_homework_result_v1"; // 抽選結果（DB未設定時のローカル控え）
@@ -162,7 +163,7 @@ export default function HomeworkRoulette() {
         // 未設定時は現在の月にだけ初期リストを出して抽選だけは可能に（追加/削除は無効）
         setAllThemes(DEFAULT_THEMES.map((text) => ({ month: currentMonth(), text })));
       } else {
-        errMsg = e instanceof Error ? e.message : "宿題リストの同期に失敗しました";
+        errMsg = e instanceof Error ? e.message : "課題リストの同期に失敗しました";
       }
     }
 
@@ -242,7 +243,7 @@ export default function HomeworkRoulette() {
   }
 
   async function reset() {
-    if (decided.length > 0 && !confirm("みんなで共有している宿題結果をリセットします。よろしいですか？")) return;
+    if (decided.length > 0 && !confirm("みんなで共有している課題結果をリセットします。よろしいですか？")) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     if (landRef.current) clearTimeout(landRef.current);
     setDecided([]);
@@ -332,7 +333,7 @@ export default function HomeworkRoulette() {
         </div>
       </div>
 
-      {/* 宿題リストの編集（応募）。会員がふだんするのはこちらなので、ルーレットより上に置く（9/21）。
+      {/* 課題リストの編集（応募）。会員がふだんするのはこちらなので、ルーレットより上に置く（9/21）。
           ルーレットは抽選のときに役員が回すだけで、いつも目立っている必要はない。 */}
       <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid #efe9e1" }}>
         <button
@@ -341,7 +342,7 @@ export default function HomeworkRoulette() {
           style={{ background: "#faf8f5" }}
         >
           <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#bbb" }}>
-            宿題を応募する（{monthThemes.length}/{MAX_PER_MONTH}）
+            課題を応募する（{monthThemes.length}/{MAX_PER_MONTH}）
           </span>
           <span className="text-xs font-black" style={{ color: "#C81E77" }}>
             {showEdit ? "閉じる" : "開く"}
@@ -394,7 +395,7 @@ export default function HomeworkRoulette() {
               </button>
             </div>
             <p className="text-[11px] leading-relaxed" style={{ color: "#bbb" }}>
-              宿題リストは12ヶ月分、各月{MAX_PER_MONTH}曲まで登録できます。全員で共有され、約5秒ごとに最新へ更新（同じ月の重複は防止）。抽選は選択中の月の曲から行われ、決定済みは除外されます。
+              課題リストは12ヶ月分、各月{MAX_PER_MONTH}曲まで登録できます。全員で共有され、約5秒ごとに最新へ更新（同じ月の重複は防止）。抽選は選択中の月の曲から行われ、決定済みは除外されます。
             </p>
           </div>
         )}
@@ -464,7 +465,7 @@ export default function HomeworkRoulette() {
             <span className="text-sm font-bold" style={{ color: "#c2b6a6" }}>
               ボタンを押して
               <br />
-              今回の宿題テーマを決めよう
+              今回の課題テーマを決めよう
             </span>
           )}
         </div>
@@ -478,7 +479,7 @@ export default function HomeworkRoulette() {
             style={{ background: "#FCEFF5", border: "1.5px solid #F3CFE1" }}
           >
             <p className="text-sm font-black" style={{ color: "#C81E77" }}>
-              今回の宿題テーマが決定しました
+              今回の課題テーマが決定しました
             </p>
             <p className="text-base font-black mt-1.5" style={{ color: "#2c2c2c" }}>
               {decided.join(" / ")}
@@ -525,17 +526,17 @@ export default function HomeworkRoulette() {
 
       {pool.length === 0 && !done && (
         <p className="text-xs text-center" style={{ color: "#c0392b" }}>
-          {selMonth}月の候補曲がありません。上の「宿題を応募する」から追加してください。
+          {selMonth}月の候補曲がありません。上の「課題を応募する」から追加してください。
         </p>
       )}
 
       {needsSetup ? (
         <p className="text-[11px] text-center leading-relaxed" style={{ color: "#bbb" }}>
-          共有設定が未完了のため、初期リストを表示中です（宿題リストと結果を全員で共有するには設定が必要です）
+          共有設定が未完了のため、初期リストを表示中です（課題リストと結果を全員で共有するには設定が必要です）
         </p>
       ) : (
         <p className="text-[11px] text-center" style={{ color: "#bbb" }}>
-          {lastBy ? `最終更新: ${lastBy}・` : ""}宿題リストも結果も全員で共有・保存されます
+          {lastBy ? `最終更新: ${lastBy}・` : ""}課題リストも結果も全員で共有・保存されます
         </p>
       )}
     </div>

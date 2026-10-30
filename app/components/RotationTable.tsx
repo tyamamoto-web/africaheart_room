@@ -39,7 +39,7 @@ const eventShad: Record<string, string> = {
 
 // 会員メニュー(/test)の該当タブへのリンク（宿題タイム→宿題ルーレット等）
 const featureLink: Record<string, { href: string; hint: string }> = {
-  homework: { href: "/test?tab=homework", hint: "タップで宿題ルーレットへ" },
+  homework: { href: "/test?tab=homework", hint: "タップで課題ルーレットへ" },
   duet:     { href: "/test?tab=duet",     hint: "タップでデュエット曲リストへ" },
 };
 

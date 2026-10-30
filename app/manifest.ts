@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "アフリカハート",
     short_name: "アフリカハート",
-    description: "社会人カラオケサークル「アフリカハート」の会員アプリ（部屋割り・デュエット曲・宿題ルーレット・プロフィール）",
+    description: "社会人カラオケサークル「アフリカハート」の会員アプリ（部屋割り・デュエット曲・課題ルーレット・プロフィール）",
     lang: "ja",
     start_url: "/",
     scope: "/",

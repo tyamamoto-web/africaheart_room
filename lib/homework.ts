@@ -60,7 +60,7 @@ export async function getHomework(): Promise<Homework> {
   if (!res.ok) {
     const txt = await readText(res);
     if (looksMissingTable(res.status, txt)) throw new HomeworkSetupError();
-    throw new Error(`宿題結果の取得に失敗しました (${res.status})`);
+    throw new Error(`課題結果の取得に失敗しました (${res.status})`);
   }
   const rows = (await res.json()) as Array<{
     themes?: string[];
@@ -91,7 +91,7 @@ export async function saveHomework(themes: string[], by: string): Promise<void> 
   if (!res.ok) {
     const txt = await readText(res);
     if (looksMissingTable(res.status, txt)) throw new HomeworkSetupError();
-    throw new Error(`宿題結果の保存に失敗しました (${res.status})`);
+    throw new Error(`課題結果の保存に失敗しました (${res.status})`);
   }
 }
 
@@ -110,7 +110,7 @@ export async function listThemes(): Promise<ThemeRow[]> {
   if (!res.ok) {
     const txt = await readText(res);
     if (looksMissingTable(res.status, txt)) throw new HomeworkSetupError();
-    throw new Error(`宿題リストの取得に失敗しました (${res.status})`);
+    throw new Error(`課題リストの取得に失敗しました (${res.status})`);
   }
   const rows = (await res.json()) as Array<{ month?: number; text?: string }>;
   return Array.isArray(rows)
