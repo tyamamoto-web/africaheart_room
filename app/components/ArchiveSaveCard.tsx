@@ -164,7 +164,8 @@ type Loaded = {
   names: string[];
   /** 出欠で参加なのに、部屋割りに名前が無い人 */
   extras: string[];
-  note: string;
+  /** 来る時間・帰る時間。補足の下書きを作り直すのに要る */
+  times: AttendanceTimeMap;
 };
 
 export default function ArchiveSaveCard({
@@ -178,7 +179,14 @@ export default function ArchiveSaveCard({
 }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [note, setNote] = useState("");
+  /* 役員が補足に手を入れたか。入れたあとは、下書きで上書きしない。 */
+  const [edited, setEdited] = useState(false);
   const [withExtras, setWithExtras] = useState(false);
+  /* 合言葉が済んでいるか。sessionStorage を押すたびに見に行かない ──
+     保存が例外になる端末（すべてのCookieをブロックなど）では unlockOfficer が
+     true を返しても読み出しは false のままで、確かめから先へ進めなくなる。
+     ほかの役員画面（OfficerGate・SurveyFeature・GalleryFeature）と同じ持ち方。 */
+  const [unlocked, setUnlocked] = useState(false);
   /* ボタンの段取り。"" ＝ ふだん／"ask" ＝ 合言葉を聞いている／"confirm" ＝ 上書きの確かめ */
   const [step, setStep] = useState<"" | "ask" | "confirm">("");
   const [pass, setPass] = useState("");
@@ -208,14 +216,30 @@ export default function ArchiveSaveCard({
       const extras = Object.keys(going)
         .filter((n) => going[n] === "going" && !names.includes(n))
         .sort();
-      const draft = draftNote(rows, names, times);
-      setData({ overview, rows, names, extras, note: draft });
-      setNote(draft);
+      setData({ overview, rows, names, extras, times });
+      setUnlocked(isOfficerUnlocked());
     })();
     return () => {
       alive = false;
     };
   }, []);
+
+  /* 記録に残す顔ぶれ。アーカイブの「参加 N名」はこれを数えて出る。 */
+  const people = useMemo(
+    () => (withExtras && data ? [...data.names, ...data.extras] : (data?.names ?? [])),
+    [withExtras, data]
+  );
+
+  /* 補足の下書き。参加者と同じ顔ぶれから作るので、「部屋割りに名前が無い人も
+     入れる」を切り替えると人数も遅刻・早退も付いてくる。
+     役員が手を入れたあとは触らない（書いたものを消さない）。 */
+  const draft = useMemo(
+    () => (data ? draftNote(data.rows, people, data.times) : ""),
+    [data, people]
+  );
+  useEffect(() => {
+    if (!edited) setNote(draft);
+  }, [draft, edited]);
 
   /* 残せない理由。空なら残せる。 */
   const blocked = useMemo(() => {
@@ -230,8 +254,7 @@ export default function ArchiveSaveCard({
 
   if (!data) return null;
 
-  const { overview, rows, names, extras } = data;
-  const people = withExtras ? [...names, ...extras] : names;
+  const { overview, rows, extras } = data;
   /* この回がもう記録にあるか。親がまだ読み終わっていなければ、無いものとして出す
      （押したときに findRoundRecord でもう一度、はっきり確かめる）。 */
   const saved = stored?.some((r) => r.key === overview.date) ?? false;
@@ -275,7 +298,7 @@ export default function ArchiveSaveCard({
   function press() {
     setError("");
     setDone("");
-    if (!isOfficerUnlocked()) {
+    if (!unlocked && !isOfficerUnlocked()) {
       setStep("ask");
       return;
     }
@@ -294,6 +317,7 @@ export default function ArchiveSaveCard({
       setPass("");
       return;
     }
+    setUnlocked(true);
     setPass("");
     setError("");
     if (saved) {
@@ -377,7 +401,10 @@ export default function ArchiveSaveCard({
             <textarea
               id="as-note"
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setEdited(true);
+              }}
               rows={3}
               className="as-note"
             />
