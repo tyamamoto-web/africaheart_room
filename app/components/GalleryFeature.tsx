@@ -801,7 +801,9 @@ export default function GalleryFeature() {
   const [panel, setPanel] = useState<"view" | "upload">("view");
   const [officer, setOfficer] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  /* 選んだものへの操作（まとめて保存・まとめて消す）の結果を、どちらも同じ1行に出す。 */
+  const [pickMsg, setPickMsg] = useState("");
   const [reloading, setReloading] = useState(false);
   /* いまの回は開催の概要から決まる（lib/currentRound.ts）。
      ready になるまでは、どのフォルダを読むかが決まっていないので読みにいかない。 */
@@ -881,7 +883,7 @@ export default function GalleryFeature() {
     setItems([]);
     setSelecting(false);
     setPicked([]);
-    setSaveMsg("");
+    setPickMsg("");
     setViewIdx(null);
     setChosen(key);
   };
@@ -919,7 +921,7 @@ export default function GalleryFeature() {
 
   async function savePicked() {
     setSaving(true);
-    setSaveMsg("");
+    setPickMsg("");
     const targets = pickedShown;
     let ok = 0;
     for (let n = 0; n < targets.length; n++) {
@@ -935,7 +937,40 @@ export default function GalleryFeature() {
       }
     }
     setSaving(false);
-    setSaveMsg(`${ok}件を保存しました`);
+    setPickMsg(`${ok}件を保存しました`);
+  }
+
+  /**
+   * 選んだものをまとめて消す（運営）。
+   * 1件ずつの「この1件を消す」と同じ消し方（lib/gallery.ts の deleteFromGallery。
+   * 一覧用の小さい画像も一緒に消える）を、選んだぶんだけ繰り返す。
+   * 1件だめでも止めずに次へ進み、消せなかったぶんだけ選んだままにして、
+   * 何が残ったのかが画面で分かるようにする。
+   */
+  async function deletePicked() {
+    const targets = pickedShown;
+    if (targets.length === 0) return;
+    if (!window.confirm(`選んだ${targets.length}件を消します。元に戻せません。`)) return;
+    setDeleting(true);
+    setPickMsg("");
+    const failed: string[] = [];
+    let ok = 0;
+    for (const it of targets) {
+      try {
+        await deleteFromGallery(it);
+        ok++;
+      } catch {
+        failed.push(it.path);
+      }
+    }
+    setDeleting(false);
+    setPicked(failed);
+    setPickMsg(
+      failed.length === 0
+        ? `${ok}件を消しました`
+        : `${ok}件を消しました（${failed.length}件は消せませんでした）`
+    );
+    await load();
   }
 
   /* 回の選び分け。回が1つしか無いうちは出さない。
@@ -1016,7 +1051,7 @@ export default function GalleryFeature() {
               onClick={() => {
                 setSelecting((v) => !v);
                 setPicked([]);
-                setSaveMsg("");
+                setPickMsg("");
               }}
               className="text-xs font-bold"
               style={{ color: SUB }}
@@ -1173,12 +1208,34 @@ export default function GalleryFeature() {
           >
             {saving ? "保存しています…" : `${pickedShown.length}件をまとめて保存`}
           </button>
+          {/* まとめて消す。消せるのは運営で、いまの回を見ているときだけ
+              （1件ずつの「この1件を消す」と同じ決め方。終わった回は読むだけにして、
+              前の回の写真を押し間違いで消せないようにする）。
+              保存と間違えて押さないように、字だけの控えめなボタンにしてある。 */}
+          {officer && isCurrent && (
+            <button
+              type="button"
+              onClick={() => void deletePicked()}
+              disabled={deleting || saving || pickedShown.length === 0}
+              className="w-full mt-2 py-2 text-xs"
+              style={{ color: SUB, opacity: deleting || saving || pickedShown.length === 0 ? 0.45 : 1 }}
+            >
+              {deleting ? "消しています…" : `${pickedShown.length}件をまとめて消す（運営）`}
+            </button>
+          )}
+          {/* 運営がまだ合言葉を入れていないときは、消すところへの行き方だけ出す
+              （合言葉を聞く場所は「追加（運営）」ひとつにまとめてある）。 */}
+          {isCurrent && !officer && (
+            <p className="text-[11px] mt-2 leading-relaxed" style={{ color: DIM }}>
+              まとめて消すときは、「追加（運営）」で合言葉を入れてから選んでください。
+            </p>
+          )}
           {isIOS() && (
             <p className="text-[11px] mt-2 leading-relaxed" style={{ color: DIM }}>
               iPhoneはまとめて保存が止められることがあります。うまくいかないときは、1枚ずつ開いて保存してください。
             </p>
           )}
-          {saveMsg && <p className="text-xs mt-2 text-center" style={{ color: SUB }}>{saveMsg}</p>}
+          {pickMsg && <p className="text-xs mt-2 text-center" style={{ color: SUB }}>{pickMsg}</p>}
         </div>
       )}
 
