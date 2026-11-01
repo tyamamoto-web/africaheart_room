@@ -32,6 +32,7 @@
    ============================================================ */
 
 import { useEffect, useMemo, useState } from "react";
+import ArchiveSaveCard from "@/app/components/ArchiveSaveCard";
 import PlanTable from "@/app/components/PlanTable";
 import { archiveEvents, mergeArchive } from "@/lib/eventArchive";
 import { readRoundArchive, type RoundRecord } from "@/lib/roundArchive";
@@ -108,6 +109,21 @@ export default function PresidentArchive() {
         <Stat n={events.length} unit="回" label="これまでのオフ会" />
         <Stat n={totalSeats} unit="名" label="のべ参加" />
       </div>
+
+      {/* いまの回を、押すだけで記録に残せるようにする（合言葉つき）。
+          残せないあいだ（開催日がまだ先など）は、この枠そのものが理由だけになる。 */}
+      <ArchiveSaveCard
+        stored={stored}
+        onSaved={(list) => {
+          setStored(list);
+          // 残したばかりの回を開いて見せる（並びの先頭に来る）
+          const key = list[0]?.key ?? "";
+          if (key) {
+            setOpened(true);
+            setOpen([key]);
+          }
+        }}
+      />
 
       <ol style={{ listStyle: "none", margin: "20px 0 0", padding: 0, display: "grid", gap: 12 }}>
         {events.map((ev) => {

@@ -167,12 +167,29 @@ export async function saveRoundRecord(rec: RoundRecord): Promise<RoundRecord[]> 
 }
 
 /**
+ * いま記録に残っているか、はっきり確かめる。読めなければ例外を投げる。
+ *
+ * 「記録に残す」を押したときの、上書きの手前の確かめに使う。
+ * readRoundArchive は読めなくても空で返すので、それを「まだ無い」と取り違えると、
+ * 手で直した補足や参加者を、黙って下書きで塗りつぶしてしまう。
+ */
+export async function findRoundRecord(key: string): Promise<RoundRecord | null> {
+  const list = decodeAll(await readSharedStrict(SHARED_ROW.roundArchive));
+  return list.find((r) => r.key === key) ?? null;
+}
+
+/**
  * リポジトリに凍結してある回（lib/archive.ts と lib/data.ts）。
  * ここへ自動で書くと、アーカイブの画面でリポジトリのぶんを押しのけてしまうので、
  * 開催日を打ち間違えてこの日になったときのために除いておく。
  * lib/eventArchive.ts から引くと import が循環するので、鍵だけを写してある。
  */
 const FROZEN_KEYS = ["2026-08-22", "2026-07-26", "2026-06-27"];
+
+/** その回がリポジトリに凍結してあるか（ここへ書いても画面には出ない）。 */
+export function isFrozenRound(key: string): boolean {
+  return FROZEN_KEYS.includes(key);
+}
 
 /**
  * 開催日を次の回に進める直前に、いまの回を記録へ写す。

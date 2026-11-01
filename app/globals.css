@@ -1063,3 +1063,53 @@ html { scrollbar-width: thin; scrollbar-color: #55524d #e6e3df; }
   color: #1B1C1E;
 }
 @media (prefers-reduced-motion: reduce) { .ar-head { transition: none; } }
+
+/* =========================================================
+   社長室：アーカイブの「この回を記録に残す」（ArchiveSaveCard）
+   ---------------------------------------------------------
+   アーカイブと同じ白地・グレー。入力欄とボタンだけここに置く
+   （:focus と :hover、幅いっぱいの textarea はインラインに書けない）。
+   ========================================================= */
+.as-note {
+  width: 100%;
+  margin-top: 6px;
+  padding: 9px 11px;
+  border: 1px solid #DFE1E4;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #1B1C1E;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.8;
+  resize: vertical;
+}
+.as-note:focus-visible { outline: 2px solid #35373C; outline-offset: -1px; }
+.as-pass {
+  width: 120px;
+  padding: 9px 12px;
+  border: 1px solid #DFE1E4;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #1B1C1E;
+  font-family: inherit;
+  font-size: 13.5px;
+  letter-spacing: 0.18em;
+}
+.as-pass:focus-visible { outline: 2px solid #35373C; outline-offset: -1px; }
+.as-go, .as-cancel {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.as-go { border: none; background: #35373C; color: #FFFFFF; }
+.as-go[disabled] { background: #B9BCC1; cursor: default; }
+.as-cancel { border: 1px solid #DFE1E4; background: #FFFFFF; color: #63666C; }
+@media (hover: hover) and (pointer: fine) {
+  .as-go:not([disabled]):hover { background: #1B1C1E; }
+  .as-cancel:hover { background: #F4F5F6; }
+}
+.as-go:focus-visible, .as-cancel:focus-visible { outline: 2px solid #35373C; outline-offset: 2px; }
