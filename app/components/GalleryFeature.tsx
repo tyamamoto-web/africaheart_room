@@ -161,6 +161,10 @@ function Lightbox({
   const item = items[index];
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  /* 消す前の確かめ。window.confirm は使わない ── プレビュー画面やアプリに
+     埋め込まれたブラウザでは、ダイアログを出さずにそのまま「キャンセル」を
+     返すことがあり、押しても何も起きない。画面の中で二度押しにする。 */
+  const [asking, setAsking] = useState(false);
   const [playFailed, setPlayFailed] = useState(false);
   const touchX = useRef<number | null>(null);
 
@@ -184,6 +188,8 @@ function Lightbox({
   useEffect(() => {
     setPlayFailed(false);
     setMsg("");
+    // 別の1件に移ったら確かめはやり直し（1回目を押したまま隣へ送って、違う1件を消さないため）
+    setAsking(false);
   }, [index]);
 
   useEffect(() => {
@@ -213,7 +219,7 @@ function Lightbox({
   }
 
   async function remove() {
-    if (!window.confirm("この1件を消します。元に戻せません。")) return;
+    setAsking(false);
     try {
       await deleteFromGallery(item);
       onDeleted();
@@ -323,16 +329,36 @@ function Lightbox({
         >
           {saving ? "保存中…" : item.kind === "video" ? "この動画を保存" : "この写真を保存"}
         </button>
-        {canDelete && (
-          <button
-            type="button"
-            onClick={remove}
-            className="w-full mt-2 py-2 text-xs"
-            style={{ color: "#8d8b84" }}
-          >
-            この1件を消す（運営）
-          </button>
-        )}
+        {canDelete &&
+          (asking ? (
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => void remove()}
+                className="flex-1 py-2 text-xs font-bold"
+                style={{ background: "#3a2b2b", color: "#f1efe8", border: "1px solid #6b5450", borderRadius: 8 }}
+              >
+                もう一度押すと、この1件を消します
+              </button>
+              <button
+                type="button"
+                onClick={() => setAsking(false)}
+                className="px-4 py-2 text-xs"
+                style={{ color: "#8d8b84" }}
+              >
+                消さない
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAsking(true)}
+              className="w-full mt-2 py-2 text-xs"
+              style={{ color: "#8d8b84" }}
+            >
+              この1件を消す（運営）
+            </button>
+          ))}
         {msg && <p className="text-xs text-center mt-2" style={{ color: "#d3d1c7" }}>{msg}</p>}
       </div>
     </div>
@@ -802,6 +828,8 @@ export default function GalleryFeature() {
   const [officer, setOfficer] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  /* まとめて消す前の確かめ。1件ずつのときと同じ理由で window.confirm は使わない。 */
+  const [askingDelete, setAskingDelete] = useState(false);
   /* 選んだものへの操作（まとめて保存・まとめて消す）の結果を、どちらも同じ1行に出す。 */
   const [pickMsg, setPickMsg] = useState("");
   const [reloading, setReloading] = useState(false);
@@ -907,6 +935,12 @@ export default function GalleryFeature() {
     return out;
   }, [shown]);
 
+  // 選ぶものを変えたら、消す確かめはやり直し（1回目を押したあとに選び直して、
+  // 思っていたのと違うものを消さないため）
+  useEffect(() => {
+    setAskingDelete(false);
+  }, [picked, filter, round]);
+
   function toggle(path: string) {
     setPicked((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
   }
@@ -949,8 +983,8 @@ export default function GalleryFeature() {
    */
   async function deletePicked() {
     const targets = pickedShown;
+    setAskingDelete(false);
     if (targets.length === 0) return;
-    if (!window.confirm(`選んだ${targets.length}件を消します。元に戻せません。`)) return;
     setDeleting(true);
     setPickMsg("");
     const failed: string[] = [];
@@ -1212,17 +1246,46 @@ export default function GalleryFeature() {
               （1件ずつの「この1件を消す」と同じ決め方。終わった回は読むだけにして、
               前の回の写真を押し間違いで消せないようにする）。
               保存と間違えて押さないように、字だけの控えめなボタンにしてある。 */}
-          {officer && isCurrent && (
-            <button
-              type="button"
-              onClick={() => void deletePicked()}
-              disabled={deleting || saving || pickedShown.length === 0}
-              className="w-full mt-2 py-2 text-xs"
-              style={{ color: SUB, opacity: deleting || saving || pickedShown.length === 0 ? 0.45 : 1 }}
-            >
-              {deleting ? "消しています…" : `${pickedShown.length}件をまとめて消す（運営）`}
-            </button>
-          )}
+          {officer &&
+            isCurrent &&
+            (askingDelete ? (
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => void deletePicked()}
+                  disabled={deleting}
+                  className="flex-1 py-2 text-xs font-bold"
+                  style={{
+                    background: "#F3ECEB",
+                    color: "#6B3F3A",
+                    border: "1px solid #DFC9C6",
+                    borderRadius: 8,
+                    opacity: deleting ? 0.45 : 1,
+                  }}
+                >
+                  {deleting ? "消しています…" : `もう一度押すと、${pickedShown.length}件を消します`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAskingDelete(false)}
+                  disabled={deleting}
+                  className="px-4 py-2 text-xs"
+                  style={{ color: DIM }}
+                >
+                  消さない
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAskingDelete(true)}
+                disabled={deleting || saving || pickedShown.length === 0}
+                className="w-full mt-2 py-2 text-xs"
+                style={{ color: SUB, opacity: deleting || saving || pickedShown.length === 0 ? 0.45 : 1 }}
+              >
+                {`${pickedShown.length}件をまとめて消す（運営）`}
+              </button>
+            ))}
           {/* 運営がまだ合言葉を入れていないときは、消すところへの行き方だけ出す
               （合言葉を聞く場所は「追加（運営）」ひとつにまとめてある）。 */}
           {isCurrent && !officer && (
